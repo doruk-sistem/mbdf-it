@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
-import { createServerSupabaseClient } from "@/lib/supabase";
+import { createServerSupabase } from "@/lib/clientSupabase";
 import { ProfileForm } from "@/components/settings/profile-form";
 import { CompanyForm } from "@/components/settings/company-form";
 import { SecuritySection } from "@/components/settings/security-section";
@@ -9,13 +8,12 @@ import { Separator } from "@/components/ui/separator";
 import { User, Building, Shield } from "lucide-react";
 
 export default async function SettingsPage() {
-  const cookieStore = cookies();
-  const supabase = createServerSupabaseClient(cookieStore);
+  const supabase = createServerSupabase();
   
   // Check authentication
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { user: authUser }, error } = await supabase.auth.getUser();
   
-  if (!session) {
+  if (!authUser || error) {
     redirect("/auth/sign-in");
   }
 
@@ -33,7 +31,7 @@ export default async function SettingsPage() {
         contact_phone
       )
     `)
-    .eq("id", session.user.id)
+    .eq("id", authUser.id)
     .single();
 
   if (!profile?.full_name || !profile?.company_id) {

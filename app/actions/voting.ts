@@ -1,14 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
-import { createServerSupabaseClient } from "@/lib/supabase";
-import type { Database } from "@/types/supabase";
+import { createServerSupabase } from '@/lib/clientSupabase';
+
 
 // Get current user
 async function getCurrentUser() {
-  const cookieStore = cookies();
-  const supabase = createServerSupabaseClient(cookieStore);
+  const supabase = createServerSupabase();
   
   const { data: { user }, error } = await supabase.auth.getUser();
   if (error || !user) {
@@ -21,8 +19,7 @@ async function getCurrentUser() {
 // Nominate LR candidate
 export async function nominateLRCandidate(roomId: string, candidateUserId: string) {
   const user = await getCurrentUser();
-  const cookieStore = cookies();
-  const supabase = createServerSupabaseClient(cookieStore);
+  const supabase = createServerSupabase();
 
   try {
     // Check if user is a member of the room
@@ -109,8 +106,7 @@ export async function submitLRVote(
   }
 ) {
   const user = await getCurrentUser();
-  const cookieStore = cookies();
-  const supabase = createServerSupabaseClient(cookieStore);
+  const supabase = createServerSupabase();
 
   // Validate scores
   const scoreValues = Object.values(scores);
@@ -200,8 +196,7 @@ export async function submitLRVote(
 // Finalize LR selection
 export async function finalizeLRSelection(roomId: string, candidateId: string) {
   const user = await getCurrentUser();
-  const cookieStore = cookies();
-  const supabase = createServerSupabaseClient(cookieStore);
+  const supabase = createServerSupabase();
 
   try {
     // Check if user has permission to finalize selection
@@ -269,8 +264,7 @@ export async function finalizeLRSelection(roomId: string, candidateId: string) {
 // Remove LR candidate (only before voting starts or by admin)
 export async function removeLRCandidate(roomId: string, candidateId: string) {
   const user = await getCurrentUser();
-  const cookieStore = cookies();
-  const supabase = createServerSupabaseClient(cookieStore);
+  const supabase = createServerSupabase();
 
   try {
     // Check if user has permission to remove candidates

@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { User } from "@supabase/supabase-js";
-import { createClientSupabaseClient } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 
 interface AuthContextType {
   user: User | null;
@@ -34,16 +34,16 @@ export function AuthProvider({ children, initialUser, initialProfile }: AuthProv
   const [user, setUser] = useState<User | null>(initialUser || null);
   const [profile, setProfile] = useState<any | null>(initialProfile || null);
   const [loading, setLoading] = useState(!initialUser);
-  const supabase = createClientSupabaseClient();
+  // supabase is already imported
 
   useEffect(() => {
-    // Get initial session
+    // Get initial user
     const getInitialSession = async () => {
       if (!initialUser) {
-        const { data: { session } } = await supabase.auth.getSession();
-        setUser(session?.user || null);
+        const { data: { user: authUser }, error } = await supabase.auth.getUser();
+        setUser(authUser || null);
         
-        if (session?.user && !initialProfile) {
+        if (authUser && !error && !initialProfile) {
           // Fetch profile
           const { data: profileData } = await supabase
             .from("profiles")
@@ -58,7 +58,7 @@ export function AuthProvider({ children, initialUser, initialProfile }: AuthProv
                 contact_phone
               )
             `)
-            .eq("id", session.user.id)
+            .eq("id", authUser.id)
             .single();
           
           setProfile(profileData);

@@ -2,13 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
-import { createServerSupabaseClient, uploadFile, deleteFile } from "@/lib/supabase";
-import type { Database } from "@/types/supabase";
+import { createServerSupabase } from '@/lib/clientSupabase';
+import { uploadFile, deleteFile } from "@/lib/supabase";
 
 // Get current user
 async function getCurrentUser() {
-  const cookieStore = cookies();
-  const supabase = createServerSupabaseClient(cookieStore);
+  const supabase = createServerSupabase();
   
   const { data: { user }, error } = await supabase.auth.getUser();
   if (error || !user) {
@@ -21,8 +20,7 @@ async function getCurrentUser() {
 // Upload document
 export async function uploadDocument(roomId: string, formData: FormData) {
   const user = await getCurrentUser();
-  const cookieStore = cookies();
-  const supabase = createServerSupabaseClient(cookieStore);
+  const supabase = createServerSupabase();
 
   const file = formData.get("file") as File;
   const description = formData.get("description") as string;
@@ -110,8 +108,7 @@ export async function uploadDocument(roomId: string, formData: FormData) {
 // Delete document
 export async function deleteDocument(documentId: string) {
   const user = await getCurrentUser();
-  const cookieStore = cookies();
-  const supabase = createServerSupabaseClient(cookieStore);
+  const supabase = createServerSupabase();
 
   try {
     // Get document details
@@ -187,8 +184,7 @@ export async function deleteDocument(documentId: string) {
 // Update document
 export async function updateDocument(documentId: string, formData: FormData) {
   const user = await getCurrentUser();
-  const cookieStore = cookies();
-  const supabase = createServerSupabaseClient(cookieStore);
+  const supabase = createServerSupabase();
 
   const name = formData.get("name") as string;
   const description = formData.get("description") as string;

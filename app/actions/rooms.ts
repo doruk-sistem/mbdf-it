@@ -2,18 +2,17 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
-import { createServerSupabaseClient } from "@/lib/supabase";
+import { createServerSupabase } from '@/lib/clientSupabase';
 import type { Database } from "@/types/supabase";
 
 type Room = Database['public']['Tables']['mbdf_room']['Row'];
 type RoomInsert = Database['public']['Tables']['mbdf_room']['Insert'];
 type RoomUpdate = Database['public']['Tables']['mbdf_room']['Update'];
 
+
 // Get current user
 async function getCurrentUser() {
-  const cookieStore = cookies();
-  const supabase = createServerSupabaseClient(cookieStore);
+  const supabase = createServerSupabase();
   
   const { data: { user }, error } = await supabase.auth.getUser();
   if (error || !user) {
@@ -26,8 +25,7 @@ async function getCurrentUser() {
 // Create a new MBDF room
 export async function createRoom(formData: FormData) {
   const user = await getCurrentUser();
-  const cookieStore = cookies();
-  const supabase = createServerSupabaseClient(cookieStore);
+  const supabase = createServerSupabase();
 
   const name = formData.get("name") as string;
   const description = formData.get("description") as string;
@@ -93,8 +91,7 @@ export async function createRoom(formData: FormData) {
 // Update room
 export async function updateRoom(roomId: string, formData: FormData) {
   const user = await getCurrentUser();
-  const cookieStore = cookies();
-  const supabase = createServerSupabaseClient(cookieStore);
+  const supabase = createServerSupabase();
 
   const name = formData.get("name") as string;
   const description = formData.get("description") as string;
@@ -163,8 +160,7 @@ export async function updateRoom(roomId: string, formData: FormData) {
 // Join room
 export async function joinRoom(roomId: string) {
   const user = await getCurrentUser();
-  const cookieStore = cookies();
-  const supabase = createServerSupabaseClient(cookieStore);
+  const supabase = createServerSupabase();
 
   try {
     // Check if user is already a member
@@ -214,8 +210,7 @@ export async function joinRoom(roomId: string) {
 // Leave room
 export async function leaveRoom(roomId: string) {
   const user = await getCurrentUser();
-  const cookieStore = cookies();
-  const supabase = createServerSupabaseClient(cookieStore);
+  const supabase = createServerSupabase();
 
   try {
     // Get member info
@@ -277,8 +272,7 @@ export async function leaveRoom(roomId: string) {
 // Add member to room
 export async function addMemberToRoom(roomId: string, userEmail: string, role: string = "member") {
   const user = await getCurrentUser();
-  const cookieStore = cookies();
-  const supabase = createServerSupabaseClient(cookieStore);
+  const supabase = createServerSupabase();
 
   try {
     // Check if current user has permission to add members
@@ -351,8 +345,7 @@ export async function addMemberToRoom(roomId: string, userEmail: string, role: s
 // Remove member from room
 export async function removeMemberFromRoom(roomId: string, memberId: string) {
   const user = await getCurrentUser();
-  const cookieStore = cookies();
-  const supabase = createServerSupabaseClient(cookieStore);
+  const supabase = createServerSupabase();
 
   try {
     // Check if current user has permission to remove members

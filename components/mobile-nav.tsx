@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Building2, FileText, Users, Menu, X, Settings, LogOut, Building } from "lucide-react";
+import { Building2, FileText, Users, Menu, X, Settings, LogOut, Building, LogIn } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -14,12 +14,12 @@ import { signOut } from "@/app/actions/auth";
 
 interface MobileNavProps {
   user?: {
-    full_name?: string;
+    full_name: string | null;
     email: string;
-    avatar_url?: string;
+    avatar_url?: string | null;
     company?: {
       name: string;
-    };
+    } | null;
   };
 }
 
@@ -118,44 +118,57 @@ export function MobileNav({ user }: MobileNavProps) {
 
           {/* User Section */}
           <div className="border-t pt-4 mt-4 space-y-4">
-            {user && (
-              <div className="flex items-center space-x-3 px-3">
-                <div className="flex-1">
-                  <p className="text-sm font-medium">{user.full_name || "Kullanıcı"}</p>
-                  <p className="text-xs text-muted-foreground truncate">{user.email}</p>
-                  {user.company && (
-                    <p className="text-xs text-muted-foreground flex items-center mt-1">
-                      <Building className="h-3 w-3 mr-1" />
-                      {user.company.name}
-                    </p>
-                  )}
+            {user ? (
+              <>
+                <div className="flex items-center space-x-3 px-3">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{user.full_name || "Kullanıcı"}</p>
+                    <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                    {user.company && (
+                      <p className="text-xs text-muted-foreground flex items-center mt-1">
+                        <Building className="h-3 w-3 mr-1" />
+                        {user.company.name}
+                      </p>
+                    )}
+                  </div>
                 </div>
+                
+                <div className="space-y-2 px-3">
+                  <Link
+                    href="/settings"
+                    onClick={() => setIsOpen(false)}
+                    className="flex items-center space-x-2 text-sm text-muted-foreground hover:text-accent-foreground w-full"
+                  >
+                    <Settings className="h-4 w-4" />
+                    <span>Ayarlar</span>
+                  </Link>
+                  
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleSignOut}
+                    disabled={isSigningOut}
+                    className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10 h-8 px-0"
+                  >
+                    <LogOut className="h-4 w-4 mr-2" />
+                    <span>{isSigningOut ? "Çıkış yapılıyor..." : "Çıkış Yap"}</span>
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <div className="px-3">
+                <Button 
+                  asChild 
+                  className="w-full"
+                  onClick={() => setIsOpen(false)}
+                >
+                  <Link href="/auth/sign-in">
+                    <LogIn className="mr-2 h-4 w-4" />
+                    Giriş Yap
+                  </Link>
+                </Button>
               </div>
             )}
-            
-            <div className="space-y-2 px-3">
-              <Link
-                href="/settings"
-                onClick={() => setIsOpen(false)}
-                className="flex items-center space-x-2 text-sm text-muted-foreground hover:text-accent-foreground w-full"
-              >
-                <Settings className="h-4 w-4" />
-                <span>Ayarlar</span>
-              </Link>
-              
-              {user && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleSignOut}
-                  disabled={isSigningOut}
-                  className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10 h-8 px-0"
-                >
-                  <LogOut className="h-4 w-4 mr-2" />
-                  <span>{isSigningOut ? "Çıkış yapılıyor..." : "Çıkış Yap"}</span>
-                </Button>
-              )}
-            </div>
             
             <div className="flex justify-center">
               <ThemeToggle />

@@ -1,18 +1,19 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
-import { createServerSupabaseClient } from "@/lib/supabase";
+import { createServerSupabase } from "@/lib/clientSupabase";
 import { SignInCard } from "@/components/auth/sign-in-card";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default async function SignInPage() {
   // Check if user is already authenticated
-  const cookieStore = cookies();
-  const supabase = createServerSupabaseClient(cookieStore);
+  const supabase = createServerSupabase();
   
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { user: authUser }, error } = await supabase.auth.getUser();
+
+  console.log("authUser", authUser);
+  console.log("aaa");
   
-  if (session) {
+  if (authUser && !error) {
     redirect("/");
   }
 

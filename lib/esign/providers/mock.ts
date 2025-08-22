@@ -133,7 +133,8 @@ startxref
 
     try {
       // Upload to storage
-      await uploadFile('docs', filePath, signedPdfBuffer, {
+      const pdfBlob = new Blob([new Uint8Array(signedPdfBuffer)], { type: 'application/pdf' });
+      await uploadFile('docs', filePath, pdfBlob, {
         contentType: 'application/pdf',
         metadata: {
           signatureId,

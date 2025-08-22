@@ -12,7 +12,7 @@ import {
   Users,
   Eye,
   Send,
-  Signature
+  PenTool
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -150,7 +150,7 @@ export function AgreementsContent() {
     });
   };
 
-  const handleRequestSignature = (agreementId: string) => {
+  const handleRequestPenTool = (agreementId: string) => {
     toast({
       title: "İmza talebi gönderildi",
       description: "İmza talebi ilgili taraflara e-posta ile gönderildi.",
@@ -424,8 +424,8 @@ export function AgreementsContent() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleRequestSignature(agreement.id)}>
-                                <Signature className="mr-2 h-4 w-4" />
+                              <DropdownMenuItem onClick={() => handleRequestPenTool(agreement.id)}>
+                                <PenTool className="mr-2 h-4 w-4" />
                                 İmza Talep Et
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => handleSendKEP(agreement.id)}>

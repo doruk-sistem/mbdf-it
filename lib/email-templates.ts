@@ -416,9 +416,10 @@ export function getEmailTemplate(
 ) {
   const template = emailTemplates[type];
   
+  const values = Object.values(params) as [string, ...string[]];
   return {
     subject: template.subject,
-    html: template.html(...Object.values(params)),
-    text: template.text(...Object.values(params))
+    html: template.html(...values),
+    text: template.text(...values)
   };
 }

@@ -8,8 +8,8 @@ export async function middleware(request: NextRequest) {
   // Create Supabase client for middleware
   const supabase = createMiddlewareSupabaseClient(request, response);
 
-  // Get session
-  const { data: { session } } = await supabase.auth.getSession();
+  // Get user (more secure than getSession)
+  const { data: { user }, error } = await supabase.auth.getUser();
 
   // Define protected and public routes
   const protectedRoutes = ['/mbdf', '/agreements', '/kks', '/settings', '/onboarding'];
@@ -29,7 +29,7 @@ export async function middleware(request: NextRequest) {
   // Handle authentication routes
   if (isAuthRoute) {
     // If user is already authenticated and trying to access auth pages, redirect to dashboard
-    if (session && pathname === '/auth/sign-in') {
+    if (user && !error && pathname === '/auth/sign-in') {
       return NextResponse.redirect(new URL('/', request.url));
     }
     return response;
@@ -37,8 +37,8 @@ export async function middleware(request: NextRequest) {
 
   // Handle protected routes
   if (isProtectedRoute || pathname === '/') {
-    // If no session, redirect to sign-in
-    if (!session) {
+    // If no user, redirect to sign-in
+    if (!user || error) {
       const signInUrl = new URL('/auth/sign-in', request.url);
       // Store the intended destination
       if (pathname !== '/') {

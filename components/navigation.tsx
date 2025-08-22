@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Building2, FileText, Settings, Users, Vote } from "lucide-react";
+import { Building2, FileText, Settings, Users, Vote, LogIn } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -20,12 +20,12 @@ import {
 
 interface NavigationProps {
   user?: {
-    full_name?: string;
+    full_name: string | null;
     email: string;
-    avatar_url?: string;
+    avatar_url?: string | null;
     company?: {
       name: string;
-    };
+    } | null;
   };
 }
 
@@ -133,8 +133,16 @@ export function Navigation({ user }: NavigationProps) {
           <nav className="flex items-center space-x-2">
             <ThemeToggle />
             
-            {user && (
+            {user ? (
               <UserMenu user={user} />
+            ) : (
+              <Button asChild>
+                <Link href="/auth/sign-in">
+                  <LogIn className="mr-2 h-4 w-4" />
+                  <span className="hidden sm:inline">Giriş Yap</span>
+                  <span className="sm:hidden">Giriş</span>
+                </Link>
+              </Button>
             )}
           </nav>
         </div>

@@ -1,16 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
-import { createServerSupabaseClient } from "@/lib/supabase";
+import { createServerSupabase } from '@/lib/clientSupabase';
 import { sendAccessRequestNotification, sendAccessApprovedNotification, sendAccessRejectedNotification } from "@/lib/email";
-import type { Database } from "@/types/supabase";
 import { generateTimestampHash } from "@/lib/kks/hash";
+
 
 // Get current user
 async function getCurrentUser() {
-  const cookieStore = cookies();
-  const supabase = createServerSupabaseClient(cookieStore);
+  const supabase = createServerSupabase();
   
   const { data: { user }, error } = await supabase.auth.getUser();
   if (error || !user) {
@@ -23,8 +21,7 @@ async function getCurrentUser() {
 // Create access package
 export async function createAccessPackage(roomId: string, formData: FormData) {
   const user = await getCurrentUser();
-  const cookieStore = cookies();
-  const supabase = createServerSupabaseClient(cookieStore);
+  const supabase = createServerSupabase();
 
   const name = formData.get("name") as string;
   const description = formData.get("description") as string;
@@ -96,8 +93,7 @@ export async function createAccessPackage(roomId: string, formData: FormData) {
 // Update access package
 export async function updateAccessPackage(packageId: string, formData: FormData) {
   const user = await getCurrentUser();
-  const cookieStore = cookies();
-  const supabase = createServerSupabaseClient(cookieStore);
+  const supabase = createServerSupabase();
 
   const name = formData.get("name") as string;
   const description = formData.get("description") as string;
@@ -177,8 +173,7 @@ export async function updateAccessPackage(packageId: string, formData: FormData)
 // Create access request
 export async function createAccessRequest(packageId: string, justification: string) {
   const user = await getCurrentUser();
-  const cookieStore = cookies();
-  const supabase = createServerSupabaseClient(cookieStore);
+  const supabase = createServerSupabase();
 
   if (!justification.trim()) {
     throw new Error("Justification is required");
@@ -251,16 +246,16 @@ export async function createAccessRequest(packageId: string, justification: stri
       .eq("room_id", pkg.room_id)
       .in("role", ["admin", "lr"]);
 
-    const lrEmails = lrMembers?.map(m => m.profiles!.email).filter(Boolean) || [];
+    const lrEmails = lrMembers?.map(m => (m.profiles as any)?.email).filter(Boolean) || [];
 
     // Send notification emails
     if (lrEmails.length > 0) {
       try {
         await sendAccessRequestNotification(
           lrEmails,
-          request.profiles!.full_name || "Unknown User",
+          (request.profiles as any)?.full_name || "Unknown User",
           pkg.name,
-          pkg.mbdf_room.name
+          (pkg.mbdf_room as any)?.name
         );
       } catch (emailError) {
         console.error("Failed to send notification email:", emailError);
@@ -290,8 +285,7 @@ export async function createAccessRequest(packageId: string, justification: stri
 // Approve access request
 export async function approveAccessRequest(requestId: string) {
   const user = await getCurrentUser();
-  const cookieStore = cookies();
-  const supabase = createServerSupabaseClient(cookieStore);
+  const supabase = createServerSupabase();
 
   try {
     // Get request details
@@ -319,7 +313,7 @@ export async function approveAccessRequest(requestId: string) {
     const { data: member } = await supabase
       .from("mbdf_member")
       .select("role")
-      .eq("room_id", request.access_package.room_id)
+      .eq("room_id", (request.access_package as any)?.room_id)
       .eq("user_id", user.id)
       .single();
 
@@ -349,10 +343,10 @@ export async function approveAccessRequest(requestId: string) {
     // Send approval email to requester
     try {
       await sendAccessApprovedNotification(
-        request.profiles!.email,
-        request.profiles!.full_name || "Unknown User",
-        request.access_package.name,
-        request.mbdf_room[0].mbdf_room.name,
+        (request.profiles as any)?.email,
+        (request.profiles as any)?.full_name || "Unknown User",
+        (request.access_package as any)?.name,
+        (request as any)?.mbdf_room?.[0]?.mbdf_room?.name,
         accessToken
       );
     } catch (emailError) {
@@ -364,7 +358,7 @@ export async function approveAccessRequest(requestId: string) {
     await supabase
       .from("audit_log")
       .insert({
-        room_id: request.access_package.room_id,
+        room_id: (request.access_package as any)?.room_id,
         user_id: user.id,
         action: "access_request_approved",
         resource_type: "access_request",
@@ -372,7 +366,7 @@ export async function approveAccessRequest(requestId: string) {
         new_values: { approved_by: user.id, access_token: accessToken }
       });
 
-    revalidatePath(`/mbdf/${request.access_package.room_id}`);
+    revalidatePath(`/mbdf/${(request.access_package as any)?.room_id}`);
   } catch (error) {
     console.error("Approve request error:", error);
     throw error;
@@ -382,8 +376,7 @@ export async function approveAccessRequest(requestId: string) {
 // Reject access request
 export async function rejectAccessRequest(requestId: string, reason?: string) {
   const user = await getCurrentUser();
-  const cookieStore = cookies();
-  const supabase = createServerSupabaseClient(cookieStore);
+  const supabase = createServerSupabase();
 
   try {
     // Get request details
@@ -411,7 +404,7 @@ export async function rejectAccessRequest(requestId: string, reason?: string) {
     const { data: member } = await supabase
       .from("mbdf_member")
       .select("role")
-      .eq("room_id", request.access_package.room_id)
+      .eq("room_id", (request.access_package as any)?.room_id)
       .eq("user_id", user.id)
       .single();
 
@@ -438,10 +431,10 @@ export async function rejectAccessRequest(requestId: string, reason?: string) {
     // Send rejection email to requester
     try {
       await sendAccessRejectedNotification(
-        request.profiles!.email,
-        request.profiles!.full_name || "Unknown User",
-        request.access_package.name,
-        request.mbdf_room[0].mbdf_room.name,
+        (request.profiles as any)?.email,
+        (request.profiles as any)?.full_name || "Unknown User",
+        (request.access_package as any)?.name,
+        (request as any)?.mbdf_room?.[0]?.mbdf_room?.name,
         reason
       );
     } catch (emailError) {
@@ -453,7 +446,7 @@ export async function rejectAccessRequest(requestId: string, reason?: string) {
     await supabase
       .from("audit_log")
       .insert({
-        room_id: request.access_package.room_id,
+        room_id: (request.access_package as any)?.room_id,
         user_id: user.id,
         action: "access_request_rejected",
         resource_type: "access_request",
@@ -461,7 +454,7 @@ export async function rejectAccessRequest(requestId: string, reason?: string) {
         new_values: { approved_by: user.id, rejected_reason: reason }
       });
 
-    revalidatePath(`/mbdf/${request.access_package.room_id}`);
+    revalidatePath(`/mbdf/${(request.access_package as any)?.room_id}`);
   } catch (error) {
     console.error("Reject request error:", error);
     throw error;

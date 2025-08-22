@@ -1,17 +1,15 @@
-import { cookies } from "next/headers";
-import { createServerSupabaseClient } from "@/lib/supabase";
+import { createServerSupabase } from "@/lib/clientSupabase";
 import { Navigation } from "@/components/navigation";
 
 export async function NavigationWrapper() {
-  const cookieStore = cookies();
-  const supabase = createServerSupabaseClient(cookieStore);
+  const supabase = createServerSupabase();
   
-  // Get current session
-  const { data: { session } } = await supabase.auth.getSession();
+  // Get current user (more secure than getSession)
+  const { data: { user: authUser }, error } = await supabase.auth.getUser();
   
   let user = null;
   
-  if (session?.user) {
+  if (authUser && !error) {
     // Get user profile with company info
     const { data: profile } = await supabase
       .from("profiles")
@@ -22,18 +20,18 @@ export async function NavigationWrapper() {
           name
         )
       `)
-      .eq("id", session.user.id)
+      .eq("id", authUser.id)
       .single();
-    
+
     if (profile) {
       user = {
         email: profile.email,
-        full_name: profile.full_name,
-        avatar_url: profile.avatar_url,
-        company: profile.company,
+        full_name: profile.full_name || null,
+        avatar_url: profile.avatar_url || null,
+        company: profile.company || null,
       };
     }
   }
   
-  return <Navigation user={user} />;
+  return <Navigation user={user || undefined} />;
 }

@@ -1,16 +1,14 @@
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
-import { createServerSupabaseClient } from "@/lib/supabase";
+import { createServerSupabase } from "@/lib/clientSupabase";
 import { OnboardingCard } from "@/components/auth/onboarding-card";
 
 export default async function OnboardingPage() {
-  const cookieStore = cookies();
-  const supabase = createServerSupabaseClient(cookieStore);
+  const supabase = createServerSupabase();
   
   // Check if user is authenticated
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { user: authUser }, error } = await supabase.auth.getUser();
   
-  if (!session) {
+  if (!authUser || error) {
     redirect("/auth/sign-in");
   }
 
@@ -18,7 +16,7 @@ export default async function OnboardingPage() {
   const { data: profile } = await supabase
     .from("profiles")
     .select("full_name, company_id")
-    .eq("id", session.user.id)
+    .eq("id", authUser.id)
     .single();
 
   if (profile?.full_name && profile?.company_id) {
@@ -35,7 +33,7 @@ export default async function OnboardingPage() {
           </p>
         </div>
         
-        <OnboardingCard userEmail={session.user.email!} />
+        <OnboardingCard userEmail={authUser.email!} />
       </div>
     </div>
   );

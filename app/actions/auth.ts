@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { createServerSupabaseClient } from "@/lib/supabase";
+import { createServerSupabase, createAdminSupabase } from '@/lib/clientSupabase';
 
 interface OnboardingData {
   fullName: string;
@@ -16,8 +16,7 @@ interface OnboardingData {
 
 // Send magic link for authentication
 export async function sendMagicLink(email: string) {
-  const cookieStore = cookies();
-  const supabase = createServerSupabaseClient(cookieStore);
+  const supabase = createServerSupabase();
 
   try {
     const { error } = await supabase.auth.signInWithOtp({
@@ -49,8 +48,7 @@ export async function sendMagicLink(email: string) {
 
 // Complete user onboarding
 export async function completeOnboarding(data: OnboardingData) {
-  const cookieStore = cookies();
-  const supabase = createServerSupabaseClient(cookieStore);
+  const supabase = createServerSupabase();
 
   try {
     // Get current user
@@ -74,8 +72,9 @@ export async function completeOnboarding(data: OnboardingData) {
     if (existingCompany) {
       companyId = existingCompany.id;
     } else {
-      // Create new company
-      const { data: newCompany, error: companyError } = await supabase
+      // Create new company using admin client to bypass RLS
+      const adminSupabase = createAdminSupabase();
+      const { data: newCompany, error: companyError } = await adminSupabase
         .from("company")
         .insert({
           name: data.companyName,
@@ -141,8 +140,7 @@ export async function completeOnboarding(data: OnboardingData) {
 
 // Sign out user
 export async function signOut() {
-  const cookieStore = cookies();
-  const supabase = createServerSupabaseClient(cookieStore);
+  const supabase = createServerSupabase();
 
   try {
     const { error } = await supabase.auth.signOut();
@@ -165,8 +163,7 @@ export async function signOut() {
 
 // Get current user profile
 export async function getCurrentUserProfile() {
-  const cookieStore = cookies();
-  const supabase = createServerSupabaseClient(cookieStore);
+  const supabase = createServerSupabase();
 
   try {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -208,8 +205,7 @@ export async function getCurrentUserProfile() {
 
 // Update user profile
 export async function updateUserProfile(formData: FormData) {
-  const cookieStore = cookies();
-  const supabase = createServerSupabaseClient(cookieStore);
+  const supabase = createServerSupabase();
 
   const fullName = formData.get("fullName") as string;
   const phone = formData.get("phone") as string;
@@ -264,8 +260,7 @@ export async function updateUserProfile(formData: FormData) {
 
 // Update company information
 export async function updateCompanyInfo(formData: FormData) {
-  const cookieStore = cookies();
-  const supabase = createServerSupabaseClient(cookieStore);
+  const supabase = createServerSupabase();
 
   const name = formData.get("name") as string;
   const vatNumber = formData.get("vatNumber") as string;
