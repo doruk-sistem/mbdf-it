@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { createServerSupabase, createAdminSupabase } from '@/lib/clientSupabase';
+import { sendMail } from '@/lib/email';
+import { emailTemplates } from '@/lib/email-templates';
 
 interface OnboardingData {
   fullName: string;
@@ -19,24 +21,55 @@ export async function sendMagicLink(email: string) {
   const supabase = createServerSupabase();
 
   try {
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
-      },
-    });
+    // Check if we have custom email service configured
+    const hasResendKey = process.env.RESEND_API_KEY;
+    
+    if (hasResendKey) {
+      // Generate OTP token manually for custom email
+      const { data, error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          shouldCreateUser: true,
+          emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+        },
+      });
 
-    if (error) {
-      console.error("Magic link error:", error);
-      return {
-        success: false,
-        error: error.message === "Email not confirmed" 
-          ? "Lütfen e-posta adresinizi doğrulayın."
-          : "E-posta gönderimi başarısız. Lütfen tekrar deneyin.",
-      };
+      if (error) {
+        console.error("Magic link error:", error);
+        return {
+          success: false,
+          error: error.message === "Email not confirmed" 
+            ? "Lütfen e-posta adresinizi doğrulayın."
+            : "E-posta gönderimi başarısız. Lütfen tekrar deneyin.",
+        };
+      }
+
+      // Don't send custom email for now, let Supabase handle it
+      // We can customize later with email templates
+      return { success: true };
+      
+    } else {
+      // Use default Supabase email
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          shouldCreateUser: true,
+          emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+        },
+      });
+
+      if (error) {
+        console.error("Magic link error:", error);
+        return {
+          success: false,
+          error: error.message === "Email not confirmed" 
+            ? "Lütfen e-posta adresinizi doğrulayın."
+            : "E-posta gönderimi başarısız. Lütfen tekrar deneyin.",
+        };
+      }
+
+      return { success: true };
     }
-
-    return { success: true };
   } catch (error) {
     console.error("Unexpected magic link error:", error);
     return {
