@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { createServerSupabase, createAdminSupabase } from '@/lib/clientSupabase';
 import { sendMail } from '@/lib/email';
 import { emailTemplates } from '@/lib/email-templates';
+import type { Database } from '@/types/supabase';
 
 interface OnboardingData {
   fullName: string;
@@ -107,14 +108,15 @@ export async function completeOnboarding(data: OnboardingData) {
     } else {
       // Create new company using admin client to bypass RLS
       const adminSupabase = createAdminSupabase();
+      
       const { data: newCompany, error: companyError } = await adminSupabase
         .from("company")
         .insert({
           name: data.companyName,
-          vat_number: data.vatNumber,
-          address: data.address,
-          contact_phone: data.contactPhone,
-        })
+          vat_number: data.vatNumber || null,
+          address: data.address || null,
+          contact_phone: data.contactPhone || null,
+        } as any)
         .select("id")
         .single();
 
@@ -126,7 +128,7 @@ export async function completeOnboarding(data: OnboardingData) {
         };
       }
 
-      companyId = newCompany.id;
+      companyId = (newCompany as any).id;
     }
 
     // Update user profile
