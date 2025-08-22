@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { MobileNav } from "@/components/mobile-nav";
+import { UserMenu } from "@/components/auth/user-menu";
 import {
   NavigationMenu,
   NavigationMenuContent,
@@ -21,6 +22,10 @@ interface NavigationProps {
   user?: {
     full_name?: string;
     email: string;
+    avatar_url?: string;
+    company?: {
+      name: string;
+    };
   };
 }
 
@@ -129,16 +134,7 @@ export function Navigation({ user }: NavigationProps) {
             <ThemeToggle />
             
             {user && (
-              <div className="flex items-center space-x-2">
-                <span className="text-sm text-muted-foreground hidden sm:inline-block">
-                  {user.full_name || user.email}
-                </span>
-                <Button variant="ghost" size="sm" asChild>
-                  <Link href="/settings">
-                    <Settings className="h-4 w-4" />
-                  </Link>
-                </Button>
-              </div>
+              <UserMenu user={user} />
             )}
           </nav>
         </div>

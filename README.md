@@ -22,11 +22,13 @@ KKDİK MBDF süreçlerini yönetmek için geliştirilmiş modern web uygulaması
 - **Interactive Animations**: Framer Motion ile geçiş efektleri
 
 ### 🔒 Security & Performance
+- **Magic Link Authentication**: Şifresiz güvenli giriş sistemi
 - **Row Level Security (RLS)**: Supabase RLS ile veri güvenliği
 - **Role-based Access**: Rol bazlı erişim kontrolü
 - **Signed URLs**: Güvenli dosya erişimi
 - **Audit Logging**: Tüm işlemlerin kayıt altına alınması
 - **Server Actions**: Type-safe sunucu işlemleri
+- **Middleware Protection**: Route-level güvenlik kontrolü
 
 ## 🛠️ Teknoloji Stack
 
@@ -82,13 +84,14 @@ cp .env.local.example .env.local
 # Supabase Configuration
 NEXT_PUBLIC_SUPABASE_URL=your-supabase-project-url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
 
-# Email Configuration (Resend)
+# Site Configuration
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
+
+# Email Configuration (Resend) - Opsiyonel
 RESEND_API_KEY=your-resend-api-key
 EMAIL_FROM=noreply@yourdomain.com
-
-# App Configuration (opsiyonel)
-NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
 ### 4. Supabase Setup
@@ -103,21 +106,26 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 SQL dosyalarını sırası ile çalıştırın:
 
 ```bash
-# 1. Ana schema ve tabloları oluştur
+# 1. ÖNCE: Ana schema ve tabloları oluştur (mbdf_member dahil)
 sql/schema.sql
 
-# 2. Row Level Security politikalarını uygula
+# 2. SONRA: Authentication triggers ve basic policies 
+sql/auth.sql
+
+# 3. Enhanced RLS policies (mbdf_member tablosunu kullanır)
 sql/policies.sql
 
-# 3. LR oylaması fonksiyonlarını ekle
+# 4. LR oylaması fonksiyonlarını ekle
 sql/lr_voting.sql
 
-# 4. E-imza ve KEP fonksiyonlarını ekle
+# 5. E-imza ve KEP fonksiyonlarını ekle
 sql/esign_kep.sql
 
-# 5. KKS hazırlama fonksiyonlarını ekle
+# 6. KKS hazırlama fonksiyonlarını ekle
 sql/kks_prep.sql
 ```
+
+**ÖNEMLİ:** SQL dosyalarını mutlaka bu sırada çalıştırın. `auth.sql` dosyası artık `mbdf_member` tablosuna referans yapmıyor, bu yüzden `schema.sql`'den sonra güvenle çalıştırılabilir.
 
 #### 4.3 Storage Bucket'larını Oluşturun
 Supabase Dashboard > Storage:
@@ -142,11 +150,14 @@ FOR ALL USING (bucket_id = 'kks' AND auth.role() = 'authenticated');
 #### 4.4 Authentication Setup
 Supabase Dashboard > Authentication:
 
-1. **Email/Password** provider'ını etkinleştirin
-2. **Email confirmation** ayarını isteğe göre yapılandırın
+1. **Email (Magic Link)** provider'ını etkinleştirin
+2. **Email confirmation** ayarını KAPATIN (disable edin)
 3. Redirect URLs'i ayarlayın:
    - Site URL: `http://localhost:3000`
    - Redirect URLs: `http://localhost:3000/**`
+4. **Email Templates** kısmından magic link email template'ini özelleştirin (opsiyonel)
+
+**Önemli:** Magic link authentication kullanıldığı için şifre gerektirmez. Kullanıcılar sadece email adressleri ile giriş yapar.
 
 ### 5. Uygulamayı Başlatın
 ```bash
@@ -155,29 +166,76 @@ pnpm dev
 
 Uygulama [http://localhost:3000](http://localhost:3000) adresinde çalışmaya başlayacaktır.
 
+## 🔐 Authentication Sistemi
+
+### Giriş Akışı
+1. **Sign-in Sayfası**: `/auth/sign-in` - Email adresi ile magic link isteme
+2. **Magic Link**: Email'e gönderilen bağlantı ile otomatik giriş
+3. **Callback**: `/auth/callback` - Session kurulumu ve yönlendirme
+4. **Onboarding**: `/onboarding` - İlk giriş için profil tamamlama
+5. **Dashboard**: `/` - Ana sayfa ve MBDF odaları
+
+### Özellikler
+- **Şifresiz Giriş**: Magic link ile güvenli authentication
+- **Otomatik Profil Oluşturma**: SQL trigger ile kullanıcı kaydında otomatik profil
+- **Onboarding Akışı**: Kullanıcı ve şirket bilgileri toplama
+- **Route Protection**: Middleware ile sayfa erişim kontrolü
+- **User Menu**: Profil, ayarlar ve çıkış işlemleri
+- **Mobile Support**: Responsive tasarım ve mobile navigation
+
+### Korumalı Sayfalar
+- `/` - Dashboard (auth gerekli)
+- `/mbdf/*` - MBDF odaları (auth gerekli)
+- `/agreements` - Sözleşmeler (auth gerekli)
+- `/kks` - KKS gönderimler (auth gerekli)
+- `/settings` - Profil ayarları (auth gerekli)
+- `/onboarding` - Profil tamamlama (auth gerekli, onboarding incomplete)
+
+### Public Sayfalar
+- `/auth/sign-in` - Giriş sayfası
+- `/auth/callback` - Auth callback
+- `/api/*` - API endpoints
+
 ## 📁 Proje Yapısı
 
 ```
 ├── app/                    # Next.js App Router
 │   ├── actions/           # Server Actions
-│   ├── agreements/        # Sözleşmeler sayfaları
-│   ├── kks/              # KKS sayfaları
-│   ├── mbdf/[roomId]/    # MBDF oda sayfaları
-│   ├── globals.css       # Global stiller
-│   └── layout.tsx        # Root layout
+│   │   └── auth.ts       # Authentication actions
+│   ├── auth/             # Authentication sayfaları
+│   │   ├── sign-in/      # Giriş sayfası
+│   │   └── callback/     # Auth callback
+│   ├── onboarding/       # Kullanıcı onboarding
+│   ├── settings/         # Profil ve ayarlar
+│   ├── agreements/       # Sözleşmeler sayfaları
+│   ├── kks/             # KKS sayfaları
+│   ├── mbdf/[roomId]/   # MBDF oda sayfaları
+│   ├── globals.css      # Global stiller
+│   ├── layout.tsx       # Root layout
+│   └── middleware.ts    # Route protection
 ├── components/            # React bileşenleri
 │   ├── ui/               # shadcn/ui bileşenleri
-│   ├── dashboard/        # Dashboard bileşenleri
-│   ├── room/             # Oda yönetim bileşenleri
-│   ├── agreements/       # Sözleşme bileşenleri
-│   └── kks/              # KKS bileşenleri
+│   ├── auth/            # Authentication bileşenleri
+│   │   ├── sign-in-card.tsx
+│   │   ├── onboarding-card.tsx
+│   │   ├── user-menu.tsx
+│   │   └── auth-wrapper.tsx
+│   ├── settings/        # Ayarlar bileşenleri
+│   ├── dashboard/       # Dashboard bileşenleri
+│   ├── room/            # Oda yönetim bileşenleri
+│   ├── agreements/      # Sözleşme bileşenleri
+│   └── kks/             # KKS bileşenleri
 ├── lib/                  # Utility fonksiyonları
 │   ├── esign/           # E-imza providers
 │   ├── kks/             # KKS utilities
 │   ├── supabase.ts      # Supabase client
-│   ├── email.ts         # Email utilities
+│   ├── email-templates.ts # Email templates
 │   └── utils.ts         # Genel utilities
-├── sql/                  # Veritabanı dosyaları
+├── sql/                 # Veritabanı dosyaları
+│   ├── schema.sql       # Ana schema
+│   ├── auth.sql         # Authentication
+│   ├── policies.sql     # RLS policies
+│   └── ...             # Diğer SQL dosyaları
 ├── types/               # TypeScript type tanımları
 └── README.md
 ```
@@ -247,23 +305,38 @@ pnpm start
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-production-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-production-service-role-key
+NEXT_PUBLIC_SITE_URL=https://yourdomain.com
 RESEND_API_KEY=your-production-resend-key
 EMAIL_FROM=noreply@yourdomain.com
-NEXT_PUBLIC_APP_URL=https://yourdomain.com
 ```
 
 ## 📝 API Documentation
 
 ### Server Actions
+- `app/actions/auth.ts`: Authentication işlemleri
+  - `sendMagicLink()`: Magic link gönderimi
+  - `completeOnboarding()`: Onboarding tamamlama
+  - `signOut()`: Çıkış işlemi
+  - `updateUserProfile()`: Profil güncelleme
+  - `updateCompanyInfo()`: Şirket bilgileri güncelleme
 - `app/actions/rooms.ts`: MBDF oda yönetimi
 - `app/actions/packages.ts`: Erişim paketi yönetimi
 - `app/actions/documents.ts`: Dokuman yönetimi
 - `app/actions/voting.ts`: LR oylaması yönetimi
 
 ### Database Functions
-- `finalize_lr_selection()`: LR seçimi sonuçlandırma
-- `create_agreement_with_parties()`: Sözleşme oluşturma
-- `generate_kks_evidence()`: KKS kanıt dosyası oluşturma
+- **Authentication Functions**:
+  - `handle_new_user()`: Yeni kullanıcı profil oluşturma (trigger)
+  - `handle_user_delete()`: Kullanıcı silme ve audit log (trigger)
+  - `get_current_user_profile()`: Mevcut kullanıcı profili ve şirket bilgileri
+  - `is_onboarding_complete()`: Onboarding tamamlanma kontrolü
+  - `can_access_room()`: Oda erişim yetkisi kontrolü
+  - `get_user_role_in_room()`: Kullanıcının odadaki rolü
+- **Business Functions**:
+  - `finalize_lr_selection()`: LR seçimi sonuçlandırma
+  - `create_agreement_with_parties()`: Sözleşme oluşturma
+  - `generate_kks_evidence()`: KKS kanıt dosyası oluşturma
 
 ## 🔐 Güvenlik
 
@@ -302,6 +375,25 @@ Resend API key'ini kontrol edin ve domain verification'ını tamamlayın.
 
 **4. File upload hataları**
 Storage bucket'larının oluşturulduğunu ve policy'lerin ayarlandığını kontrol edin.
+
+**5. Magic link authentication hataları**
+```bash
+# Email provider ayarlarını kontrol edin
+# Supabase Dashboard > Authentication > Providers > Email
+# "Enable email confirmations" KAPALI olmalı
+```
+
+**6. Onboarding döngüsü sorunları**
+```bash
+# Profil veya company_id eksikse onboarding'e yönlendirir
+# sql/auth.sql dosyasının doğru çalıştırıldığından emin olun
+```
+
+**7. Middleware redirect döngüleri**
+```bash
+# NEXT_PUBLIC_SITE_URL environment variable'ının doğru ayarlandığından emin olun
+# Callback URL'lerin Supabase'de doğru yapılandırıldığını kontrol edin
+```
 
 ### Debug Modları
 ```bash

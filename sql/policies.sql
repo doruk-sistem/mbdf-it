@@ -19,16 +19,15 @@ alter table public.kks_submission enable row level security;
 alter table public.kks_evidence enable row level security;
 
 -- Helper functions
-create or replace function auth.user_id() returns uuid as $$
-  select coalesce(
-    nullif(current_setting('request.jwt.claim.sub', true), ''),
-    (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub')
-  )::uuid
+-- Note: auth.uid() is already available in Supabase
+create or replace function public.current_user_id() returns uuid as $$
+  select auth.uid()
 $$ language sql stable;
 
-create or replace function public.current_user_id() returns uuid as $$
-  select auth.user_id()
-$$ language sql stable;
+-- Drop existing functions to avoid parameter name conflicts
+drop function if exists public.is_member_of_room(uuid);
+drop function if exists public.is_lr_of_room(uuid);
+drop function if exists public.is_admin_of_room(uuid);
 
 create or replace function public.is_member_of_room(room_uuid uuid) returns boolean as $$
   select exists (
@@ -55,10 +54,25 @@ create or replace function public.is_admin_of_room(room_uuid uuid) returns boole
   )
 $$ language sql stable;
 
--- Company policies
+-- Company policies (enhanced)
+drop policy if exists "Users can view their own company" on public.company;
+drop policy if exists "Authenticated users can create companies" on public.company;
+drop policy if exists "Users can update their own company" on public.company;
+
 create policy "Users can view their own company" on public.company
   for select using (
     id in (select company_id from public.profiles where id = public.current_user_id())
+  );
+
+create policy "Users can view room member companies" on public.company
+  for select using (
+    exists (
+      select 1 from public.profiles p1
+      inner join public.mbdf_member m1 on p1.id = m1.user_id
+      inner join public.mbdf_member m2 on m1.room_id = m2.room_id
+      inner join public.profiles p2 on m2.user_id = p2.id
+      where p1.id = public.current_user_id() and p2.company_id = public.company.id
+    )
   );
 
 create policy "Authenticated users can create companies" on public.company
@@ -69,11 +83,18 @@ create policy "Users can update their own company" on public.company
     id in (select company_id from public.profiles where id = public.current_user_id())
   );
 
--- Profiles policies
-create policy "Users can view profiles in same rooms" on public.profiles
+-- Profiles policies (enhanced)
+drop policy if exists "Allow profile creation" on public.profiles;
+drop policy if exists "Users can view profiles in same rooms" on public.profiles;
+drop policy if exists "Users can update their own profile" on public.profiles;
+drop policy if exists "Users can insert their own profile" on public.profiles;
+
+create policy "Users can view their own profile" on public.profiles
+  for select using (id = public.current_user_id());
+
+create policy "Users can view room member profiles" on public.profiles
   for select using (
-    id = public.current_user_id() or
-    exists (
+    id != public.current_user_id() and exists (
       select 1 from public.mbdf_member m1
       inner join public.mbdf_member m2 on m1.room_id = m2.room_id
       where m1.user_id = public.current_user_id() and m2.user_id = public.profiles.id
@@ -81,9 +102,10 @@ create policy "Users can view profiles in same rooms" on public.profiles
   );
 
 create policy "Users can update their own profile" on public.profiles
-  for update using (id = public.current_user_id());
+  for update using (id = public.current_user_id())
+  with check (id = public.current_user_id());
 
-create policy "Users can insert their own profile" on public.profiles
+create policy "Allow profile creation" on public.profiles
   for insert with check (id = public.current_user_id());
 
 -- Substance policies (read-only for now)

@@ -3,29 +3,52 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Building2, FileText, Users, Menu, X, Settings } from "lucide-react";
+import { Building2, FileText, Users, Menu, X, Settings, LogOut, Building } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { useToast } from "@/components/ui/use-toast";
+import { signOut } from "@/app/actions/auth";
 
 interface MobileNavProps {
   user?: {
     full_name?: string;
     email: string;
+    avatar_url?: string;
+    company?: {
+      name: string;
+    };
   };
 }
 
 export function MobileNav({ user }: MobileNavProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const pathname = usePathname();
+  const { toast } = useToast();
 
   const isActive = (path: string) => {
     if (path === "/") {
       return pathname === path;
     }
     return pathname.startsWith(path);
+  };
+
+  const handleSignOut = async () => {
+    setIsSigningOut(true);
+    
+    try {
+      await signOut();
+    } catch (error: any) {
+      toast({
+        title: "Hata",
+        description: error.message || "Çıkış yapılırken bir hata oluştu.",
+        variant: "destructive",
+      });
+      setIsSigningOut(false);
+    }
   };
 
   const navItems = [
@@ -100,19 +123,41 @@ export function MobileNav({ user }: MobileNavProps) {
                 <div className="flex-1">
                   <p className="text-sm font-medium">{user.full_name || "Kullanıcı"}</p>
                   <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                  {user.company && (
+                    <p className="text-xs text-muted-foreground flex items-center mt-1">
+                      <Building className="h-3 w-3 mr-1" />
+                      {user.company.name}
+                    </p>
+                  )}
                 </div>
               </div>
             )}
             
-            <div className="flex items-center justify-between px-3">
+            <div className="space-y-2 px-3">
               <Link
                 href="/settings"
                 onClick={() => setIsOpen(false)}
-                className="flex items-center space-x-2 text-sm text-muted-foreground hover:text-accent-foreground"
+                className="flex items-center space-x-2 text-sm text-muted-foreground hover:text-accent-foreground w-full"
               >
                 <Settings className="h-4 w-4" />
                 <span>Ayarlar</span>
               </Link>
+              
+              {user && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleSignOut}
+                  disabled={isSigningOut}
+                  className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10 h-8 px-0"
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  <span>{isSigningOut ? "Çıkış yapılıyor..." : "Çıkış Yap"}</span>
+                </Button>
+              )}
+            </div>
+            
+            <div className="flex justify-center">
               <ThemeToggle />
             </div>
           </div>
