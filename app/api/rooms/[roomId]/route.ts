@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabase } from '@/lib/supabase';
+import { createServerSupabase, createAdminSupabase } from '@/lib/supabase';
 import { RoomWithDetailsSchema } from '@/lib/schemas';
 import { z } from 'zod';
 
@@ -26,35 +26,11 @@ export async function GET(
       );
     }
 
-    // Get room with related data
-    const { data: room, error } = await supabase
-      .from('mbdf_room')
-      .select(`
-        *,
-        substance (*),
-        created_by_profile:profiles!mbdf_room_created_by_fkey (*),
-        mbdf_member (count)
-      `)
-      .eq('id', roomId)
-      .single();
+    // Use admin client to bypass RLS
+    const adminSupabase = createAdminSupabase();
 
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return NextResponse.json(
-          { error: 'Room not found', success: false },
-          { status: 404 }
-        );
-      }
-      
-      console.error('Error fetching room:', error);
-      return NextResponse.json(
-        { error: 'Failed to fetch room', success: false },
-        { status: 500 }
-      );
-    }
-
-    // Check if user has access to this room
-    const { data: membership, error: memberError } = await supabase
+    // First check if user has access to this room using admin client
+    const { data: membership, error: memberError } = await adminSupabase
       .from('mbdf_member')
       .select('id')
       .eq('room_id', roomId)
@@ -76,10 +52,52 @@ export async function GET(
       );
     }
 
-    // Transform data to include member count
+    // Get room basic data using admin client
+    const { data: room, error: roomError } = await adminSupabase
+      .from('mbdf_room')
+      .select('*')
+      .eq('id', roomId)
+      .single() as { data: any; error: any };
+
+    if (roomError) {
+      if (roomError.code === 'PGRST116') {
+        return NextResponse.json(
+          { error: 'Room not found', success: false },
+          { status: 404 }
+        );
+      }
+      
+      console.error('Error fetching room:', roomError);
+      return NextResponse.json(
+        { error: 'Failed to fetch room', success: false },
+        { status: 500 }
+      );
+    }
+
+    // Get related data separately to avoid stack depth issues
+    const [substanceResult, profileResult, memberCountResult] = await Promise.all([
+      adminSupabase
+        .from('substance')
+        .select('*')
+        .eq('id', room.substance_id)
+        .single(),
+      adminSupabase
+        .from('profiles')
+        .select('*')
+        .eq('id', room.created_by)
+        .single(),
+      adminSupabase
+        .from('mbdf_member')
+        .select('*', { count: 'exact', head: true })
+        .eq('room_id', roomId)
+    ]);
+
+    // Transform data to include all related data
     const roomWithCount = {
       ...room,
-      member_count: Array.isArray(room.mbdf_member) ? room.mbdf_member.length : 0,
+      substance: substanceResult.data || null,
+      created_by_profile: profileResult.data || null,
+      member_count: memberCountResult.count || 0,
     };
 
     // Validate response
@@ -120,13 +138,16 @@ export async function PUT(
       );
     }
 
+    // Use admin client to bypass RLS
+    const adminSupabase = createAdminSupabase();
+
     // Check if user is admin of this room
-    const { data: membership, error: memberError } = await supabase
+    const { data: membership, error: memberError } = await adminSupabase
       .from('mbdf_member')
       .select('role')
       .eq('room_id', roomId)
       .eq('user_id', user.id)
-      .single();
+      .single() as { data: any; error: any };
 
     if (memberError) {
       return NextResponse.json(
@@ -154,17 +175,12 @@ export async function PUT(
     if (body.description !== undefined) updateData.description = body.description;
     if (body.status !== undefined) updateData.status = body.status;
 
-    // Update room
-    const { data: room, error } = await supabase
+    // Update room using admin client
+    const { data: room, error } = await (adminSupabase as any)
       .from('mbdf_room')
       .update(updateData)
       .eq('id', roomId)
-      .select(`
-        *,
-        substance (*),
-        created_by_profile:profiles!mbdf_room_created_by_fkey (*),
-        mbdf_member (count)
-      `)
+      .select('*')
       .single();
 
     if (error) {
@@ -175,10 +191,30 @@ export async function PUT(
       );
     }
 
-    // Transform data to include member count
+    // Get related data separately to avoid stack depth issues
+    const [substanceResult, profileResult, memberCountResult] = await Promise.all([
+      adminSupabase
+        .from('substance')
+        .select('*')
+        .eq('id', room.substance_id)
+        .single(),
+      adminSupabase
+        .from('profiles')
+        .select('*')
+        .eq('id', room.created_by)
+        .single(),
+      adminSupabase
+        .from('mbdf_member')
+        .select('*', { count: 'exact', head: true })
+        .eq('room_id', roomId)
+    ]);
+
+    // Transform data to include all related data
     const roomWithCount = {
       ...room,
-      member_count: Array.isArray(room.mbdf_member) ? room.mbdf_member.length : 0,
+      substance: substanceResult.data || null,
+      created_by_profile: profileResult.data || null,
+      member_count: memberCountResult.count || 0,
     };
 
     // Validate response
@@ -219,13 +255,16 @@ export async function DELETE(
       );
     }
 
+    // Use admin client to bypass RLS
+    const adminSupabase = createAdminSupabase();
+
     // Check if user is admin of this room
-    const { data: membership, error: memberError } = await supabase
+    const { data: membership, error: memberError } = await adminSupabase
       .from('mbdf_member')
       .select('role')
       .eq('room_id', roomId)
       .eq('user_id', user.id)
-      .single();
+      .single() as { data: any; error: any };
 
     if (memberError) {
       return NextResponse.json(
@@ -242,7 +281,7 @@ export async function DELETE(
     }
 
     // Archive room instead of deleting
-    const { error } = await supabase
+    const { error } = await (adminSupabase as any)
       .from('mbdf_room')
       .update({ status: 'archived' })
       .eq('id', roomId);

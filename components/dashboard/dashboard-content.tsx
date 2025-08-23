@@ -260,13 +260,13 @@ export function DashboardContent() {
                           </div>
                           <div className="space-y-1">
                             <p className="text-sm text-muted-foreground">
-                              {room.substance.name}
+                              {room.substance?.name || 'Bilinmeyen madde'}
                             </p>
                             <p className="text-sm text-muted-foreground">
-                              EC: {room.substance.ec_number || 'N/A'}
+                              EC: {room.substance?.ec_number || 'N/A'}
                             </p>
                             <p className="text-sm text-muted-foreground">
-                              CAS: {room.substance.cas_number || 'N/A'}
+                              CAS: {room.substance?.cas_number || 'N/A'}
                             </p>
                           </div>
                         </CardHeader>

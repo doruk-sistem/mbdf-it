@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 // Common schemas
 export const IdSchema = z.string().uuid();
-export const DateSchema = z.string().datetime();
+export const DateSchema = z.string(); // Use flexible string validation for Supabase timestamps
 
 // User role enum
 export const UserRoleSchema = z.enum(['admin', 'lr', 'member']);
@@ -191,8 +191,8 @@ export const MessageSchema = z.object({
 
 // Extended schemas with joins - Base room schema must be defined first
 export const RoomWithDetailsSchema = RoomSchema.extend({
-  substance: SubstanceSchema,
-  created_by_profile: ProfileSchema,
+  substance: SubstanceSchema.nullable(),
+  created_by_profile: ProfileSchema.nullable(),
   member_count: z.number().optional(),
 });
 

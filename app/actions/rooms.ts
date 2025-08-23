@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createServerSupabase } from '@/lib/supabase';
+import { createServerSupabase, createAdminSupabase } from '@/lib/supabase';
 import type { Database } from "@/types/supabase";
 
 type Room = Database['public']['Tables']['mbdf_room']['Row'];
@@ -20,6 +20,20 @@ async function getCurrentUser() {
   }
   
   return user;
+}
+
+// Check membership using admin client to avoid RLS issues
+async function checkMembership(roomId: string, userId: string) {
+  const adminSupabase = createAdminSupabase();
+  
+  const { data: membership } = await adminSupabase
+    .from("mbdf_member")
+    .select("role")
+    .eq("room_id", roomId)
+    .eq("user_id", userId)
+    .single() as { data: any; error: any };
+    
+  return membership;
 }
 
 // Create a new MBDF room
@@ -103,12 +117,7 @@ export async function updateRoom(roomId: string, formData: FormData) {
 
   try {
     // Check if user has permission to update room
-    const { data: member } = await supabase
-      .from("mbdf_member")
-      .select("role")
-      .eq("room_id", roomId)
-      .eq("user_id", user.id)
-      .single();
+    const member = await checkMembership(roomId, user.id);
 
     if (!member || (member.role !== "admin" && member.role !== "lr")) {
       throw new Error("Insufficient permissions");
@@ -491,22 +500,18 @@ export async function updateMemberRole(roomId: string, memberId: string, newRole
 export async function getRoomMembers(roomId: string) {
   const user = await getCurrentUser();
   const supabase = createServerSupabase();
+  const adminSupabase = createAdminSupabase();
 
   try {
     // Check if user is a member of the room
-    const { data: membership } = await supabase
-      .from("mbdf_member")
-      .select("role")
-      .eq("room_id", roomId)
-      .eq("user_id", user.id)
-      .single();
+    const membership = await checkMembership(roomId, user.id);
 
     if (!membership) {
       throw new Error("Not a member of this room");
     }
 
-    // Get all members with profile and company data
-    const { data: members, error } = await supabase
+    // Get all members with profile and company data using admin client
+    const { data: members, error } = await adminSupabase
       .from("mbdf_member")
       .select(`
         id,

@@ -119,8 +119,18 @@ export function CreateRoomForm() {
                 disabled={createRoomMutation.isPending}
                 required
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Madde seçin" />
+                <SelectTrigger className="min-h-[4rem] items-start justify-start">
+                  {selectedSubstance ? (
+                    <div className="flex flex-col items-start text-left w-full">
+                      <span className="font-medium">{selectedSubstance.name}</span>
+                      <div className="text-xs text-muted-foreground flex gap-3 mt-0.5">
+                        {selectedSubstance.ec_number && <span>EC: {selectedSubstance.ec_number}</span>}
+                        {selectedSubstance.cas_number && <span>CAS: {selectedSubstance.cas_number}</span>}
+                      </div>
+                    </div>
+                  ) : (
+                    <SelectValue placeholder="Madde seçin" />
+                  )}
                 </SelectTrigger>
                 <SelectContent className="max-h-60">
                   {substancesLoading ? (
