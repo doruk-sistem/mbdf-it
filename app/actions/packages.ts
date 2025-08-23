@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createServerSupabase } from '@/lib/clientSupabase';
+import { createServerSupabase } from "@/lib/supabase";
 import { sendAccessRequestNotification, sendAccessApprovedNotification, sendAccessRejectedNotification } from "@/lib/email";
 import { generateTimestampHash } from "@/lib/kks/hash";
 

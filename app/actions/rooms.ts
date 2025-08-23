@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createServerSupabase } from '@/lib/clientSupabase';
+import { createServerSupabase } from '@/lib/supabase';
 import type { Database } from "@/types/supabase";
 
 type Room = Database['public']['Tables']['mbdf_room']['Row'];
@@ -411,5 +411,128 @@ export async function removeMemberFromRoom(roomId: string, memberId: string) {
   } catch (error) {
     console.error("Remove member error:", error);
     throw new Error("Failed to remove member");
+  }
+}
+
+// Update member role
+export async function updateMemberRole(roomId: string, memberId: string, newRole: string) {
+  const user = await getCurrentUser();
+  const supabase = createServerSupabase();
+
+  try {
+    // Check if current user has permission to update roles
+    const { data: currentMember } = await supabase
+      .from("mbdf_member")
+      .select("role")
+      .eq("room_id", roomId)
+      .eq("user_id", user.id)
+      .single();
+
+    if (!currentMember || currentMember.role !== "admin") {
+      throw new Error("Insufficient permissions");
+    }
+
+    // Get member to be updated
+    const { data: targetMember } = await supabase
+      .from("mbdf_member")
+      .select("user_id, role")
+      .eq("room_id", roomId)
+      .eq("id", memberId)
+      .single();
+
+    if (!targetMember) {
+      throw new Error("Member not found");
+    }
+
+    // Don't allow changing the role of the only admin
+    if (targetMember.role === "admin" && newRole !== "admin") {
+      const { count } = await supabase
+        .from("mbdf_member")
+        .select("*", { count: "exact", head: true })
+        .eq("room_id", roomId)
+        .eq("role", "admin");
+
+      if (count === 1) {
+        throw new Error("Cannot change role of the only administrator");
+      }
+    }
+
+    // Update member role
+    const { error } = await supabase
+      .from("mbdf_member")
+      .update({ role: newRole as Database['public']['Enums']['user_role'] })
+      .eq("id", memberId);
+
+    if (error) {
+      console.error("Update member role error:", error);
+      throw new Error("Failed to update member role");
+    }
+
+    // Log the action
+    await supabase
+      .from("audit_log")
+      .insert({
+        room_id: roomId,
+        user_id: user.id,
+        action: "member_role_updated",
+        resource_type: "mbdf_member",
+        old_values: { user_id: targetMember.user_id, role: targetMember.role },
+        new_values: { user_id: targetMember.user_id, role: newRole }
+      });
+
+    revalidatePath(`/mbdf/${roomId}`);
+  } catch (error) {
+    console.error("Update member role error:", error);
+    throw new Error("Failed to update member role");
+  }
+}
+
+// Get room members with details
+export async function getRoomMembers(roomId: string) {
+  const user = await getCurrentUser();
+  const supabase = createServerSupabase();
+
+  try {
+    // Check if user is a member of the room
+    const { data: membership } = await supabase
+      .from("mbdf_member")
+      .select("role")
+      .eq("room_id", roomId)
+      .eq("user_id", user.id)
+      .single();
+
+    if (!membership) {
+      throw new Error("Not a member of this room");
+    }
+
+    // Get all members with profile and company data
+    const { data: members, error } = await supabase
+      .from("mbdf_member")
+      .select(`
+        id,
+        role,
+        joined_at,
+        profiles:user_id (
+          full_name,
+          email,
+          avatar_url,
+          company:company_id (
+            name,
+            vat_number
+          )
+        )
+      `)
+      .eq("room_id", roomId)
+      .order("joined_at", { ascending: true });
+
+    if (error) {
+      console.error("Get room members error:", error);
+      throw new Error("Failed to get room members");
+    }
+
+    return { members: members || [], currentUserRole: membership.role };
+  } catch (error) {
+    console.error("Get room members error:", error);
+    throw new Error("Failed to get room members");
   }
 }

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createServerSupabase } from "@/lib/clientSupabase";
+import { createServerSupabase } from "@/lib/supabase";
 import { ProfileForm } from "@/components/settings/profile-form";
 import { CompanyForm } from "@/components/settings/company-form";
 import { SecuritySection } from "@/components/settings/security-section";

@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Users, FileText, Package, Vote, Settings, MoreVertical } from "lucide-react";
+import { useRoom } from "@/hooks/use-rooms";
+import { Skeleton } from "@/components/ui/skeleton";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,33 +27,54 @@ interface RoomContentProps {
   roomId: string;
 }
 
-// Mock data - in real app, this would come from Supabase
-const mockRoom = {
-  id: "1",
-  name: "Benzene MBDF",
-  description: "Benzene maddesinin MBDF süreçlerini yönetmek için oluşturulmuş oda",
-  substance: {
-    name: "Benzene",
-    ec_number: "200-753-7",
-    cas_number: "71-43-2"
-  },
-  status: "active",
-  member_count: 8,
-  document_count: 15,
-  package_count: 3,
-  created_at: "2024-01-15T10:00:00Z"
-};
-
 export function RoomContent({ roomId }: RoomContentProps) {
-  const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState("members");
+  
+  // Query hooks
+  const { data: room, isLoading, error } = useRoom(roomId);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        {/* Header Skeleton */}
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-64" />
+          <Skeleton className="h-4 w-96" />
+          <Skeleton className="h-4 w-48" />
+        </div>
+        
+        {/* Stats Skeleton */}
+        <div className="grid gap-4 md:grid-cols-3">
+          {[...Array(3)].map((_, i) => (
+            <Card key={i}>
+              <CardHeader className="pb-2">
+                <Skeleton className="h-4 w-24" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-8 w-16 mb-2" />
+                <Skeleton className="h-3 w-20" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
-  if (!mounted) {
-    return null;
+  if (error) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-destructive">Oda bilgileri yüklenirken bir hata oluştu.</p>
+      </div>
+    );
+  }
+
+  if (!room) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-muted-foreground">Oda bulunamadı.</p>
+      </div>
+    );
   }
 
   return (
@@ -65,20 +88,20 @@ export function RoomContent({ roomId }: RoomContentProps) {
       >
         <div className="space-y-1">
           <div className="flex items-center space-x-3">
-            <h1 className="text-3xl font-bold tracking-tight">{mockRoom.name}</h1>
-            <Badge variant={mockRoom.status === "active" ? "default" : "secondary"}>
-              {mockRoom.status === "active" ? "Aktif" : "Kapalı"}
+            <h1 className="text-3xl font-bold tracking-tight">{room.name}</h1>
+            <Badge variant={room.status === "active" ? "default" : "secondary"}>
+              {room.status === "active" ? "Aktif" : "Kapalı"}
             </Badge>
           </div>
           <p className="text-muted-foreground">
-            {mockRoom.description}
+            {room.description || "MBDF odası"}
           </p>
           <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-            <span>EC: {mockRoom.substance.ec_number}</span>
+            <span>EC: {room.substance?.ec_number || 'N/A'}</span>
             <span>•</span>
-            <span>CAS: {mockRoom.substance.cas_number}</span>
+            <span>CAS: {room.substance?.cas_number || 'N/A'}</span>
             <span>•</span>
-            <span>Oluşturulma: {new Date(mockRoom.created_at).toLocaleDateString('tr-TR')}</span>
+            <span>Oluşturulma: {new Date(room.created_at).toLocaleDateString('tr-TR')}</span>
           </div>
         </div>
         
@@ -122,7 +145,7 @@ export function RoomContent({ roomId }: RoomContentProps) {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{mockRoom.member_count}</div>
+            <div className="text-2xl font-bold">{room.member_count || 0}</div>
             <p className="text-xs text-muted-foreground">
               Aktif üyeler
             </p>
@@ -135,7 +158,7 @@ export function RoomContent({ roomId }: RoomContentProps) {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{mockRoom.document_count}</div>
+            <div className="text-2xl font-bold">{room.document_count || 0}</div>
             <p className="text-xs text-muted-foreground">
               Yüklenen dosyalar
             </p>
@@ -148,7 +171,7 @@ export function RoomContent({ roomId }: RoomContentProps) {
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{mockRoom.package_count}</div>
+            <div className="text-2xl font-bold">{room.package_count || 0}</div>
             <p className="text-xs text-muted-foreground">
               Erişim paketleri
             </p>

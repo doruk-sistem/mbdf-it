@@ -1,12 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, UserX, Crown, Shield } from "lucide-react";
+import { Plus, UserX, Crown, Shield, MoreHorizontal } from "lucide-react";
+import { useMembers, useJoinRoom, useLeaveRoom, useUpdateMemberRole, type MembersListResponse } from "@/hooks/use-members";
+import { Skeleton } from "@/components/ui/skeleton";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger 
+} from "@/components/ui/dialog";
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -15,6 +25,14 @@ import {
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue 
+} from "@/components/ui/select";
 import { 
   Table,
   TableBody,
@@ -24,60 +42,33 @@ import {
   TableRow 
 } from "@/components/ui/table";
 
+import type { Database } from "@/types/supabase";
+import type { MemberWithProfile } from "@/lib/schemas";
+
 interface MembersTabProps {
   roomId: string;
 }
 
-// Mock data
-const mockMembers = [
-  {
-    id: "1",
-    profiles: {
-      full_name: "Ahmet Yılmaz",
-      email: "ahmet@company.com",
-      avatar_url: null,
-      company: {
-        name: "ABC Kimya"
-      }
-    },
-    role: "admin",
-    joined_at: "2024-01-15T10:00:00Z"
-  },
-  {
-    id: "2",
-    profiles: {
-      full_name: "Fatma Kaya",
-      email: "fatma@petrokim.com",
-      avatar_url: null,
-      company: {
-        name: "Petro Kimya"
-      }
-    },
-    role: "lr",
-    joined_at: "2024-01-20T14:30:00Z"
-  },
-  {
-    id: "3",
-    profiles: {
-      full_name: "Mehmet Özkan",
-      email: "mehmet@demir.com",
-      avatar_url: null,
-      company: {
-        name: "Demir A.Ş."
-      }
-    },
-    role: "member",
-    joined_at: "2024-02-01T09:15:00Z"
-  }
-];
-
 export function MembersTab({ roomId }: MembersTabProps) {
   const [searchTerm, setSearchTerm] = useState("");
+  const [addMemberDialogOpen, setAddMemberDialogOpen] = useState(false);
+  const [newMemberEmail, setNewMemberEmail] = useState("");
+  const [newMemberRole, setNewMemberRole] = useState<Database['public']['Enums']['user_role']>("member");
+  
+  // Query hooks
+  const { data: membersData, isLoading, error } = useMembers(roomId);
+  const joinRoomMutation = useJoinRoom();
+  const leaveRoomMutation = useLeaveRoom();
+  const updateRoleMutation = useUpdateMemberRole();
 
-  const filteredMembers = mockMembers.filter(member =>
-    member.profiles.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    member.profiles.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    member.profiles.company?.name.toLowerCase().includes(searchTerm.toLowerCase())
+  // Extract data from query response
+  const members = (membersData as MembersListResponse | undefined)?.items || [];
+  const currentUserRole = (membersData as MembersListResponse | undefined)?.currentUserRole || 'member' as Database['public']['Enums']['user_role'];
+
+  const filteredMembers = members.filter((member: MemberWithProfile) =>
+    member.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    member.profiles?.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    member.profiles?.company?.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const getRoleIcon = (role: string) => {
@@ -115,6 +106,75 @@ export function MembersTab({ roomId }: MembersTabProps) {
     }
   };
 
+  // Handle adding new member
+  const handleAddMember = () => {
+    if (!newMemberEmail.trim()) {
+      return;
+    }
+
+    // Note: The API should be updated to support inviting members by email
+    // For now, we'll use joinRoom which adds the current user
+    joinRoomMutation.mutate(
+      { roomId, role: newMemberRole as ('member' | 'lr' | 'admin') },
+      {
+        onSuccess: () => {
+          setNewMemberEmail("");
+          setNewMemberRole("member");
+          setAddMemberDialogOpen(false);
+        }
+      }
+    );
+  };
+
+  // Handle removing member
+  const handleRemoveMember = (memberId: string) => {
+    leaveRoomMutation.mutate({ roomId, userId: memberId });
+  };
+
+  // Handle role update
+  const handleUpdateRole = (memberId: string, newRole: Database['public']['Enums']['user_role']) => {
+    updateRoleMutation.mutate({ memberId, roomId, role: newRole });
+  };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Oda Üyeleri</CardTitle>
+          <CardDescription>
+            <Skeleton className="h-4 w-48" />
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {[...Array(3)].map((_, index) => (
+              <div key={index} className="flex items-center space-x-4">
+                <Skeleton className="h-12 w-12 rounded-full" />
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-[200px]" />
+                  <Skeleton className="h-3 w-[150px]" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Oda Üyeleri</CardTitle>
+          <CardDescription className="text-destructive">
+            Üyeler yüklenirken bir hata oluştu.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -125,10 +185,73 @@ export function MembersTab({ roomId }: MembersTabProps) {
               Bu odadaki tüm üyeleri görüntüleyin ve yönetin
             </CardDescription>
           </div>
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Üye Ekle
-          </Button>
+          {(currentUserRole === "admin" || currentUserRole === "lr") && (
+            <Dialog open={addMemberDialogOpen} onOpenChange={setAddMemberDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Üye Ekle
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Yeni Üye Ekle</DialogTitle>
+                  <DialogDescription>
+                    Odaya yeni üye eklemek için e-posta adresini ve rolünü seçin.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="email">E-posta Adresi</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="ornek@sirket.com"
+                      value={newMemberEmail}
+                      onChange={(e) => setNewMemberEmail(e.target.value)}
+                      disabled={joinRoomMutation.isPending}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="role">Rol</Label>
+                    <Select
+                      value={newMemberRole}
+                      onValueChange={(value: Database['public']['Enums']['user_role']) => setNewMemberRole(value)}
+                      disabled={joinRoomMutation.isPending}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="member">Üye</SelectItem>
+                        <SelectItem value="lr">LR</SelectItem>
+                        {currentUserRole === "admin" && (
+                          <SelectItem value="admin">Yönetici</SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex space-x-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setAddMemberDialogOpen(false)}
+                      disabled={joinRoomMutation.isPending}
+                      className="flex-1"
+                    >
+                      İptal
+                    </Button>
+                    <Button
+                      onClick={handleAddMember}
+                      disabled={joinRoomMutation.isPending || !newMemberEmail.trim()}
+                      className="flex-1"
+                    >
+                      {joinRoomMutation.isPending ? "Ekleniyor..." : "Ekle"}
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -155,28 +278,30 @@ export function MembersTab({ roomId }: MembersTabProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredMembers.map((member) => (
+              {filteredMembers.map((member: MemberWithProfile) => (
                 <TableRow key={member.id}>
                   <TableCell>
                     <div className="flex items-center space-x-3">
                       <Avatar className="h-8 w-8">
-                        <AvatarImage src={member.profiles.avatar_url || ""} />
+                        <AvatarImage src={member.profiles?.avatar_url || ""} />
                         <AvatarFallback>
-                          {member.profiles.full_name
-                            .split(" ")
-                            .map(n => n[0])
-                            .join("")
-                            .toUpperCase()}
+                          {member.profiles?.full_name
+                            ? member.profiles.full_name
+                                .split(" ")
+                                .map((n: string) => n[0])
+                                .join("")
+                                .toUpperCase()
+                            : "?"}
                         </AvatarFallback>
                       </Avatar>
                       <div>
-                        <p className="font-medium">{member.profiles.full_name}</p>
-                        <p className="text-sm text-muted-foreground">{member.profiles.email}</p>
+                        <p className="font-medium">{member.profiles?.full_name || "İsimsiz"}</p>
+                        <p className="text-sm text-muted-foreground">{member.profiles?.email}</p>
                       </div>
                     </div>
                   </TableCell>
                   <TableCell>
-                    <span className="text-sm">{member.profiles.company?.name}</span>
+                    <span className="text-sm">{member.profiles?.company?.name || "Şirket bilgisi yok"}</span>
                   </TableCell>
                   <TableCell>
                     <Badge variant={getRoleVariant(member.role)} className="text-xs">
@@ -192,38 +317,37 @@ export function MembersTab({ roomId }: MembersTabProps) {
                     </span>
                   </TableCell>
                   <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <svg
-                            className="h-4 w-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
+                    {(currentUserRole === "admin" || currentUserRole === "lr") && member.role !== "admin" && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" disabled={updateRoleMutation.isPending || leaveRoomMutation.isPending}>
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => handleUpdateRole(member.id, member.role === "lr" ? "member" : "lr")}
                           >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M12 5v.01M12 12v.01M12 19v.01"
-                            />
-                          </svg>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem>Profili görüntüle</DropdownMenuItem>
-                        {member.role !== "admin" && (
-                          <>
-                            <DropdownMenuItem>Rol değiştir</DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-destructive">
-                              <UserX className="mr-2 h-4 w-4" />
-                              Odadan çıkar
+                            {member.role === "lr" ? "LR'den Üye Yap" : "LR Yap"}
+                          </DropdownMenuItem>
+                          {currentUserRole === "admin" && (
+                            <DropdownMenuItem
+                              onClick={() => handleUpdateRole(member.id, "admin")}
+                            >
+                              Yönetici Yap
                             </DropdownMenuItem>
-                          </>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                          )}
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onClick={() => handleRemoveMember(member.id)}
+                          >
+                            <UserX className="mr-2 h-4 w-4" />
+                            Odadan Çıkar
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

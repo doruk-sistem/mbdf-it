@@ -1,0 +1,271 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createServerSupabase } from '@/lib/supabase';
+import { KksEvidenceSchema } from '@/lib/schemas';
+import { z } from 'zod';
+import { createHash } from 'crypto';
+
+interface RouteParams {
+  params: {
+    id: string;
+  };
+}
+
+export async function GET(
+  request: NextRequest,
+  { params }: RouteParams
+) {
+  try {
+    const supabase = createServerSupabase();
+    const { id } = params;
+    
+    // Get current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized', success: false },
+        { status: 401 }
+      );
+    }
+
+    // Check if user has access to this submission
+    const { data: submission, error: submissionError } = await supabase
+      .from('kks_submission')
+      .select('created_by, room_id')
+      .eq('id', id)
+      .single();
+
+    if (submissionError) {
+      return NextResponse.json(
+        { error: 'KKS submission not found', success: false },
+        { status: 404 }
+      );
+    }
+
+    if (submission.created_by !== user.id) {
+      // Check room membership
+      const { data: membership, error: memberError } = await supabase
+        .from('mbdf_member')
+        .select('id')
+        .eq('room_id', submission.room_id)
+        .eq('user_id', user.id)
+        .single();
+
+      if (memberError) {
+        return NextResponse.json(
+          { error: 'Access denied', success: false },
+          { status: 403 }
+        );
+      }
+    }
+
+    // Get evidence files
+    const { data: evidence, error } = await supabase
+      .from('kks_evidence')
+      .select('*')
+      .eq('submission_id', id)
+      .order('generated_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching KKS evidence:', error);
+      return NextResponse.json(
+        { error: 'Failed to fetch KKS evidence', success: false },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      items: evidence || [],
+      total: evidence?.length || 0,
+    });
+  } catch (error) {
+    console.error('API Error in GET /api/kks/[id]/evidence:', error);
+    
+    return NextResponse.json(
+      { error: 'Internal server error', success: false },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(
+  request: NextRequest,
+  { params }: RouteParams
+) {
+  try {
+    const supabase = createServerSupabase();
+    const { id } = params;
+    
+    // Get current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized', success: false },
+        { status: 401 }
+      );
+    }
+
+    // Check if user has access to this submission
+    const { data: submission, error: submissionError } = await supabase
+      .from('kks_submission')
+      .select('created_by, submission_data, title')
+      .eq('id', id)
+      .single();
+
+    if (submissionError) {
+      return NextResponse.json(
+        { error: 'KKS submission not found', success: false },
+        { status: 404 }
+      );
+    }
+
+    if (submission.created_by !== user.id) {
+      return NextResponse.json(
+        { error: 'Only the creator can generate evidence', success: false },
+        { status: 403 }
+      );
+    }
+
+    // Parse request body
+    const body = await request.json();
+    const { file_type = 'pdf' } = body;
+
+    if (!['pdf', 'xml', 'json'].includes(file_type)) {
+      return NextResponse.json(
+        { error: 'Invalid file_type. Must be pdf, xml, or json', success: false },
+        { status: 400 }
+      );
+    }
+
+    // Generate evidence file content based on submission data
+    let fileContent: string;
+    let fileName: string;
+
+    switch (file_type) {
+      case 'json':
+        fileContent = JSON.stringify({
+          submission_id: id,
+          title: submission.title,
+          data: submission.submission_data,
+          generated_at: new Date().toISOString(),
+          generated_by: user.id,
+        }, null, 2);
+        fileName = `kks_submission_${id}.json`;
+        break;
+
+      case 'xml':
+        fileContent = `<?xml version="1.0" encoding="UTF-8"?>
+<kks_submission>
+  <id>${id}</id>
+  <title>${submission.title}</title>
+  <generated_at>${new Date().toISOString()}</generated_at>
+  <generated_by>${user.id}</generated_by>
+  <data>${JSON.stringify(submission.submission_data)}</data>
+</kks_submission>`;
+        fileName = `kks_submission_${id}.xml`;
+        break;
+
+      case 'pdf':
+        // For PDF, we would typically use a library like PDFKit or Puppeteer
+        // For now, generate a simple text representation
+        fileContent = `KKS Submission Evidence
+Submission ID: ${id}
+Title: ${submission.title}
+Generated At: ${new Date().toISOString()}
+Generated By: ${user.id}
+
+Data:
+${JSON.stringify(submission.submission_data, null, 2)}`;
+        fileName = `kks_submission_${id}.pdf`;
+        break;
+
+      default:
+        fileContent = '';
+        fileName = '';
+    }
+
+    // Calculate file hash
+    const fileHash = createHash('sha256').update(fileContent).digest('hex');
+
+    // Generate file path for storage
+    const filePath = `kks-evidence/${id}/${fileName}`;
+
+    // Upload to storage
+    const { error: uploadError } = await supabase.storage
+      .from('docs')
+      .upload(filePath, Buffer.from(fileContent), {
+        contentType: file_type === 'pdf' ? 'application/pdf' : 
+                    file_type === 'xml' ? 'application/xml' : 
+                    'application/json',
+        metadata: {
+          submissionId: id,
+          generatedBy: user.id,
+        },
+      });
+
+    if (uploadError) {
+      console.error('Error uploading evidence file:', uploadError);
+      return NextResponse.json(
+        { error: 'Failed to upload evidence file', success: false },
+        { status: 500 }
+      );
+    }
+
+    // Save evidence record to database
+    const { data: evidence, error } = await supabase
+      .from('kks_evidence')
+      .insert([
+        {
+          submission_id: id,
+          file_path: filePath,
+          file_type,
+          file_hash: fileHash,
+        },
+      ])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating KKS evidence record:', error);
+      
+      // Clean up uploaded file
+      await supabase.storage.from('docs').remove([filePath]);
+      
+      return NextResponse.json(
+        { error: 'Failed to create evidence record', success: false },
+        { status: 500 }
+      );
+    }
+
+    // Create signed URL for download
+    const { data: signedUrlData, error: urlError } = await supabase.storage
+      .from('docs')
+      .createSignedUrl(filePath, 3600); // 1 hour expiry
+
+    const evidenceWithUrl = {
+      ...evidence,
+      download_url: urlError ? null : signedUrlData.signedUrl,
+    };
+
+    // Validate response
+    const validatedEvidence = KksEvidenceSchema.parse(evidence);
+
+    return NextResponse.json({
+      ...validatedEvidence,
+      download_url: evidenceWithUrl.download_url,
+    }, { status: 201 });
+  } catch (error) {
+    console.error('API Error in POST /api/kks/[id]/evidence:', error);
+    
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: 'Invalid input', details: error.issues, success: false },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json(
+      { error: 'Internal server error', success: false },
+      { status: 500 }
+    );
+  }
+}

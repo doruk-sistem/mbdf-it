@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createServerSupabase } from "@/lib/clientSupabase";
+import { createServerSupabase } from "@/lib/supabase";
 import { CreateRoomForm } from "@/components/rooms/create-room-form";
 
 export default async function CreateRoomPage() {

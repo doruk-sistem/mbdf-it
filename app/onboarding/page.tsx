@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createServerSupabase } from "@/lib/clientSupabase";
+import { createServerSupabase } from "@/lib/supabase";
 import { OnboardingCard } from "@/components/auth/onboarding-card";
 
 export default async function OnboardingPage() {

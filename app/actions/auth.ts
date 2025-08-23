@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { createServerSupabase, createAdminSupabase } from '@/lib/clientSupabase';
+import { createServerSupabase, createAdminSupabase } from '@/lib/supabase';
 import { sendMail } from '@/lib/email';
 import { emailTemplates } from '@/lib/email-templates';
 import type { Database } from '@/types/supabase';

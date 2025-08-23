@@ -406,20 +406,392 @@ GÜVENLİK UYARISI: Bu şifre sıfırlama talebinde bulunmadıysanız, lütfen b
 
 Bu bağlantı 1 saat içinde geçerliliğini yitirecektir.
     `
+  },
+
+  // Agreement created notification
+  agreementCreated: {
+    subject: (agreementTitle: string) => `Yeni Sözleşme: ${agreementTitle}`,
+    html: (recipientName: string, agreementTitle: string, agreementId: string, signUrl: string) => `
+      <!DOCTYPE html>
+      <html lang="tr">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Yeni Sözleşme</title>
+        <style>
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8fafc;
+          }
+          .container {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+          }
+          .header {
+            text-align: center;
+            margin-bottom: 32px;
+          }
+          .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #6366f1;
+            margin-bottom: 8px;
+          }
+          .title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #1e293b;
+          }
+          .content {
+            margin-bottom: 32px;
+            color: #64748b;
+          }
+          .button {
+            display: inline-block;
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            color: white;
+            text-decoration: none;
+            padding: 16px 32px;
+            border-radius: 12px;
+            font-weight: 600;
+            text-align: center;
+            margin: 16px 0;
+          }
+          .footer {
+            text-align: center;
+            margin-top: 32px;
+            padding-top: 32px;
+            border-top: 1px solid #e2e8f0;
+            color: #64748b;
+            font-size: 14px;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <div class="logo">📄 MBDF-IT</div>
+            <h1 class="title">Yeni Sözleşme</h1>
+          </div>
+          
+          <div class="content">
+            <p>Merhaba ${recipientName},</p>
+            <p>Sizin için yeni bir MBDF sözleşmesi oluşturuldu:</p>
+            <p><strong>${agreementTitle}</strong></p>
+            <p>Sözleşmeyi incelemek ve imzalamak için aşağıdaki butona tıklayın.</p>
+          </div>
+          
+          <div style="text-align: center;">
+            <a href="${signUrl}" class="button">Sözleşmeyi Görüntüle</a>
+          </div>
+          
+          <div class="footer">
+            <p>Bu e-posta MBDF-IT Portal tarafından otomatik olarak gönderilmiştir.</p>
+            <p>Sözleşme ID: ${agreementId}</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
+    text: (recipientName: string, agreementTitle: string, agreementId: string, signUrl: string) => `
+Yeni Sözleşme
+
+Merhaba ${recipientName},
+
+Sizin için yeni bir MBDF sözleşmesi oluşturuldu:
+${agreementTitle}
+
+Sözleşmeyi incelemek ve imzalamak için: ${signUrl}
+
+Sözleşme ID: ${agreementId}
+
+Bu e-posta MBDF-IT Portal tarafından otomatik olarak gönderilmiştir.
+    `
+  },
+
+  // Agreement signed notification
+  agreementSigned: {
+    subject: (agreementTitle: string) => `Sözleşme İmzalandı: ${agreementTitle}`,
+    html: (recipientName: string, agreementTitle: string, signerName: string, agreementId: string, signUrl: string) => `
+      <!DOCTYPE html>
+      <html lang="tr">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Sözleşme İmzalandı</title>
+        <style>
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8fafc;
+          }
+          .container {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+          }
+          .header {
+            text-align: center;
+            margin-bottom: 32px;
+          }
+          .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #10b981;
+            margin-bottom: 8px;
+          }
+          .title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #1e293b;
+          }
+          .content {
+            margin-bottom: 32px;
+            color: #64748b;
+          }
+          .button {
+            display: inline-block;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            text-decoration: none;
+            padding: 16px 32px;
+            border-radius: 12px;
+            font-weight: 600;
+            text-align: center;
+            margin: 16px 0;
+          }
+          .footer {
+            text-align: center;
+            margin-top: 32px;
+            padding-top: 32px;
+            border-top: 1px solid #e2e8f0;
+            color: #64748b;
+            font-size: 14px;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <div class="logo">✅ MBDF-IT</div>
+            <h1 class="title">Sözleşme İmzalandı</h1>
+          </div>
+          
+          <div class="content">
+            <p>Merhaba ${recipientName},</p>
+            <p><strong>${signerName}</strong> aşağıdaki sözleşmeyi imzaladı:</p>
+            <p><strong>${agreementTitle}</strong></p>
+            <p>Sözleşmenin güncel durumunu görüntülemek için aşağıdaki butona tıklayın.</p>
+          </div>
+          
+          <div style="text-align: center;">
+            <a href="${signUrl}" class="button">Sözleşmeyi Görüntüle</a>
+          </div>
+          
+          <div class="footer">
+            <p>Bu e-posta MBDF-IT Portal tarafından otomatik olarak gönderilmiştir.</p>
+            <p>Sözleşme ID: ${agreementId}</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
+    text: (recipientName: string, agreementTitle: string, signerName: string, agreementId: string, signUrl: string) => `
+Sözleşme İmzalandı
+
+Merhaba ${recipientName},
+
+${signerName} aşağıdaki sözleşmeyi imzaladı:
+${agreementTitle}
+
+Sözleşmenin güncel durumunu görüntülemek için: ${signUrl}
+
+Sözleşme ID: ${agreementId}
+
+Bu e-posta MBDF-IT Portal tarafından otomatik olarak gönderilmiştir.
+    `
+  },
+
+  // Signature request notification
+  signatureRequest: {
+    subject: (agreementTitle: string) => `İmza Talebi: ${agreementTitle}`,
+    html: (recipientName: string, agreementTitle: string, agreementId: string, signUrl: string) => `
+      <!DOCTYPE html>
+      <html lang="tr">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>İmza Talebi</title>
+        <style>
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8fafc;
+          }
+          .container {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+          }
+          .header {
+            text-align: center;
+            margin-bottom: 32px;
+          }
+          .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #f59e0b;
+            margin-bottom: 8px;
+          }
+          .title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #1e293b;
+          }
+          .content {
+            margin-bottom: 32px;
+            color: #64748b;
+          }
+          .button {
+            display: inline-block;
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+            text-decoration: none;
+            padding: 16px 32px;
+            border-radius: 12px;
+            font-weight: 600;
+            text-align: center;
+            margin: 16px 0;
+          }
+          .footer {
+            text-align: center;
+            margin-top: 32px;
+            padding-top: 32px;
+            border-top: 1px solid #e2e8f0;
+            color: #64748b;
+            font-size: 14px;
+          }
+          .urgent {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 16px 0;
+            color: #92400e;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <div class="logo">✍️ MBDF-IT</div>
+            <h1 class="title">İmza Talebi</h1>
+          </div>
+          
+          <div class="content">
+            <p>Merhaba ${recipientName},</p>
+            <p>Aşağıdaki sözleşme için imzanız bekleniyor:</p>
+            <p><strong>${agreementTitle}</strong></p>
+            <p>Lütfen sözleşmeyi inceleyin ve imzalayın.</p>
+          </div>
+          
+          <div class="urgent">
+            <strong>Önemli:</strong> Bu sözleşmenin imzalanması MBDF sürecinin devam edebilmesi için gereklidir.
+          </div>
+          
+          <div style="text-align: center;">
+            <a href="${signUrl}" class="button">Sözleşmeyi İmzala</a>
+          </div>
+          
+          <div class="footer">
+            <p>Bu e-posta MBDF-IT Portal tarafından otomatik olarak gönderilmiştir.</p>
+            <p>Sözleşme ID: ${agreementId}</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
+    text: (recipientName: string, agreementTitle: string, agreementId: string, signUrl: string) => `
+İmza Talebi
+
+Merhaba ${recipientName},
+
+Aşağıdaki sözleşme için imzanız bekleniyor:
+${agreementTitle}
+
+Lütfen sözleşmeyi inceleyin ve imzalayın: ${signUrl}
+
+ÖNEMLİ: Bu sözleşmenin imzalanması MBDF sürecinin devam edebilmesi için gereklidir.
+
+Sözleşme ID: ${agreementId}
+
+Bu e-posta MBDF-IT Portal tarafından otomatik olarak gönderilmiştir.
+    `
   }
 };
 
 // Helper function to send emails (if using Resend or another email service)
 export function getEmailTemplate(
   type: keyof typeof emailTemplates,
-  params: Record<string, string>
+  params: Record<string, any>
 ) {
   const template = emailTemplates[type];
   
-  const values = Object.values(params) as [string, ...string[]];
+  // Handle different template signature types
+  if (type === 'magicLink' || type === 'passwordReset') {
+    const [link] = Object.values(params) as [string];
+    return {
+      subject: template.subject,
+      html: (template as any).html(link),
+      text: (template as any).text(link)
+    };
+  } else if (type === 'welcome') {
+    const [email, name] = Object.values(params) as [string, string?];
+    return {
+      subject: template.subject,
+      html: (template as any).html(email, name),
+      text: (template as any).text(email, name)
+    };
+  } else if (type === 'agreementCreated' || type === 'signatureRequest') {
+    const [recipientName, agreementTitle, agreementId, signUrl] = Object.values(params) as [string, string, string, string];
+    return {
+      subject: (template as any).subject(agreementTitle),
+      html: (template as any).html(recipientName, agreementTitle, agreementId, signUrl),
+      text: (template as any).text(recipientName, agreementTitle, agreementId, signUrl)
+    };
+  } else if (type === 'agreementSigned') {
+    const [recipientName, agreementTitle, signerName, agreementId, signUrl] = Object.values(params) as [string, string, string, string, string];
+    return {
+      subject: (template as any).subject(agreementTitle),
+      html: (template as any).html(recipientName, agreementTitle, signerName, agreementId, signUrl),
+      text: (template as any).text(recipientName, agreementTitle, signerName, agreementId, signUrl)
+    };
+  }
+  
+  // Default fallback
   return {
-    subject: template.subject,
-    html: template.html(...values),
-    text: template.text(...values)
+    subject: 'MBDF-IT Portal',
+    html: '<p>Template not found</p>',
+    text: 'Template not found'
   };
 }

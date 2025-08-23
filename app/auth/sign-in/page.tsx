@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import { createServerSupabase } from "@/lib/clientSupabase";
+import { createServerSupabase } from "@/lib/supabase";
 import { SignInCard } from "@/components/auth/sign-in-card";
 import { Skeleton } from "@/components/ui/skeleton";
 

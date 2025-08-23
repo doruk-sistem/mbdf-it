@@ -1,99 +1,59 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
 import Link from "next/link";
 import { Building2, Users, FileText, Clock, ArrowRight, Plus } from "lucide-react";
+import { useRooms } from "@/hooks/use-rooms";
+import { DashboardSkeleton } from "./dashboard-skeleton";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { motion } from "framer-motion";
 
-// Mock data - in real app, this would come from Supabase
-const mockRooms = [
-  {
-    id: "1",
-    name: "Benzene MBDF",
-    substance: {
-      name: "Benzene",
-      ec_number: "200-753-7",
-      cas_number: "71-43-2"
-    },
-    status: "active",
-    member_count: 8,
-    created_at: "2024-01-15T10:00:00Z"
-  },
-  {
-    id: "2", 
-    name: "Toluene MBDF",
-    substance: {
-      name: "Toluene",
-      ec_number: "203-625-9",
-      cas_number: "108-88-3"
-    },
-    status: "active",
-    member_count: 12,
-    created_at: "2024-02-01T14:30:00Z"
-  },
-  {
-    id: "3",
-    name: "Acetone MBDF",
-    substance: {
-      name: "Acetone", 
-      ec_number: "200-662-2",
-      cas_number: "67-64-1"
-    },
-    status: "closed",
-    member_count: 15,
-    created_at: "2024-01-08T09:15:00Z"
-  }
-];
+interface DashboardStats {
+  total_rooms: number;
+  active_rooms: number;
+  total_members: number;
+  pending_requests: number;
+}
 
-const mockStats = {
-  total_rooms: 3,
-  active_rooms: 2,
-  total_members: 35,
-  pending_requests: 4
-};
-
-const mockActivity = [
-  {
-    id: "1",
-    action: "Yeni erişim isteği oluşturuldu",
-    user: "Ahmet Yılmaz",
-    room: "Benzene MBDF",
-    time: "2 saat önce",
-    type: "request"
-  },
-  {
-    id: "2", 
-    action: "LR seçimi tamamlandı",
-    user: "Sistem",
-    room: "Toluene MBDF", 
-    time: "5 saat önce",
-    type: "vote"
-  },
-  {
-    id: "3",
-    action: "Dokuman yüklendi",
-    user: "Fatma Kaya",
-    room: "Benzene MBDF",
-    time: "1 gün önce", 
-    type: "document"
-  }
-];
+interface DashboardActivity {
+  id: string;
+  action: string;
+  user: string;
+  room: string;
+  time: string;
+  type: string;
+}
 
 export function DashboardContent() {
-  const [mounted, setMounted] = useState(false);
+  const { data: roomsData, isLoading, error } = useRooms();
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted) {
-    return null;
+  if (isLoading) {
+    return <DashboardSkeleton />;
   }
+
+  if (error) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-red-500">Veri yüklenirken bir hata oluştu</p>
+      </div>
+    );
+  }
+
+  const rooms = roomsData?.items || [];
+  
+  // Calculate stats from rooms data
+  const stats: DashboardStats = {
+    total_rooms: rooms.length,
+    active_rooms: rooms.filter(room => room.status === 'active').length,
+    total_members: rooms.reduce((sum, room) => sum + (room.member_count || 0), 0),
+    pending_requests: 0, // This would need a separate API call
+  };
+
+  // Mock activity data for now
+  const activity: DashboardActivity[] = [];
 
   return (
     <div className="space-y-8">
@@ -110,9 +70,9 @@ export function DashboardContent() {
             <Building2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{mockStats.total_rooms}</div>
+            <div className="text-2xl font-bold">{stats.total_rooms}</div>
             <p className="text-xs text-muted-foreground">
-              +1 geçen aydan
+              Katıldığınız odalar
             </p>
           </CardContent>
         </Card>
@@ -123,7 +83,7 @@ export function DashboardContent() {
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{mockStats.active_rooms}</div>
+            <div className="text-2xl font-bold">{stats.active_rooms}</div>
             <p className="text-xs text-muted-foreground">
               Şu anda aktif
             </p>
@@ -136,7 +96,7 @@ export function DashboardContent() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{mockStats.total_members}</div>
+            <div className="text-2xl font-bold">{stats.total_members}</div>
             <p className="text-xs text-muted-foreground">
               Tüm odalarda
             </p>
@@ -149,7 +109,7 @@ export function DashboardContent() {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{mockStats.pending_requests}</div>
+            <div className="text-2xl font-bold">{stats.pending_requests}</div>
             <p className="text-xs text-muted-foreground">
               Onay bekliyor
             </p>
@@ -170,30 +130,38 @@ export function DashboardContent() {
               <CardTitle>Son Aktiviteler</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {mockActivity.map((activity, index) => (
-                <motion.div
-                  key={activity.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.2, delay: index * 0.1 }}
-                  className="flex items-center space-x-4"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium leading-none">
-                      {activity.action}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {activity.user} • {activity.room}
-                    </p>
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    {activity.time}
-                  </div>
-                  <Badge variant="secondary" className="text-xs">
-                    {activity.type}
-                  </Badge>
-                </motion.div>
-              ))}
+              {activity.length > 0 ? (
+                activity.map((item, index) => (
+                  <motion.div
+                    key={item.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.2, delay: index * 0.1 }}
+                    className="flex items-center space-x-4"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium leading-none">
+                        {item.action}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {item.user} • {item.room}
+                      </p>
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      {item.time}
+                    </div>
+                    <Badge variant="secondary" className="text-xs">
+                      {item.type}
+                    </Badge>
+                  </motion.div>
+                ))
+              ) : (
+                <div className="text-center py-4">
+                  <p className="text-sm text-muted-foreground">
+                    Henüz aktivite bulunmuyor
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </motion.div>
@@ -256,7 +224,7 @@ export function DashboardContent() {
               <div>
                 <CardTitle>MBDF Odaları</CardTitle>
                 <CardDescription>
-                  Aktif MBDF odalarınızı yönetin
+                  Katıldığınız MBDF odalarını yönetin
                 </CardDescription>
               </div>
               <Button asChild>
@@ -268,9 +236,9 @@ export function DashboardContent() {
             </div>
           </CardHeader>
           <CardContent>
-            {mockRooms.length > 0 ? (
+            {rooms.length > 0 ? (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {mockRooms.map((room, index) => (
+                {rooms.map((room, index) => (
                   <motion.div
                     key={room.id}
                     initial={{ opacity: 0, scale: 0.9 }}
@@ -286,15 +254,19 @@ export function DashboardContent() {
                             <Badge 
                               variant={room.status === "active" ? "default" : "secondary"}
                             >
-                              {room.status === "active" ? "Aktif" : "Kapalı"}
+                              {room.status === "active" ? "Aktif" : 
+                               room.status === "closed" ? "Kapalı" : "Arşivlendi"}
                             </Badge>
                           </div>
                           <div className="space-y-1">
                             <p className="text-sm text-muted-foreground">
-                              EC: {room.substance.ec_number}
+                              {room.substance.name}
                             </p>
                             <p className="text-sm text-muted-foreground">
-                              CAS: {room.substance.cas_number}
+                              EC: {room.substance.ec_number || 'N/A'}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              CAS: {room.substance.cas_number || 'N/A'}
                             </p>
                           </div>
                         </CardHeader>
@@ -324,7 +296,7 @@ export function DashboardContent() {
                 <Building2 className="mx-auto h-12 w-12 text-muted-foreground" />
                 <h3 className="mt-4 text-lg font-semibold">Henüz oda yok</h3>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  İlk MBDF odanızı oluşturarak başlayın.
+                  İlk MBDF odanızı oluşturarak başlayın veya var olan bir odaya katılın.
                 </p>
                 <Button asChild className="mt-4">
                   <Link href="/create-room">

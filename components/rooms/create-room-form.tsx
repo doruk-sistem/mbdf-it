@@ -15,25 +15,11 @@ import {
   SelectTrigger,
   SelectValue 
 } from "@/components/ui/select";
-import { useToast } from "@/components/ui/use-toast";
-import { createRoom } from "@/app/actions/rooms";
-
-// Mock substance data - bu gerçek uygulamada API'den gelecek
-const substances = [
-  { id: "1", name: "Titanium Dioxide", casNumber: "13463-67-7" },
-  { id: "2", name: "Silicon Dioxide", casNumber: "7631-86-9" },
-  { id: "3", name: "Iron Oxide", casNumber: "1309-37-1" },
-  { id: "4", name: "Aluminum Oxide", casNumber: "1344-28-1" },
-  { id: "5", name: "Zinc Oxide", casNumber: "1314-13-2" },
-  { id: "6", name: "Calcium Carbonate", casNumber: "471-34-1" },
-  { id: "7", name: "Sodium Chloride", casNumber: "7647-14-5" },
-  { id: "8", name: "Potassium Chloride", casNumber: "7447-40-7" },
-  { id: "9", name: "Magnesium Sulfate", casNumber: "7487-88-9" },
-  { id: "10", name: "Copper Sulfate", casNumber: "7758-98-7" },
-];
+import { Skeleton } from "@/components/ui/skeleton";
+import { useSubstances } from "@/hooks/use-substances";
+import { useCreateRoom } from "@/hooks/use-rooms";
 
 export function CreateRoomForm() {
-  const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [formData, setFormData] = useState({
     name: "",
@@ -41,51 +27,42 @@ export function CreateRoomForm() {
     substanceId: "",
   });
   
-  const { toast } = useToast();
   const router = useRouter();
+  
+  // Query hooks
+  const { data: substancesData, isLoading: substancesLoading } = useSubstances();
+  const createRoomMutation = useCreateRoom();
+
+  console.log("substancesData", substancesData);
+
+  // Extract substances from query response
+  const substances = substancesData?.items || [];
 
   const filteredSubstances = substances.filter(substance =>
     substance.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    substance.casNumber.includes(searchTerm)
+    (substance.cas_number && substance.cas_number.includes(searchTerm)) ||
+    (substance.ec_number && substance.ec_number.includes(searchTerm))
   );
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.name.trim() || !formData.substanceId) {
-      toast({
-        title: "Eksik Bilgi",
-        description: "Lütfen oda adı ve madde seçimini yapın.",
-        variant: "destructive",
-      });
       return;
     }
 
-    setIsLoading(true);
-
-    try {
-      const formDataObj = new FormData();
-      formDataObj.append("name", formData.name.trim());
-      formDataObj.append("description", formData.description.trim());
-      formDataObj.append("substanceId", formData.substanceId);
-
-      await createRoom(formDataObj);
-      
-      toast({
-        title: "Başarılı!",
-        description: "MBDF odası başarıyla oluşturuldu.",
-      });
-      
-      // createRoom function already redirects, so we don't need to do it here
-    } catch (error: any) {
-      toast({
-        title: "Hata",
-        description: error.message || "Oda oluşturulurken bir hata oluştu.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
+    createRoomMutation.mutate(
+      {
+        name: formData.name.trim(),
+        description: formData.description.trim(),
+        substance_id: formData.substanceId,
+      },
+      {
+        onSuccess: () => {
+          router.push('/');
+        }
+      }
+    );
   };
 
   const selectedSubstance = substances.find(s => s.id === formData.substanceId);
@@ -114,7 +91,7 @@ export function CreateRoomForm() {
               placeholder="örn. TiO2 MBDF Çalışma Grubu"
               value={formData.name}
               onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-              disabled={isLoading}
+              disabled={createRoomMutation.isPending}
               required
             />
           </div>
@@ -133,31 +110,38 @@ export function CreateRoomForm() {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-9"
-                  disabled={isLoading}
+                  disabled={createRoomMutation.isPending}
                 />
               </div>
               <Select
                 value={formData.substanceId}
                 onValueChange={(value) => setFormData(prev => ({ ...prev, substanceId: value }))}
-                disabled={isLoading}
+                disabled={createRoomMutation.isPending}
                 required
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Madde seçin" />
                 </SelectTrigger>
                 <SelectContent className="max-h-60">
-                  {filteredSubstances.length > 0 ? (
+                  {substancesLoading ? (
+                    <div className="px-2 py-1 text-sm text-muted-foreground">
+                      Maddeler yükleniyor...
+                    </div>
+                  ) : filteredSubstances.length > 0 ? (
                     filteredSubstances.map((substance) => (
                       <SelectItem key={substance.id} value={substance.id}>
                         <div className="flex flex-col">
                           <span className="font-medium">{substance.name}</span>
-                          <span className="text-sm text-muted-foreground">CAS: {substance.casNumber}</span>
+                          <div className="text-xs text-muted-foreground space-y-0.5">
+                            {substance.ec_number && <div>EC: {substance.ec_number}</div>}
+                            {substance.cas_number && <div>CAS: {substance.cas_number}</div>}
+                          </div>
                         </div>
                       </SelectItem>
                     ))
                   ) : (
                     <div className="px-2 py-1 text-sm text-muted-foreground">
-                      Madde bulunamadı
+                      {searchTerm ? "Arama sonucu bulunamadı" : "Madde bulunamadı"}
                     </div>
                   )}
                 </SelectContent>
@@ -165,10 +149,17 @@ export function CreateRoomForm() {
             </div>
             {selectedSubstance && (
               <div className="mt-2 p-3 bg-muted rounded-lg">
-                <div className="text-sm">
-                  <span className="font-medium">Seçili Madde:</span> {selectedSubstance.name}
-                  <br />
-                  <span className="font-medium">CAS No:</span> {selectedSubstance.casNumber}
+                <div className="text-sm space-y-1">
+                  <div><span className="font-medium">Seçili Madde:</span> {selectedSubstance.name}</div>
+                  {selectedSubstance.ec_number && (
+                    <div><span className="font-medium">EC No:</span> {selectedSubstance.ec_number}</div>
+                  )}
+                  {selectedSubstance.cas_number && (
+                    <div><span className="font-medium">CAS No:</span> {selectedSubstance.cas_number}</div>
+                  )}
+                  {selectedSubstance.description && (
+                    <div className="text-muted-foreground">{selectedSubstance.description}</div>
+                  )}
                 </div>
               </div>
             )}
@@ -182,7 +173,7 @@ export function CreateRoomForm() {
               placeholder="MBDF odası hakkında açıklama (opsiyonel)"
               value={formData.description}
               onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              disabled={isLoading}
+              disabled={createRoomMutation.isPending}
               rows={4}
             />
           </div>
@@ -193,13 +184,13 @@ export function CreateRoomForm() {
               type="button"
               variant="outline"
               onClick={() => router.back()}
-              disabled={isLoading}
+              disabled={createRoomMutation.isPending}
               className="flex-1"
             >
               İptal
             </Button>
-            <Button type="submit" disabled={isLoading} className="flex-1">
-              {isLoading ? (
+            <Button type="submit" disabled={createRoomMutation.isPending || !formData.name.trim() || !formData.substanceId} className="flex-1">
+              {createRoomMutation.isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Oluşturuluyor...

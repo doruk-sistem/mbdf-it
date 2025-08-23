@@ -1,8 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createServerSupabase } from '@/lib/clientSupabase';
-
+import { createServerSupabase } from "@/lib/supabase";
+import type { Database } from "@/types/supabase";
 
 // Get current user
 async function getCurrentUser() {
@@ -14,6 +14,341 @@ async function getCurrentUser() {
   }
   
   return user;
+}
+
+// Nominate candidate for LR
+export async function nominateCandidate(roomId: string, candidateUserId: string) {
+  const user = await getCurrentUser();
+  const supabase = createServerSupabase();
+
+  try {
+    // Check if user is a member of the room
+    const { data: membership } = await supabase
+      .from("mbdf_member")
+      .select("role")
+      .eq("room_id", roomId)
+      .eq("user_id", user.id)
+      .single();
+
+    if (!membership) {
+      throw new Error("Not a member of this room");
+    }
+
+    // Check if candidate is also a member
+    const { data: candidateMembership } = await supabase
+      .from("mbdf_member")
+      .select("id")
+      .eq("room_id", roomId)
+      .eq("user_id", candidateUserId)
+      .single();
+
+    if (!candidateMembership) {
+      throw new Error("Candidate is not a member of this room");
+    }
+
+    // Check if already nominated
+    const { data: existingCandidate } = await supabase
+      .from("lr_candidate")
+      .select("id")
+      .eq("room_id", roomId)
+      .eq("user_id", candidateUserId)
+      .single();
+
+    if (existingCandidate) {
+      throw new Error("User is already nominated as LR candidate");
+    }
+
+    // Add candidate
+    const { error } = await supabase
+      .from("lr_candidate")
+      .insert({
+        room_id: roomId,
+        user_id: candidateUserId,
+        is_selected: false
+      });
+
+    if (error) {
+      console.error("Nominate candidate error:", error);
+      throw new Error("Failed to nominate candidate");
+    }
+
+    // Log the action
+    await supabase
+      .from("audit_log")
+      .insert({
+        room_id: roomId,
+        user_id: user.id,
+        action: "lr_candidate_nominated",
+        resource_type: "lr_candidate",
+        new_values: { room_id: roomId, candidate_user_id: candidateUserId }
+      });
+
+    revalidatePath(`/mbdf/${roomId}`);
+  } catch (error) {
+    console.error("Nominate candidate error:", error);
+    throw new Error("Failed to nominate candidate");
+  }
+}
+
+// Cast vote for LR candidate
+export async function castVote(
+  roomId: string,
+  candidateId: string,
+  scores: {
+    technical_score: number;
+    experience_score: number;
+    availability_score: number;
+    communication_score: number;
+    leadership_score: number;
+  }
+) {
+  const user = await getCurrentUser();
+  const supabase = createServerSupabase();
+
+  try {
+    // Check if user is a member of the room
+    const { data: membership } = await supabase
+      .from("mbdf_member")
+      .select("role")
+      .eq("room_id", roomId)
+      .eq("user_id", user.id)
+      .single();
+
+    if (!membership) {
+      throw new Error("Not a member of this room");
+    }
+
+    // Validate scores
+    Object.values(scores).forEach(score => {
+      if (score < 0 || score > 5) {
+        throw new Error("Scores must be between 0 and 5");
+      }
+    });
+
+    // Check if candidate exists
+    const { data: candidate } = await supabase
+      .from("lr_candidate")
+      .select("id")
+      .eq("room_id", roomId)
+      .eq("id", candidateId)
+      .single();
+
+    if (!candidate) {
+      throw new Error("Candidate not found");
+    }
+
+    // Insert or update vote
+    const { error } = await supabase
+      .from("lr_vote")
+      .upsert({
+        room_id: roomId,
+        voter_id: user.id,
+        candidate_id: candidateId,
+        ...scores
+      });
+
+    if (error) {
+      console.error("Cast vote error:", error);
+      throw new Error("Failed to cast vote");
+    }
+
+    // Log the action
+    await supabase
+      .from("audit_log")
+      .insert({
+        room_id: roomId,
+        user_id: user.id,
+        action: "vote_cast",
+        resource_type: "lr_vote",
+        new_values: { candidate_id: candidateId, scores }
+      });
+
+    revalidatePath(`/mbdf/${roomId}`);
+  } catch (error) {
+    console.error("Cast vote error:", error);
+    throw new Error("Failed to cast vote");
+  }
+}
+
+// Finalize LR selection
+export async function finalizeLRSelection(roomId: string, candidateId: string) {
+  const user = await getCurrentUser();
+  const supabase = createServerSupabase();
+
+  try {
+    // Check if user has permission (admin only)
+    const { data: membership } = await supabase
+      .from("mbdf_member")
+      .select("role")
+      .eq("room_id", roomId)
+      .eq("user_id", user.id)
+      .single();
+
+    if (!membership || membership.role !== "admin") {
+      throw new Error("Only administrators can finalize LR selection");
+    }
+
+    // Reset all candidates
+    await supabase
+      .from("lr_candidate")
+      .update({ is_selected: false })
+      .eq("room_id", roomId);
+
+    // Select the chosen candidate
+    const { error } = await supabase
+      .from("lr_candidate")
+      .update({ is_selected: true })
+      .eq("room_id", roomId)
+      .eq("id", candidateId);
+
+    if (error) {
+      console.error("Finalize selection error:", error);
+      throw new Error("Failed to finalize selection");
+    }
+
+    // Update member role to LR
+    const { data: candidate } = await supabase
+      .from("lr_candidate")
+      .select("user_id")
+      .eq("id", candidateId)
+      .single();
+
+    if (candidate) {
+      await supabase
+        .from("mbdf_member")
+        .update({ role: "lr" })
+        .eq("room_id", roomId)
+        .eq("user_id", candidate.user_id);
+    }
+
+    // Log the action
+    await supabase
+      .from("audit_log")
+      .insert({
+        room_id: roomId,
+        user_id: user.id,
+        action: "lr_selected",
+        resource_type: "lr_candidate",
+        new_values: { candidate_id: candidateId }
+      });
+
+    revalidatePath(`/mbdf/${roomId}`);
+  } catch (error) {
+    console.error("Finalize selection error:", error);
+    throw new Error("Failed to finalize selection");
+  }
+}
+
+// Get voting results and candidates
+export async function getVotingResults(roomId: string) {
+  const user = await getCurrentUser();
+  const supabase = createServerSupabase();
+
+  try {
+    // Check if user is a member of the room
+    const { data: membership } = await supabase
+      .from("mbdf_member")
+      .select("role")
+      .eq("room_id", roomId)
+      .eq("user_id", user.id)
+      .single();
+
+    if (!membership) {
+      throw new Error("Not a member of this room");
+    }
+
+    // Get candidates with vote results
+    const { data: candidatesData, error } = await supabase
+      .from("lr_candidate")
+      .select(`
+        id,
+        user_id,
+        is_selected,
+        created_at,
+        profiles:user_id (
+          full_name,
+          email,
+          company:company_id (
+            name
+          )
+        )
+      `)
+      .eq("room_id", roomId)
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      console.error("Get voting results error:", error);
+      throw new Error("Failed to get voting results");
+    }
+
+    // Get vote statistics for each candidate
+    const candidatesWithScores = await Promise.all(
+      candidatesData.map(async (candidate) => {
+        // Get votes for this candidate
+        const { data: votes } = await supabase
+          .from("lr_vote")
+          .select("technical_score, experience_score, availability_score, communication_score, leadership_score")
+          .eq("candidate_id", candidate.id);
+
+        let averageScores = {
+          technical: 0,
+          experience: 0,
+          availability: 0,
+          communication: 0,
+          leadership: 0
+        };
+
+        let totalScore = 0;
+        let voteCount = votes?.length || 0;
+
+        if (votes && votes.length > 0) {
+          const totals = votes.reduce((acc, vote) => ({
+            technical: acc.technical + (vote.technical_score || 0),
+            experience: acc.experience + (vote.experience_score || 0),
+            availability: acc.availability + (vote.availability_score || 0),
+            communication: acc.communication + (vote.communication_score || 0),
+            leadership: acc.leadership + (vote.leadership_score || 0)
+          }), { technical: 0, experience: 0, availability: 0, communication: 0, leadership: 0 });
+
+          averageScores = {
+            technical: totals.technical / voteCount,
+            experience: totals.experience / voteCount,
+            availability: totals.availability / voteCount,
+            communication: totals.communication / voteCount,
+            leadership: totals.leadership / voteCount
+          };
+
+          totalScore = Object.values(averageScores).reduce((sum, score) => sum + score, 0) / 5;
+        }
+
+        return {
+          id: candidate.id,
+          user_id: candidate.user_id,
+          user: candidate.profiles,
+          is_selected: candidate.is_selected,
+          total_score: totalScore,
+          vote_count: voteCount,
+          scores: averageScores
+        };
+      })
+    );
+
+    // Get current user's votes
+    const { data: userVotes } = await supabase
+      .from("lr_vote")
+      .select("candidate_id, technical_score, experience_score, availability_score, communication_score, leadership_score")
+      .eq("room_id", roomId)
+      .eq("voter_id", user.id);
+
+    return {
+      candidates: candidatesWithScores,
+      userVotes: userVotes || [],
+      currentUserRole: membership.role
+    };
+  } catch (error) {
+    console.error("Get voting results error:", error);
+    throw new Error("Failed to get voting results");
+  }
 }
 
 // Nominate LR candidate
@@ -193,73 +528,6 @@ export async function submitLRVote(
   }
 }
 
-// Finalize LR selection
-export async function finalizeLRSelection(roomId: string, candidateId: string) {
-  const user = await getCurrentUser();
-  const supabase = createServerSupabase();
-
-  try {
-    // Check if user has permission to finalize selection
-    const { data: member } = await supabase
-      .from("mbdf_member")
-      .select("role")
-      .eq("room_id", roomId)
-      .eq("user_id", user.id)
-      .single();
-
-    if (!member || member.role !== "admin") {
-      throw new Error("Only room administrators can finalize LR selection");
-    }
-
-    // Verify candidate exists in the room
-    const { data: candidate } = await supabase
-      .from("lr_candidate")
-      .select("id, user_id")
-      .eq("room_id", roomId)
-      .eq("id", candidateId)
-      .single();
-
-    if (!candidate) {
-      throw new Error("Candidate not found in this room");
-    }
-
-    // Use the database function to finalize selection
-    const { data: result, error } = await supabase
-      .rpc("finalize_lr_selection", {
-        room_uuid: roomId,
-        selected_candidate_uuid: candidateId
-      });
-
-    if (error || !result) {
-      console.error("Finalize selection error:", error);
-      throw new Error("Failed to finalize LR selection");
-    }
-
-    // Update the selected candidate's role to LR
-    await supabase
-      .from("mbdf_member")
-      .update({ role: "lr" })
-      .eq("room_id", roomId)
-      .eq("user_id", candidate.user_id);
-
-    // Log the action (finalize_lr_selection function already logs, but add our own too)
-    await supabase
-      .from("audit_log")
-      .insert({
-        room_id: roomId,
-        user_id: user.id,
-        action: "lr_selection_finalized",
-        resource_type: "lr_candidate",
-        resource_id: candidateId,
-        new_values: { selected_candidate_id: candidateId, finalized_by: user.id }
-      });
-
-    revalidatePath(`/mbdf/${roomId}`);
-  } catch (error) {
-    console.error("Finalize LR selection error:", error);
-    throw error;
-  }
-}
 
 // Remove LR candidate (only before voting starts or by admin)
 export async function removeLRCandidate(roomId: string, candidateId: string) {

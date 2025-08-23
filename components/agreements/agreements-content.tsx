@@ -14,6 +14,9 @@ import {
   Send,
   PenTool
 } from "lucide-react";
+import { useAgreements, useCreateAgreement, useRequestSignature, useSendKep } from "@/hooks/use-agreements";
+import { useRooms } from "@/hooks/use-rooms";
+import { AgreementsSkeleton } from "./agreements-skeleton";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -46,74 +49,26 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 
-// Mock data
-const mockStats = {
-  total: 12,
-  pending: 3,
-  signed: 8,
-  draft: 1
-};
-
-const mockAgreements = [
-  {
-    id: "1",
-    title: "Benzene MBDF Konsorsiyum Anlaşması",
-    description: "MBDF konsorsiyumu üyeleri arasındaki ana anlaşma",
-    agreement_type: "consortium",
-    room: { name: "Benzene MBDF" },
-    created_by: { full_name: "Ahmet Yılmaz" },
-    created_at: "2024-02-01T10:00:00Z",
-    parties: [
-      {
-        id: "1",
-        user: { full_name: "Ahmet Yılmaz", email: "ahmet@abc.com" },
-        signature_status: "signed",
-        signed_at: "2024-02-02T14:30:00Z"
-      },
-      {
-        id: "2", 
-        user: { full_name: "Fatma Kaya", email: "fatma@petro.com" },
-        signature_status: "pending",
-        signed_at: null
-      },
-      {
-        id: "3",
-        user: { full_name: "Mehmet Özkan", email: "mehmet@demir.com" },
-        signature_status: "signed",
-        signed_at: "2024-02-03T09:15:00Z"
-      }
-    ]
-  },
-  {
-    id: "2",
-    title: "Veri Paylaşım Anlaşması",
-    description: "MBDF verilerinin paylaşım koşulları",
-    agreement_type: "data_sharing",
-    room: { name: "Benzene MBDF" },
-    created_by: { full_name: "Fatma Kaya" },
-    created_at: "2024-02-10T15:20:00Z",
-    parties: [
-      {
-        id: "4",
-        user: { full_name: "Ahmet Yılmaz", email: "ahmet@abc.com" },
-        signature_status: "pending",
-        signed_at: null
-      },
-      {
-        id: "5",
-        user: { full_name: "Fatma Kaya", email: "fatma@petro.com" },
-        signature_status: "signed",
-        signed_at: "2024-02-10T15:30:00Z"
-      }
-    ]
-  }
-];
-
 export function AgreementsContent() {
   const [mounted, setMounted] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [filterStatus, setFilterStatus] = useState("all");
+  const [createFormData, setCreateFormData] = useState({
+    title: "",
+    description: "",
+    content: "",
+    agreement_type: "",
+    room_id: "",
+    party_ids: [] as string[]
+  });
   const { toast } = useToast();
+
+  // Query hooks
+  const { data: agreementsData, isLoading, error } = useAgreements();
+  const { data: roomsData } = useRooms();
+  const createAgreementMutation = useCreateAgreement();
+  const requestSignatureMutation = useRequestSignature();
+  const sendKepMutation = useSendKep();
 
   useEffect(() => {
     setMounted(true);
@@ -123,11 +78,39 @@ export function AgreementsContent() {
     return null;
   }
 
+  if (isLoading) {
+    return <AgreementsSkeleton />;
+  }
+
+  const agreements = agreementsData?.items || [];
+  const rooms = roomsData?.items || [];
+
+  // Calculate stats from actual data
+  const stats = {
+    total: agreements.length,
+    pending: agreements.filter(agreement => {
+      const parties = agreement.agreement_party || [];
+      const signedCount = parties.filter(p => p.signature_status === 'signed').length;
+      return signedCount < parties.length && signedCount === 0;
+    }).length,
+    signed: agreements.filter(agreement => {
+      const parties = agreement.agreement_party || [];
+      const signedCount = parties.filter(p => p.signature_status === 'signed').length;
+      return signedCount === parties.length && parties.length > 0;
+    }).length,
+    draft: agreements.filter(agreement => {
+      const parties = agreement.agreement_party || [];
+      return parties.length === 0;
+    }).length
+  };
+
   const getStatusBadge = (parties: any[]) => {
     const totalParties = parties.length;
     const signedParties = parties.filter(p => p.signature_status === "signed").length;
     
-    if (signedParties === totalParties) {
+    if (totalParties === 0) {
+      return <Badge variant="outline"><AlertCircle className="mr-1 h-3 w-3" />Taslak</Badge>;
+    } else if (signedParties === totalParties) {
       return <Badge variant="default"><CheckCircle className="mr-1 h-3 w-3" />Tamamlandı</Badge>;
     } else if (signedParties > 0) {
       return <Badge variant="secondary"><Clock className="mr-1 h-3 w-3" />Kısmi İmzalı</Badge>;
@@ -139,40 +122,70 @@ export function AgreementsContent() {
   const getProgressText = (parties: any[]) => {
     const totalParties = parties.length;
     const signedParties = parties.filter(p => p.signature_status === "signed").length;
-    return `${signedParties}/${totalParties} imza`;
+    return totalParties === 0 ? "Taslak" : `${signedParties}/${totalParties} imza`;
   };
 
   const handleCreateAgreement = () => {
+    if (!createFormData.title || !createFormData.agreement_type || !createFormData.room_id) {
+      toast({
+        title: "Eksik bilgi",
+        description: "Lütfen tüm gerekli alanları doldurun.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    createAgreementMutation.mutate({
+      ...createFormData,
+      party_ids: createFormData.party_ids
+    });
     setIsCreateDialogOpen(false);
-    toast({
-      title: "Sözleşme oluşturuldu",
-      description: "Yeni sözleşme başarıyla oluşturuldu.",
+    setCreateFormData({
+      title: "",
+      description: "",
+      content: "",
+      agreement_type: "",
+      room_id: "",
+      party_ids: []
     });
   };
 
   const handleRequestPenTool = (agreementId: string) => {
-    toast({
-      title: "İmza talebi gönderildi",
-      description: "İmza talebi ilgili taraflara e-posta ile gönderildi.",
-    });
+    const agreement = agreements.find(a => a.id === agreementId);
+    if (!agreement) return;
+
+    const partyIds = agreement.agreement_party
+      .filter(p => p.signature_status === 'pending')
+      .map(p => p.id);
+
+    requestSignatureMutation.mutate({ agreementId, partyIds });
   };
 
   const handleSendKEP = (agreementId: string) => {
-    toast({
-      title: "KEP bildirimi gönderildi", 
-      description: "Sözleşme KEP adresleri üzerinden bildirildi.",
+    const agreement = agreements.find(a => a.id === agreementId);
+    if (!agreement) return;
+
+    const kepAddresses = agreement.agreement_party
+      .map(p => p.profiles?.email)
+      .filter(Boolean);
+
+    sendKepMutation.mutate({ 
+      agreementId, 
+      kepAddresses,
+      subject: `MBDF Sözleşmesi: ${agreement.title}`,
+      message: `${agreement.title} sözleşmesi KEP sistemi üzerinden bildirilmiştir.`
     });
   };
 
-  const filteredAgreements = mockAgreements.filter(agreement => {
+  const filteredAgreements = agreements.filter(agreement => {
     if (filterStatus === "all") return true;
     
-    const parties = agreement.parties;
+    const parties = agreement.agreement_party || [];
     const signedCount = parties.filter(p => p.signature_status === "signed").length;
     
     switch (filterStatus) {
       case "completed":
-        return signedCount === parties.length;
+        return signedCount === parties.length && parties.length > 0;
       case "pending":
         return signedCount < parties.length && signedCount === 0;
       case "partial":
@@ -197,7 +210,7 @@ export function AgreementsContent() {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{mockStats.total}</div>
+            <div className="text-2xl font-bold">{stats.total}</div>
             <p className="text-xs text-muted-foreground">Tüm sözleşmeler</p>
           </CardContent>
         </Card>
@@ -208,7 +221,7 @@ export function AgreementsContent() {
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{mockStats.pending}</div>
+            <div className="text-2xl font-bold">{stats.pending}</div>
             <p className="text-xs text-muted-foreground">İmza bekliyor</p>
           </CardContent>
         </Card>
@@ -219,7 +232,7 @@ export function AgreementsContent() {
             <CheckCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{mockStats.signed}</div>
+            <div className="text-2xl font-bold">{stats.signed}</div>
             <p className="text-xs text-muted-foreground">Tamamlanan</p>
           </CardContent>
         </Card>
@@ -230,7 +243,7 @@ export function AgreementsContent() {
             <AlertCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{mockStats.draft}</div>
+            <div className="text-2xl font-bold">{stats.draft}</div>
             <p className="text-xs text-muted-foreground">Hazırlanıyor</p>
           </CardContent>
         </Card>
@@ -266,11 +279,19 @@ export function AgreementsContent() {
                   <div className="grid gap-4 py-4">
                     <div className="grid gap-2">
                       <Label htmlFor="title">Başlık</Label>
-                      <Input id="title" placeholder="Sözleşme başlığı..." />
+                      <Input 
+                        id="title" 
+                        placeholder="Sözleşme başlığı..." 
+                        value={createFormData.title}
+                        onChange={(e) => setCreateFormData(prev => ({ ...prev, title: e.target.value }))}
+                      />
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="type">Tür</Label>
-                      <Select>
+                      <Select 
+                        value={createFormData.agreement_type} 
+                        onValueChange={(value) => setCreateFormData(prev => ({ ...prev, agreement_type: value }))}
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="Sözleşme türünü seçin" />
                         </SelectTrigger>
@@ -284,13 +305,19 @@ export function AgreementsContent() {
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="room">MBDF Odası</Label>
-                      <Select>
+                      <Select 
+                        value={createFormData.room_id} 
+                        onValueChange={(value) => setCreateFormData(prev => ({ ...prev, room_id: value }))}
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="Oda seçin" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="1">Benzene MBDF</SelectItem>
-                          <SelectItem value="2">Toluene MBDF</SelectItem>
+                          {rooms.map((room) => (
+                            <SelectItem key={room.id} value={room.id}>
+                              {room.name} - {room.substance?.name}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -300,6 +327,8 @@ export function AgreementsContent() {
                         id="description"
                         placeholder="Sözleşme açıklaması..."
                         className="resize-none"
+                        value={createFormData.description}
+                        onChange={(e) => setCreateFormData(prev => ({ ...prev, description: e.target.value }))}
                       />
                     </div>
                     <div className="grid gap-2">
@@ -308,6 +337,8 @@ export function AgreementsContent() {
                         id="content"
                         placeholder="Sözleşme metnini girin..."
                         className="resize-none min-h-[120px]"
+                        value={createFormData.content}
+                        onChange={(e) => setCreateFormData(prev => ({ ...prev, content: e.target.value }))}
                       />
                     </div>
                   </div>
@@ -315,8 +346,11 @@ export function AgreementsContent() {
                     <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                       İptal
                     </Button>
-                    <Button onClick={handleCreateAgreement}>
-                      Oluştur
+                    <Button 
+                      onClick={handleCreateAgreement}
+                      disabled={createAgreementMutation.isPending}
+                    >
+                      {createAgreementMutation.isPending ? "Oluşturuluyor..." : "Oluştur"}
                     </Button>
                   </div>
                 </DialogContent>
@@ -341,7 +375,9 @@ export function AgreementsContent() {
 
             {/* Agreements */}
             <div className="space-y-4">
-              {filteredAgreements.map((agreement, index) => (
+              {isLoading && <AgreementsSkeleton />}
+              
+              {!isLoading && filteredAgreements.map((agreement, index) => (
                 <motion.div
                   key={agreement.id}
                   initial={{ opacity: 0, x: -20 }}
@@ -357,15 +393,15 @@ export function AgreementsContent() {
                         <div className="flex-1 space-y-2">
                           <div className="flex items-center justify-between">
                             <h3 className="font-semibold text-lg">{agreement.title}</h3>
-                            {getStatusBadge(agreement.parties)}
+                            {getStatusBadge(agreement.agreement_party || [])}
                           </div>
                           <p className="text-sm text-muted-foreground">
-                            {agreement.description}
+                            {agreement.description || "Açıklama bulunmuyor"}
                           </p>
                           <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                            <span>Oda: {agreement.room.name}</span>
+                            <span>Oda: {agreement.room?.name || "Bilinmiyor"}</span>
                             <span>•</span>
-                            <span>Oluşturan: {agreement.created_by.full_name}</span>
+                            <span>Oluşturan: {agreement.created_by_profile?.full_name || "Bilinmiyor"}</span>
                             <span>•</span>
                             <span>Tarih: {new Date(agreement.created_at).toLocaleDateString('tr-TR')}</span>
                           </div>
@@ -373,14 +409,14 @@ export function AgreementsContent() {
                             <div className="flex items-center space-x-2">
                               <Users className="h-4 w-4 text-muted-foreground" />
                               <span className="text-sm text-muted-foreground">
-                                {getProgressText(agreement.parties)}
+                                {getProgressText(agreement.agreement_party || [])}
                               </span>
                             </div>
                             <div className="flex -space-x-2">
-                              {agreement.parties.slice(0, 3).map((party, i) => (
+                              {(agreement.agreement_party || []).slice(0, 3).map((party, i) => (
                                 <Avatar key={party.id} className="h-6 w-6 border-2 border-background">
                                   <AvatarFallback className="text-xs">
-                                    {party.user.full_name
+                                    {(party.profiles?.full_name || "U")
                                       .split(" ")
                                       .map(n => n[0])
                                       .join("")
@@ -388,10 +424,10 @@ export function AgreementsContent() {
                                   </AvatarFallback>
                                 </Avatar>
                               ))}
-                              {agreement.parties.length > 3 && (
+                              {(agreement.agreement_party || []).length > 3 && (
                                 <div className="h-6 w-6 rounded-full bg-muted border-2 border-background flex items-center justify-center">
                                   <span className="text-xs text-muted-foreground">
-                                    +{agreement.parties.length - 3}
+                                    +{(agreement.agreement_party || []).length - 3}
                                   </span>
                                 </div>
                               )}
@@ -424,11 +460,17 @@ export function AgreementsContent() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleRequestPenTool(agreement.id)}>
+                              <DropdownMenuItem 
+                                onClick={() => handleRequestPenTool(agreement.id)}
+                                disabled={requestSignatureMutation.isPending}
+                              >
                                 <PenTool className="mr-2 h-4 w-4" />
                                 İmza Talep Et
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleSendKEP(agreement.id)}>
+                              <DropdownMenuItem 
+                                onClick={() => handleSendKEP(agreement.id)}
+                                disabled={sendKepMutation.isPending}
+                              >
                                 <Send className="mr-2 h-4 w-4" />
                                 KEP Gönder
                               </DropdownMenuItem>
@@ -446,7 +488,17 @@ export function AgreementsContent() {
               ))}
             </div>
 
-            {filteredAgreements.length === 0 && (
+            {error && (
+              <div className="text-center py-12">
+                <AlertCircle className="mx-auto h-12 w-12 text-destructive" />
+                <h3 className="mt-4 text-lg font-semibold text-destructive">Hata Oluştu</h3>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Sözleşmeler yüklenirken bir hata oluştu.
+                </p>
+              </div>
+            )}
+
+            {!error && filteredAgreements.length === 0 && (
               <div className="text-center py-12">
                 <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
                 <h3 className="mt-4 text-lg font-semibold">Sözleşme bulunamadı</h3>

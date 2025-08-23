@@ -14,6 +14,9 @@ import {
   Eye,
   Archive
 } from "lucide-react";
+import { useKKSSubmissions, useCreateKKSSubmission, useGenerateEvidence, useSendKKS } from "@/hooks/use-kks";
+import { useRooms } from "@/hooks/use-rooms";
+import { KKSSkeleton } from "./kks-skeleton";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -45,67 +48,25 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 
-// Mock data
-const mockStats = {
-  total: 8,
-  draft: 2,
-  submitted: 4,
-  sent: 2
-};
-
-const mockSubmissions = [
-  {
-    id: "1",
-    title: "Benzene MBDF 2024 Veri Gönderimi",
-    description: "2024 yılı benzene MBDF verileri",
-    room: { 
-      name: "Benzene MBDF",
-      substance: { name: "Benzene", ec_number: "200-753-7" }
-    },
-    status: "sent",
-    created_by: { full_name: "Ahmet Yılmaz" },
-    created_at: "2024-01-15T10:00:00Z",
-    submitted_at: "2024-01-20T14:30:00Z",
-    sent_at: "2024-01-22T09:15:00Z",
-    confirmation_number: "KKS_2024_001_BZ"
-  },
-  {
-    id: "2",
-    title: "Toluene MBDF Q1 2024",
-    description: "Toluene için Q1 2024 dönem raporu",
-    room: {
-      name: "Toluene MBDF", 
-      substance: { name: "Toluene", ec_number: "203-625-9" }
-    },
-    status: "submitted",
-    created_by: { full_name: "Fatma Kaya" },
-    created_at: "2024-02-01T11:00:00Z",
-    submitted_at: "2024-02-05T16:45:00Z",
-    sent_at: null,
-    confirmation_number: null
-  },
-  {
-    id: "3",
-    title: "Benzene Güvenlik Değerlendirmesi",
-    description: "Güncellenmiş güvenlik değerlendirme raporu",
-    room: {
-      name: "Benzene MBDF",
-      substance: { name: "Benzene", ec_number: "200-753-7" }
-    },
-    status: "draft",
-    created_by: { full_name: "Mehmet Özkan" },
-    created_at: "2024-02-10T09:30:00Z",
-    submitted_at: null,
-    sent_at: null,
-    confirmation_number: null
-  }
-];
 
 export function KKSContent() {
   const [mounted, setMounted] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [filterStatus, setFilterStatus] = useState("all");
+  const [createFormData, setCreateFormData] = useState({
+    title: "",
+    description: "",
+    submission_data: {},
+    room_id: ""
+  });
   const { toast } = useToast();
+
+  // Query hooks
+  const { data: submissionsData, isLoading, error } = useKKSSubmissions();
+  const { data: roomsData } = useRooms();
+  const createSubmissionMutation = useCreateKKSSubmission();
+  const generateEvidenceMutation = useGenerateEvidence();
+  const sendKKSMutation = useSendKKS();
 
   useEffect(() => {
     setMounted(true);
@@ -114,6 +75,21 @@ export function KKSContent() {
   if (!mounted) {
     return null;
   }
+
+  if (isLoading) {
+    return <KKSSkeleton />;
+  }
+
+  const submissions = submissionsData?.items || [];
+  const rooms = roomsData?.items || [];
+
+  // Calculate stats from actual data
+  const stats = {
+    total: submissions.length,
+    draft: submissions.filter(s => s.status === 'draft').length,
+    submitted: submissions.filter(s => s.status === 'submitted').length,
+    sent: submissions.filter(s => s.status === 'sent').length
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -129,24 +105,36 @@ export function KKSContent() {
   };
 
   const handleCreateSubmission = () => {
+    if (!createFormData.title || !createFormData.room_id) {
+      toast({
+        title: "Eksik bilgi",
+        description: "Lütfen tüm gerekli alanları doldurun.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    createSubmissionMutation.mutate({
+      ...createFormData,
+      submission_data: createFormData.submission_data || {}
+    });
     setIsCreateDialogOpen(false);
-    toast({
-      title: "KKS gönderimi oluşturuldu",
-      description: "Yeni KKS gönderimi başarıyla oluşturuldu.",
+    setCreateFormData({
+      title: "",
+      description: "",
+      submission_data: {},
+      room_id: ""
     });
   };
 
-  const handleGenerateEvidence = (submissionId: string) => {
-    toast({
-      title: "Kanıt dosyaları oluşturuluyor",
-      description: "CSV ve PDF kanıt dosyaları oluşturuluyor...",
-    });
+  const handleGenerateEvidence = (submissionId: string, fileType: 'pdf' | 'xml' | 'json' = 'pdf') => {
+    generateEvidenceMutation.mutate({ submissionId, fileType });
   };
 
   const handleSendToKKS = (submissionId: string) => {
-    toast({
-      title: "KKS'ye gönderiliyor", 
-      description: "Gönderim KKS sistemine iletiliyor...",
+    sendKKSMutation.mutate({ 
+      submissionId,
+      officialSend: true
     });
   };
 
@@ -157,7 +145,7 @@ export function KKSContent() {
     });
   };
 
-  const filteredSubmissions = mockSubmissions.filter(submission => {
+  const filteredSubmissions = submissions.filter(submission => {
     if (filterStatus === "all") return true;
     return submission.status === filterStatus;
   });
@@ -177,7 +165,7 @@ export function KKSContent() {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{mockStats.total}</div>
+            <div className="text-2xl font-bold">{stats.total}</div>
             <p className="text-xs text-muted-foreground">Tüm gönderimler</p>
           </CardContent>
         </Card>
@@ -188,7 +176,7 @@ export function KKSContent() {
             <AlertCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{mockStats.draft}</div>
+            <div className="text-2xl font-bold">{stats.draft}</div>
             <p className="text-xs text-muted-foreground">Hazırlanıyor</p>
           </CardContent>
         </Card>
@@ -199,7 +187,7 @@ export function KKSContent() {
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{mockStats.submitted}</div>
+            <div className="text-2xl font-bold">{stats.submitted}</div>
             <p className="text-xs text-muted-foreground">İşleme alındı</p>
           </CardContent>
         </Card>
@@ -210,7 +198,7 @@ export function KKSContent() {
             <CheckCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{mockStats.sent}</div>
+            <div className="text-2xl font-bold">{stats.sent}</div>
             <p className="text-xs text-muted-foreground">KKS'ye iletildi</p>
           </CardContent>
         </Card>
@@ -246,18 +234,28 @@ export function KKSContent() {
                   <div className="grid gap-4 py-4">
                     <div className="grid gap-2">
                       <Label htmlFor="title">Başlık</Label>
-                      <Input id="title" placeholder="Gönderim başlığı..." />
+                      <Input 
+                        id="title" 
+                        placeholder="Gönderim başlığı..." 
+                        value={createFormData.title}
+                        onChange={(e) => setCreateFormData(prev => ({ ...prev, title: e.target.value }))}
+                      />
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="room">MBDF Odası</Label>
-                      <Select>
+                      <Select
+                        value={createFormData.room_id}
+                        onValueChange={(value) => setCreateFormData(prev => ({ ...prev, room_id: value }))}
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="Oda seçin" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="1">Benzene MBDF</SelectItem>
-                          <SelectItem value="2">Toluene MBDF</SelectItem>
-                          <SelectItem value="3">Acetone MBDF</SelectItem>
+                          {rooms.map((room) => (
+                            <SelectItem key={room.id} value={room.id}>
+                              {room.name} - {room.substance?.name}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -267,6 +265,8 @@ export function KKSContent() {
                         id="description"
                         placeholder="Gönderim açıklaması..."
                         className="resize-none"
+                        value={createFormData.description}
+                        onChange={(e) => setCreateFormData(prev => ({ ...prev, description: e.target.value }))}
                       />
                     </div>
                     <div className="grid gap-2">
@@ -275,6 +275,15 @@ export function KKSContent() {
                         id="data"
                         placeholder="JSON formatında gönderim verisini girin..."
                         className="resize-none font-mono text-sm min-h-[120px]"
+                        value={JSON.stringify(createFormData.submission_data, null, 2)}
+                        onChange={(e) => {
+                          try {
+                            const data = e.target.value ? JSON.parse(e.target.value) : {};
+                            setCreateFormData(prev => ({ ...prev, submission_data: data }));
+                          } catch {
+                            // Invalid JSON, keep the text as is for user to fix
+                          }
+                        }}
                       />
                     </div>
                   </div>
@@ -282,8 +291,11 @@ export function KKSContent() {
                     <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                       İptal
                     </Button>
-                    <Button onClick={handleCreateSubmission}>
-                      Oluştur
+                    <Button 
+                      onClick={handleCreateSubmission}
+                      disabled={createSubmissionMutation.isPending}
+                    >
+                      {createSubmissionMutation.isPending ? "Oluşturuluyor..." : "Oluştur"}
                     </Button>
                   </div>
                 </DialogContent>
@@ -308,7 +320,17 @@ export function KKSContent() {
 
             {/* Submissions */}
             <div className="space-y-4">
-              {filteredSubmissions.map((submission, index) => (
+              {error && (
+                <div className="text-center py-12">
+                  <AlertCircle className="mx-auto h-12 w-12 text-destructive" />
+                  <h3 className="mt-4 text-lg font-semibold text-destructive">Hata Oluştu</h3>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    KKS gönderimler yüklenirken bir hata oluştu.
+                  </p>
+                </div>
+              )}
+              
+              {!error && filteredSubmissions.map((submission, index) => (
                 <motion.div
                   key={submission.id}
                   initial={{ opacity: 0, x: -20 }}
@@ -330,11 +352,11 @@ export function KKSContent() {
                             {submission.description}
                           </p>
                           <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                            <span>Oda: {submission.room.name}</span>
+                            <span>Oda: {submission.room?.name || "Bilinmiyor"}</span>
                             <span>•</span>
-                            <span>Madde: {submission.room.substance.name}</span>
+                            <span>Madde: {submission.room?.substance?.name || "Bilinmiyor"}</span>
                             <span>•</span>
-                            <span>Oluşturan: {submission.created_by.full_name}</span>
+                            <span>Oluşturan: {submission.created_by_profile?.full_name || "Bilinmiyor"}</span>
                           </div>
                           <div className="flex items-center space-x-4 text-sm text-muted-foreground">
                             <span>Oluşturulma: {new Date(submission.created_at).toLocaleDateString('tr-TR')}</span>
@@ -351,10 +373,10 @@ export function KKSContent() {
                               </>
                             )}
                           </div>
-                          {submission.confirmation_number && (
+                          {submission.tracking_number && (
                             <div className="flex items-center space-x-2">
                               <Badge variant="outline" className="font-mono text-xs">
-                                {submission.confirmation_number}
+                                {submission.tracking_number}
                               </Badge>
                             </div>
                           )}
@@ -385,7 +407,10 @@ export function KKSContent() {
                             <DropdownMenuContent align="end">
                               {submission.status === "draft" && (
                                 <>
-                                  <DropdownMenuItem onClick={() => handleGenerateEvidence(submission.id)}>
+                                  <DropdownMenuItem 
+                                    onClick={() => handleGenerateEvidence(submission.id)}
+                                    disabled={generateEvidenceMutation.isPending}
+                                  >
                                     <Upload className="mr-2 h-4 w-4" />
                                     Kanıt Dosyaları Oluştur
                                   </DropdownMenuItem>
@@ -394,7 +419,10 @@ export function KKSContent() {
                               )}
                               {submission.status === "submitted" && (
                                 <>
-                                  <DropdownMenuItem onClick={() => handleSendToKKS(submission.id)}>
+                                  <DropdownMenuItem 
+                                    onClick={() => handleSendToKKS(submission.id)}
+                                    disabled={sendKKSMutation.isPending}
+                                  >
                                     <Send className="mr-2 h-4 w-4" />
                                     KKS'ye Gönder
                                   </DropdownMenuItem>
@@ -433,7 +461,7 @@ export function KKSContent() {
               ))}
             </div>
 
-            {filteredSubmissions.length === 0 && (
+            {!error && filteredSubmissions.length === 0 && (
               <div className="text-center py-12">
                 <Send className="mx-auto h-12 w-12 text-muted-foreground" />
                 <h3 className="mt-4 text-lg font-semibold">Gönderim bulunamadı</h3>

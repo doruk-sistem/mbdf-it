@@ -5,11 +5,55 @@ import type { Database } from '@/types/supabase';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 // Client-side Supabase client
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
 
+// Admin Supabase client (bypasses RLS)
+export const createAdminSupabase = () => {
+  return createClient<Database>(supabaseUrl, supabaseServiceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  });
+};
+
 // Server-side Supabase client for App Router
+export const createServerSupabase = () => {
+  // Import cookies dynamically to avoid Next.js import issues in client components
+  const { cookies } = require('next/headers');
+  const cookieStore = cookies();
+  
+  return createServerClient<Database>(
+    supabaseUrl,
+    supabaseAnonKey,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+        set(name: string, value: string, options: CookieOptions) {
+          try {
+            cookieStore.set(name, value, options);
+          } catch (error) {
+            // Handle cookie setting errors silently
+          }
+        },
+        remove(name: string, options: CookieOptions) {
+          try {
+            cookieStore.delete(name);
+          } catch (error) {
+            // Handle cookie removal errors silently
+          }
+        },
+      },
+    }
+  );
+};
+
+// Legacy function for backwards compatibility
 export const createServerSupabaseClient = (cookieStore: {
   get: (name: string) => { name: string; value: string } | undefined;
   set: (name: string, value: string, options?: Partial<CookieOptions>) => void;

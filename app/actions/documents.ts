@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
-import { createServerSupabase } from '@/lib/clientSupabase';
+import { createServerSupabase } from "@/lib/supabase";
 import { uploadFile, deleteFile } from "@/lib/supabase";
 
 // Get current user

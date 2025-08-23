@@ -1,4 +1,4 @@
-import { createServerSupabase } from "@/lib/clientSupabase";
+import { createServerSupabase } from "@/lib/supabase";
 import { Navigation } from "@/components/navigation";
 
 export async function NavigationWrapper() {
