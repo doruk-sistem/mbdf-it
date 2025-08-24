@@ -41,7 +41,6 @@ export function RoomContent({ roomId }: RoomContentProps) {
   // Get user role and permissions for this specific room
   const canArchive = useCanArchiveRoom(roomId);
   const isRoomAdmin = useIsRoomAdmin(roomId);
-  console.log('canArchive', canArchive, 'isRoomAdmin', isRoomAdmin);
 
   if (isLoading) {
     return (

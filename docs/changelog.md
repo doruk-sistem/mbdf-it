@@ -1,4 +1,20 @@
 # Changelog
+## [2025-08-25] - Room Stats: Document and Package Counts Fixed
+
+### Düzeltilen
+- Oda detay sayfasında ve listede "Dokümanlar" kartı 0 gösteriyordu.
+- `document_count` ve `package_count` artık API tarafından doğru hesaplanıyor.
+
+### Teknik Detaylar
+- `app/api/rooms/[roomId]/route.ts`:
+  - GET ve PUT handler'larında `document` ve `access_package` tablolarından count sorguları eklendi.
+  - Response'a `document_count` ve `package_count` alanları eklendi.
+- `app/api/rooms/route.ts`:
+  - Listeleme endpoint'inde her oda için doküman ve paket sayıları paralel olarak hesaplanıyor.
+
+### Etki
+- Oda üst kısmındaki istatistik kartları ve dashboard verileri gerçeği yansıtıyor.
+
 ## [2025-08-24] - Archived Rooms: Block Member Additions and Document Uploads
 
 ### Değişiklikler
@@ -46,7 +62,7 @@ Ardından `/api/rooms/[roomId]/archive/confirm` endpoint'ini tekrar deneyin.
 
 Bu dosya MBDF-IT projesindeki tüm önemli değişiklikleri listeler.
 
-## [2025-01-29] - Documents API 403 Error Fix & Read-Only Access Implementation
+## [2025-08-23] - Documents API 403 Error Fix & Read-Only Access Implementation
 
 ### Düzeltilen
 - **Documents API endpoints 403 hatası çözüldü**
@@ -81,7 +97,7 @@ Bu dosya MBDF-IT projesindeki tüm önemli değişiklikleri listeler.
 - RLS politikaları düzgün şekilde yapılandırıldı
 - Authentication ve authorization kontrolleri korundu
 
-## [2025-01-28] - Dashboard Schema Validation & Stack Depth Fix
+## [2025-08-24] - Dashboard Schema Validation & Stack Depth Fix
 
 ### Düzeltilen
 - **Dashboard veri yükleme hatası çözüldü**
@@ -108,7 +124,7 @@ Bu dosya MBDF-IT projesindeki tüm önemli değişiklikleri listeler.
   - checkMembership helper fonksiyonu eklendi - tüm membership kontrolleri için merkezi çözüm
   - "Not a member of this room" hatası artık görünmeyecek
 
-## [2025-01-28] - Room Creation RLS Policy Fix
+## [2025-08-23] - Room Creation RLS Policy Fix
 
 ### Düzeltilen
 - **Oda oluşturma RLS politikası hatası çözüldü**

@@ -49,17 +49,29 @@ export async function GET(request: NextRequest) {
         .eq('id', room.created_by)
         .single();
       
-      // Get member count
-      const { count } = await adminSupabase
+      // Get counts
+      const [{ count: memberCount }, { count: documentCount }, { count: packageCount }] = await Promise.all([
+        adminSupabase
         .from('mbdf_member')
         .select('*', { count: 'exact', head: true })
-        .eq('room_id', room.id);
+        .eq('room_id', room.id),
+        adminSupabase
+          .from('document')
+          .select('*', { count: 'exact', head: true })
+          .eq('room_id', room.id),
+        adminSupabase
+          .from('access_package')
+          .select('*', { count: 'exact', head: true })
+          .eq('room_id', room.id),
+      ]);
       
       return {
         ...room,
         substance: substance || null,
         created_by_profile: created_by_profile || null,
-        member_count: count || 0
+        member_count: memberCount || 0,
+        document_count: documentCount || 0,
+        package_count: packageCount || 0,
       };
     }));
 
