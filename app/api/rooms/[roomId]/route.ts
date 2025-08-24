@@ -98,6 +98,10 @@ export async function GET(
       substance: substanceResult.data || null,
       created_by_profile: profileResult.data || null,
       member_count: memberCountResult.count || 0,
+      // Ensure archive fields exist with null values if not present (for backwards compatibility)
+      archived_at: room.archived_at || null,
+      archive_reason: room.archive_reason || null,
+      archive_initiated_by: room.archive_initiated_by || null,
     };
 
     // Validate response
@@ -215,6 +219,10 @@ export async function PUT(
       substance: substanceResult.data || null,
       created_by_profile: profileResult.data || null,
       member_count: memberCountResult.count || 0,
+      // Ensure archive fields exist with null values if not present (for backwards compatibility)
+      archived_at: room.archived_at || null,
+      archive_reason: room.archive_reason || null,
+      archive_initiated_by: room.archive_initiated_by || null,
     };
 
     // Validate response

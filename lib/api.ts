@@ -311,4 +311,9 @@ export const API_ENDPOINTS = {
   // Substances
   substances: '/api/substances',
   substance: (id: string) => `/api/substances/${id}`,
+  
+  // Room Archive Operations
+  archiveCheck: (roomId: string) => `/api/rooms/${roomId}/archive/check`,
+  archiveConfirm: (roomId: string) => `/api/rooms/${roomId}/archive/confirm`,
+  unarchiveRoom: (roomId: string) => `/api/rooms/${roomId}/archive/unarchive`,
 } as const;

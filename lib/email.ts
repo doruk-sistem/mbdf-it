@@ -217,3 +217,30 @@ export async function sendSignatureRequestNotification(
   const template = emailTemplates.agreementSignatureRequest(recipientName, agreementTitle, roomName, agreementId);
   return sendMail({ to, ...template });
 }
+
+// Generic email sender for new template system
+export interface SendEmailOptions {
+  to: string | string[];
+  subject: string;
+  template: string;
+  data: Record<string, any>;
+  from?: string;
+}
+
+export async function sendEmail(options: SendEmailOptions) {
+  const { getEmailTemplate } = await import('./email-templates');
+  
+  try {
+    const templateResult = getEmailTemplate(options.template as any, options.data);
+    
+    return await sendMail({
+      to: options.to,
+      subject: templateResult.subject,
+      html: templateResult.html,
+      from: options.from
+    });
+  } catch (error) {
+    console.error('Failed to send email with template:', error);
+    throw error;
+  }
+}

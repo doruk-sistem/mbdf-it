@@ -1,4 +1,48 @@
 # Changelog
+## [2025-08-24] - Archived Rooms: Block Member Additions and Document Uploads
+
+### Değişiklikler
+- Arşivli odalarda aşağıdaki işlemler engellendi:
+  - Üye ekleme/çıkarma ve rol güncelleme (UI disabled + server guard)
+  - Doküman yükleme (UI disabled + API guard)
+
+### Teknik Detaylar
+- UI güncellemeleri:
+  - `components/room/room-content.tsx`: `MembersTab` ve `DocumentsTab` için `isArchived` prop iletildi
+  - `components/room/tabs/members-tab.tsx`: Arşivli odalarda butonlar ve menü aksiyonları `disabled`
+  - `components/room/tabs/documents-tab.tsx`: Yükleme butonu ve form alanları `disabled`
+- Sunucu tarafı kontroller:
+  - `app/actions/rooms.ts`: `joinRoom`, `addMemberToRoom`, `removeMemberFromRoom`, `updateMemberRole` fonksiyonlarına arşiv kontrolü eklendi
+  - `app/api/documents/upload/route.ts`: Yükleme öncesi oda `status` kontrolü; `archived` ise 403
+
+### Güvenlik
+- RLS zaten `document` ve `mbdf_member` için arşivli odalarda yazma işlemlerini engelliyor; uygulama katmanında ek koruma sağlandı.
+
+### Etki
+- Arşivlenmiş odalarda istenmeyen yazma işlemleri tamamen engellendi; kullanıcılar net uyarı/disabled durumları görüyor.
+## [2025-08-24] - Archive Audit Log Column Fix
+
+### Düzeltilen
+- Oda arşivleme sırasında oluşan hata giderildi: `Failed to archive room: column "actor_id" of relation "audit_log" does not exist`
+- SQL fonksiyonları `audit_log` tablosuna kayıt atarken `actor_id` yerine mevcut olan `user_id` alanını kullanacak şekilde güncellendi.
+- `target_entity/target_id` ve `before_data/after_data` alanları yerine mevcut şema ile uyumlu `resource_type/resource_id` ve `old_values/new_values` alanları kullanılacak şekilde güncellendi.
+
+### Teknik Detaylar
+- Güncellenen dosyalar:
+  - `sql/archive_migration.sql` (audit log insert'lerinde `actor_id` -> `user_id`)
+  - `sql/fix_archive_json_error.sql` (audit log insert'lerinde `actor_id` -> `user_id`)
+  - `sql/fix_unarchive_permission.sql` (audit log insert'lerinde `actor_id` -> `user_id`)
+  - Üç dosyada da `target_entity/target_id` -> `resource_type/resource_id` ve `before_data/after_data` -> `old_values/new_values` dönüşümü yapıldı
+- Fonksiyonlar `CREATE OR REPLACE` olduğu için değişiklikler idempotent.
+
+### Uygulama
+- Aşağıdaki SQL dosyalarını production veritabanına çalıştırın (sıra önemli değil):
+  - `sql/fix_archive_json_error.sql`
+  - `sql/fix_unarchive_permission.sql`
+  - (Gerekirse) `sql/archive_migration.sql`
+
+Ardından `/api/rooms/[roomId]/archive/confirm` endpoint'ini tekrar deneyin.
+
 
 Bu dosya MBDF-IT projesindeki tüm önemli değişiklikleri listeler.
 

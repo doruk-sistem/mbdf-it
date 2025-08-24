@@ -11,7 +11,7 @@ export const UserRoleSchema = z.enum(['admin', 'lr', 'member']);
 export const RoomStatusSchema = z.enum(['active', 'closed', 'archived']);
 
 // Request status enum
-export const RequestStatusSchema = z.enum(['pending', 'approved', 'rejected']);
+export const RequestStatusSchema = z.enum(['pending', 'approved', 'rejected', 'revoked']);
 
 // Signature status enum
 export const SignatureStatusSchema = z.enum(['pending', 'signed', 'rejected']);
@@ -60,6 +60,9 @@ export const RoomSchema = z.object({
   status: RoomStatusSchema,
   substance_id: IdSchema,
   created_by: IdSchema,
+  archived_at: DateSchema.nullable(),
+  archive_reason: z.string().nullable(),
+  archive_initiated_by: IdSchema.nullable(),
   created_at: DateSchema,
   updated_at: DateSchema,
 });

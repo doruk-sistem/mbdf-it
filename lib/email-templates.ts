@@ -747,6 +747,264 @@ Sözleşme ID: ${agreementId}
 
 Bu e-posta MBDF-IT Portal tarafından otomatik olarak gönderilmiştir.
     `
+  },
+
+  // Room archived notification
+  roomArchived: {
+    subject: (roomName: string) => `MBDF Odası Arşivlendi: ${roomName}`,
+    html: (memberName: string, roomName: string, archiveReason: string, archivedAt: string, pendingRejected: number, approvedRevoked: number) => `
+      <!DOCTYPE html>
+      <html lang="tr">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>MBDF Odası Arşivlendi</title>
+        <style>
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8fafc;
+          }
+          .container {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+          }
+          .header {
+            text-align: center;
+            margin-bottom: 32px;
+          }
+          .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #dc2626;
+            margin-bottom: 8px;
+          }
+          .title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #1e293b;
+          }
+          .content {
+            margin-bottom: 32px;
+            color: #64748b;
+          }
+          .info-box {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 16px 0;
+            color: #92400e;
+          }
+          .stats-box {
+            background: #fee2e2;
+            border: 1px solid #dc2626;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 16px 0;
+            color: #991b1b;
+          }
+          .footer {
+            text-align: center;
+            margin-top: 32px;
+            padding-top: 32px;
+            border-top: 1px solid #e2e8f0;
+            color: #64748b;
+            font-size: 14px;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <div class="logo">📁 MBDF-IT</div>
+            <h1 class="title">MBDF Odası Arşivlendi</h1>
+          </div>
+          
+          <div class="content">
+            <p>Merhaba ${memberName},</p>
+            <p>Aşağıdaki MBDF odası arşivlenmiştir:</p>
+            <p><strong>${roomName}</strong></p>
+            <p>Arşivlenme Tarihi: <strong>${archivedAt}</strong></p>
+          </div>
+          
+          ${archiveReason && archiveReason.trim() ? `
+          <div class="info-box">
+            <strong>Arşivlenme Nedeni:</strong><br>
+            ${archiveReason}
+          </div>
+          ` : ''}
+          
+          ${(pendingRejected > 0 || approvedRevoked > 0) ? `
+          <div class="stats-box">
+            <strong>Etkilenen İstekler:</strong>
+            <ul style="margin: 8px 0;">
+              ${pendingRejected > 0 ? `<li>${pendingRejected} bekleyen istek reddedildi</li>` : ''}
+              ${approvedRevoked > 0 ? `<li>${approvedRevoked} onaylanmış token iptal edildi</li>` : ''}
+            </ul>
+          </div>
+          ` : ''}
+          
+          <div class="content">
+            <p><strong>Önemli:</strong> Arşivlenen oda artık salt okunur modundadır. Yeni doküman, mesaj, paket veya talep eklenemez, mevcut içerikler değiştirilemez.</p>
+            <p>Oda verileriniz korunmuştur ve görüntülemeye devam edebilirsiniz.</p>
+          </div>
+          
+          <div class="footer">
+            <p>Bu e-posta MBDF-IT Portal tarafından otomatik olarak gönderilmiştir.</p>
+            <p>Sorularınız için sistem yöneticinizle iletişime geçin.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
+    text: (memberName: string, roomName: string, archiveReason: string, archivedAt: string, pendingRejected: number, approvedRevoked: number) => `
+MBDF Odası Arşivlendi
+
+Merhaba ${memberName},
+
+Aşağıdaki MBDF odası arşivlenmiştir:
+${roomName}
+
+Arşivlenme Tarihi: ${archivedAt}
+
+${archiveReason && archiveReason.trim() ? `
+Arşivlenme Nedeni: ${archiveReason}
+` : ''}
+
+${(pendingRejected > 0 || approvedRevoked > 0) ? `
+Etkilenen İstekler:
+${pendingRejected > 0 ? `- ${pendingRejected} bekleyen istek reddedildi` : ''}
+${approvedRevoked > 0 ? `- ${approvedRevoked} onaylanmış token iptal edildi` : ''}
+` : ''}
+
+ÖNEMLİ: Arşivlenen oda artık salt okunur modundadır. Yeni doküman, mesaj, paket veya talep eklenemez, mevcut içerikler değiştirilemez.
+
+Oda verileriniz korunmuştur ve görüntülemeye devam edebilirsiniz.
+
+Bu e-posta MBDF-IT Portal tarafından otomatik olarak gönderilmiştir.
+Sorularınız için sistem yöneticinizle iletişime geçin.
+    `
+  },
+
+  // Room unarchived notification
+  roomUnarchived: {
+    subject: (roomName: string) => `MBDF Odası Yeniden Etkinleştirildi: ${roomName}`,
+    html: (memberName: string, roomName: string, unarchivedAt: string) => `
+      <!DOCTYPE html>
+      <html lang="tr">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>MBDF Odası Yeniden Etkinleştirildi</title>
+        <style>
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8fafc;
+          }
+          .container {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+          }
+          .header {
+            text-align: center;
+            margin-bottom: 32px;
+          }
+          .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #10b981;
+            margin-bottom: 8px;
+          }
+          .title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #1e293b;
+          }
+          .content {
+            margin-bottom: 32px;
+            color: #64748b;
+          }
+          .success-box {
+            background: #d1fae5;
+            border: 1px solid #10b981;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 16px 0;
+            color: #065f46;
+          }
+          .footer {
+            text-align: center;
+            margin-top: 32px;
+            padding-top: 32px;
+            border-top: 1px solid #e2e8f0;
+            color: #64748b;
+            font-size: 14px;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <div class="logo">🔄 MBDF-IT</div>
+            <h1 class="title">MBDF Odası Yeniden Etkinleştirildi</h1>
+          </div>
+          
+          <div class="content">
+            <p>Merhaba ${memberName},</p>
+            <p>Aşağıdaki MBDF odası yeniden etkinleştirilmiştir:</p>
+            <p><strong>${roomName}</strong></p>
+            <p>Etkinleştirme Tarihi: <strong>${unarchivedAt}</strong></p>
+          </div>
+          
+          <div class="success-box">
+            <strong>✅ Oda Aktif:</strong> Artık yeniden doküman yükleyebilir, mesaj gönderebilir, paket oluşturabilir ve erişim talebinde bulunabilirsiniz.
+          </div>
+          
+          <div class="content">
+            <p><strong>Önemli Not:</strong> Daha önce iptal edilen erişim tokenları otomatik olarak yeniden etkinleştirilmez. Gerekirse yeni erişim talepleri oluşturabilirsiniz.</p>
+          </div>
+          
+          <div class="footer">
+            <p>Bu e-posta MBDF-IT Portal tarafından otomatik olarak gönderilmiştir.</p>
+            <p>Sorularınız için sistem yöneticinizle iletişime geçin.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
+    text: (memberName: string, roomName: string, unarchivedAt: string) => `
+MBDF Odası Yeniden Etkinleştirildi
+
+Merhaba ${memberName},
+
+Aşağıdaki MBDF odası yeniden etkinleştirilmiştir:
+${roomName}
+
+Etkinleştirme Tarihi: ${unarchivedAt}
+
+✅ Oda Aktif: Artık yeniden doküman yükleyebilir, mesaj gönderebilir, paket oluşturabilir ve erişim talebinde bulunabilirsiniz.
+
+ÖNEMLİ NOT: Daha önce iptal edilen erişim tokenları otomatik olarak yeniden etkinleştirilmez. Gerekirse yeni erişim talepleri oluşturabilirsiniz.
+
+Bu e-posta MBDF-IT Portal tarafından otomatik olarak gönderilmiştir.
+Sorularınız için sistem yöneticinizle iletişime geçin.
+    `
   }
 };
 
@@ -785,6 +1043,20 @@ export function getEmailTemplate(
       subject: (template as any).subject(agreementTitle),
       html: (template as any).html(recipientName, agreementTitle, signerName, agreementId, signUrl),
       text: (template as any).text(recipientName, agreementTitle, signerName, agreementId, signUrl)
+    };
+  } else if (type === 'roomArchived') {
+    const [memberName, roomName, archiveReason, archivedAt, pendingRejected, approvedRevoked] = Object.values(params) as [string, string, string, string, number, number];
+    return {
+      subject: (template as any).subject(roomName),
+      html: (template as any).html(memberName, roomName, archiveReason, archivedAt, pendingRejected, approvedRevoked),
+      text: (template as any).text(memberName, roomName, archiveReason, archivedAt, pendingRejected, approvedRevoked)
+    };
+  } else if (type === 'roomUnarchived') {
+    const [memberName, roomName, unarchivedAt] = Object.values(params) as [string, string, string];
+    return {
+      subject: (template as any).subject(roomName),
+      html: (template as any).html(memberName, roomName, unarchivedAt),
+      text: (template as any).text(memberName, roomName, unarchivedAt)
     };
   }
   

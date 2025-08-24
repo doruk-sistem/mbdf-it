@@ -5,6 +5,7 @@ export const keys = {
     list: () => ['rooms', 'list'] as const,
     byId: (id: string) => ['rooms', 'byId', id] as const,
     details: (id: string) => ['rooms', 'details', id] as const,
+    archiveCheck: (roomId: string) => ['rooms', 'archive', 'check', roomId] as const,
   },
 
   // Members

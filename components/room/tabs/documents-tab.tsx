@@ -45,10 +45,11 @@ import { useDocuments, useUploadDocument } from "@/hooks/use-documents";
 
 interface DocumentsTabProps {
   roomId: string;
+  isArchived?: boolean;
 }
 
 
-export function DocumentsTab({ roomId }: DocumentsTabProps) {
+export function DocumentsTab({ roomId, isArchived = false }: DocumentsTabProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
@@ -152,7 +153,7 @@ export function DocumentsTab({ roomId }: DocumentsTabProps) {
           {isMember && (
             <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
               <DialogTrigger asChild>
-                <Button>
+                <Button disabled={isArchived} title={isArchived ? "Arşivli odada işlem yapılamaz" : undefined}>
                   <Upload className="mr-2 h-4 w-4" />
                   Yükle
                 </Button>
@@ -172,6 +173,7 @@ export function DocumentsTab({ roomId }: DocumentsTabProps) {
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder="Doküman başlığı..."
+                    disabled={isArchived}
                   />
                 </div>
                 <div className="space-y-2">
@@ -180,6 +182,7 @@ export function DocumentsTab({ roomId }: DocumentsTabProps) {
                     id="file"
                     type="file"
                     onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                    disabled={isArchived}
                   />
                   {selectedFile && (
                     <p className="text-sm text-muted-foreground">
@@ -195,6 +198,7 @@ export function DocumentsTab({ roomId }: DocumentsTabProps) {
                     onChange={(e) => setDescription(e.target.value)}
                     placeholder="Doküman açıklaması..."
                     className="resize-none"
+                    disabled={isArchived}
                   />
                 </div>
               </div>
@@ -204,7 +208,7 @@ export function DocumentsTab({ roomId }: DocumentsTabProps) {
                 </Button>
                 <Button 
                   onClick={handleUpload}
-                  disabled={uploadMutation.isPending || !selectedFile || !title.trim()}
+                  disabled={uploadMutation.isPending || !selectedFile || !title.trim() || isArchived}
                 >
                   {uploadMutation.isPending && (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />

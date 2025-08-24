@@ -56,6 +56,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Block uploads if room is archived
+    const { data: room, error: roomError } = await supabase
+      .from('mbdf_room')
+      .select('status')
+      .eq('id', roomId)
+      .single();
+
+    if (roomError) {
+      return NextResponse.json(
+        { error: 'Failed to verify room status', success: false },
+        { status: 500 }
+      );
+    }
+
+    if (room?.status === 'archived') {
+      return NextResponse.json(
+        { error: 'Room is archived. Uploads are disabled.', success: false },
+        { status: 403 }
+      );
+    }
+
     // Generate unique file path
     const timestamp = Date.now();
     const fileExtension = file.name.split('.').pop();

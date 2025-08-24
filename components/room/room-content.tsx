@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Users, FileText, Package, Vote, Settings, MoreVertical } from "lucide-react";
+import { Users, FileText, Package, Vote, Settings, MoreVertical, Archive } from "lucide-react";
 import { useRoom } from "@/hooks/use-rooms";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -22,6 +22,10 @@ import { MembersTab } from "./tabs/members-tab";
 import { DocumentsTab } from "./tabs/documents-tab";
 import { PackagesTab } from "./tabs/packages-tab";
 import { VotingTab } from "./tabs/voting-tab";
+import { ArchiveDialog } from "./archive-dialog";
+import { ArchivedBanner } from "./archived-banner";
+import { isRoomArchived, getRoomStatusText, getRoomStatusVariant } from "@/lib/archive-utils";
+import { useCanArchiveRoom, useIsRoomAdmin } from "@/hooks/use-user";
 
 interface RoomContentProps {
   roomId: string;
@@ -29,9 +33,15 @@ interface RoomContentProps {
 
 export function RoomContent({ roomId }: RoomContentProps) {
   const [activeTab, setActiveTab] = useState("members");
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   
   // Query hooks
   const { data: room, isLoading, error } = useRoom(roomId);
+  
+  // Get user role and permissions for this specific room
+  const canArchive = useCanArchiveRoom(roomId);
+  const isRoomAdmin = useIsRoomAdmin(roomId);
+  console.log('canArchive', canArchive, 'isRoomAdmin', isRoomAdmin);
 
   if (isLoading) {
     return (
@@ -79,6 +89,17 @@ export function RoomContent({ roomId }: RoomContentProps) {
 
   return (
     <div className="space-y-6">
+      {/* Archived Banner */}
+      {isRoomArchived(room) && (
+        <ArchivedBanner
+          roomId={roomId}
+          roomName={room.name}
+          archivedAt={room.archived_at || undefined}
+          archiveReason={room.archive_reason || undefined}
+          isAdmin={isRoomAdmin}
+        />
+      )}
+      
       {/* Room Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
@@ -89,8 +110,8 @@ export function RoomContent({ roomId }: RoomContentProps) {
         <div className="space-y-1">
           <div className="flex items-center space-x-3">
             <h1 className="text-3xl font-bold tracking-tight">{room.name}</h1>
-            <Badge variant={room.status === "active" ? "default" : "secondary"}>
-              {room.status === "active" ? "Aktif" : "Kapalı"}
+            <Badge variant={getRoomStatusVariant(room.status)}>
+              {getRoomStatusText(room.status)}
             </Badge>
           </div>
           <p className="text-muted-foreground">
@@ -117,16 +138,22 @@ export function RoomContent({ roomId }: RoomContentProps) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem>
+              <DropdownMenuItem disabled={isRoomArchived(room)}>
                 Odayı düzenle
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              <DropdownMenuItem disabled={isRoomArchived(room)}>
                 Üye ekle
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive">
-                Odayı arşivle
-              </DropdownMenuItem>
+              {!isRoomArchived(room) && canArchive && (
+                <DropdownMenuItem 
+                  className="text-destructive"
+                  onClick={() => setArchiveDialogOpen(true)}
+                >
+                  <Archive className="mr-2 h-4 w-4" />
+                  Odayı arşivle
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -206,11 +233,11 @@ export function RoomContent({ roomId }: RoomContentProps) {
           </TabsList>
 
           <TabsContent value="members" className="space-y-4">
-            <MembersTab roomId={roomId} />
+            <MembersTab roomId={roomId} isArchived={isRoomArchived(room)} />
           </TabsContent>
 
           <TabsContent value="documents" className="space-y-4">
-            <DocumentsTab roomId={roomId} />
+            <DocumentsTab roomId={roomId} isArchived={isRoomArchived(room)} />
           </TabsContent>
 
           <TabsContent value="packages" className="space-y-4">
@@ -222,6 +249,14 @@ export function RoomContent({ roomId }: RoomContentProps) {
           </TabsContent>
         </Tabs>
       </motion.div>
+
+      {/* Archive Dialog */}
+      <ArchiveDialog
+        roomId={roomId}
+        roomName={room.name}
+        open={archiveDialogOpen}
+        onOpenChange={setArchiveDialogOpen}
+      />
     </div>
   );
 }

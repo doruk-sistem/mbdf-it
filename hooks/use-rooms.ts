@@ -8,6 +8,55 @@ import {
   RoomWithDetailsSchema 
 } from '@/lib/schemas';
 import { useToast } from '@/components/ui/use-toast';
+import { z } from 'zod';
+
+// Archive-related schemas
+const ArchivePrecheckResponseSchema = z.object({
+  room: z.object({
+    id: z.string().uuid(),
+    name: z.string(),
+    status: z.enum(['active', 'closed', 'archived']),
+    substance: z.object({
+      ec_number: z.string().nullable(),
+      cas_number: z.string().nullable(),
+    }).nullable(),
+  }),
+  counts: z.object({
+    pending_requests: z.number(),
+    approved_requests: z.number(),
+    open_votes: z.number(),
+    draft_agreements: z.number(),
+    total_members: z.number(),
+  }),
+  effects: z.object({
+    pending_will_be_rejected: z.number(),
+    approved_will_be_revoked: z.number(),
+    votes_will_be_closed: z.number(),
+  }),
+  can_archive: z.boolean(),
+  reasons: z.array(z.string()),
+});
+
+const ArchiveResponseSchema = z.object({
+  success: z.boolean(),
+  room_id: z.string().uuid(),
+  room_name: z.string(),
+  archived_at: z.string(),
+  archive_reason: z.string().nullable(),
+  pending_requests_rejected: z.number(),
+  approved_requests_revoked: z.number(),
+});
+
+const UnarchiveResponseSchema = z.object({
+  success: z.boolean(),
+  room_id: z.string().uuid(),
+  room_name: z.string(),
+  unarchived_at: z.string(),
+});
+
+type ArchivePrecheckResponse = z.infer<typeof ArchivePrecheckResponseSchema>;
+type ArchiveResponse = z.infer<typeof ArchiveResponseSchema>;
+type UnarchiveResponse = z.infer<typeof UnarchiveResponseSchema>;
 
 // Query hooks
 export function useRooms() {
@@ -99,6 +148,78 @@ export function useDeleteRoom(roomId: string) {
       toast({
         title: 'Error',
         description: error?.data?.message || 'Failed to archive room',
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
+// Archive-related hooks
+export function useArchivePrecheck(roomId: string) {
+  return useQuery({
+    queryKey: keys.rooms.archiveCheck(roomId),
+    queryFn: () => get(API_ENDPOINTS.archiveCheck(roomId)).then(data => ArchivePrecheckResponseSchema.parse(data)),
+    enabled: !!roomId,
+    staleTime: 1000 * 30, // 30 seconds - should be fresh for archive operations
+  });
+}
+
+export function useArchiveRoom() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: ({ roomId, reason }: { roomId: string; reason?: string }) =>
+      post(API_ENDPOINTS.archiveConfirm(roomId), { reason }).then(data => ArchiveResponseSchema.parse(data)),
+    onSuccess: (data) => {
+      // Invalidate related data
+      const roomId = data.room_id;
+      invalidationHelpers.room(roomId).forEach(key => {
+        queryClient.invalidateQueries({ queryKey: key });
+      });
+      // Also invalidate archive check
+      queryClient.invalidateQueries({ queryKey: keys.rooms.archiveCheck(roomId) });
+      
+      toast({
+        title: 'Room Archived',
+        description: `${data.room_name} has been archived successfully`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Archive Failed',
+        description: error?.data?.message || 'Failed to archive room',
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
+export function useUnarchiveRoom() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (roomId: string) =>
+      post(API_ENDPOINTS.unarchiveRoom(roomId)).then(data => UnarchiveResponseSchema.parse(data)),
+    onSuccess: (data) => {
+      // Invalidate related data
+      const roomId = data.room_id;
+      invalidationHelpers.room(roomId).forEach(key => {
+        queryClient.invalidateQueries({ queryKey: key });
+      });
+      // Also invalidate archive check
+      queryClient.invalidateQueries({ queryKey: keys.rooms.archiveCheck(roomId) });
+      
+      toast({
+        title: 'Room Reactivated',
+        description: `${data.room_name} has been reactivated successfully`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Reactivation Failed',
+        description: error?.data?.message || 'Failed to reactivate room',
         variant: 'destructive',
       });
     },
