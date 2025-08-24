@@ -36,6 +36,17 @@ async function checkMembership(roomId: string, userId: string) {
   return membership;
 }
 
+// Get room status using admin client to avoid RLS issues
+async function getRoomStatus(roomId: string) {
+  const adminSupabase = createAdminSupabase();
+  const { data: room } = await adminSupabase
+    .from("mbdf_room")
+    .select("status")
+    .eq("id", roomId)
+    .single() as { data: { status: Database['public']['Enums']['room_status'] } | null } as any;
+  return room?.status;
+}
+
 // Create a new MBDF room
 export async function createRoom(formData: FormData) {
   const user = await getCurrentUser();
@@ -172,6 +183,12 @@ export async function joinRoom(roomId: string) {
   const supabase = createServerSupabase();
 
   try {
+    // Block if room is archived
+    const status = await getRoomStatus(roomId);
+    if (status === 'archived') {
+      throw new Error("Room is archived. Membership changes are disabled");
+    }
+
     // Check if user is already a member
     const { data: existingMember } = await supabase
       .from("mbdf_member")
@@ -284,6 +301,12 @@ export async function addMemberToRoom(roomId: string, userEmail: string, role: s
   const supabase = createServerSupabase();
 
   try {
+    // Block if room is archived
+    const status = await getRoomStatus(roomId);
+    if (status === 'archived') {
+      throw new Error("Room is archived. Membership changes are disabled");
+    }
+
     // Check if current user has permission to add members
     const { data: member } = await supabase
       .from("mbdf_member")
@@ -357,6 +380,12 @@ export async function removeMemberFromRoom(roomId: string, memberId: string) {
   const supabase = createServerSupabase();
 
   try {
+    // Block if room is archived
+    const status = await getRoomStatus(roomId);
+    if (status === 'archived') {
+      throw new Error("Room is archived. Membership changes are disabled");
+    }
+
     // Check if current user has permission to remove members
     const { data: currentMember } = await supabase
       .from("mbdf_member")
@@ -429,6 +458,12 @@ export async function updateMemberRole(roomId: string, memberId: string, newRole
   const supabase = createServerSupabase();
 
   try {
+    // Block if room is archived
+    const status = await getRoomStatus(roomId);
+    if (status === 'archived') {
+      throw new Error("Room is archived. Membership changes are disabled");
+    }
+
     // Check if current user has permission to update roles
     const { data: currentMember } = await supabase
       .from("mbdf_member")
