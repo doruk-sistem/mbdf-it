@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if user has access to this room
+    // Check if user is a member of this room (only members can upload)
     const { data: membership, error: memberError } = await supabase
       .from('mbdf_member')
       .select('id')
@@ -49,9 +49,9 @@ export async function POST(request: NextRequest) {
       .eq('user_id', user.id)
       .single();
 
-    if (memberError) {
+    if (memberError || !membership) {
       return NextResponse.json(
-        { error: 'Access denied', success: false },
+        { error: 'Only room members can upload documents', success: false },
         { status: 403 }
       );
     }

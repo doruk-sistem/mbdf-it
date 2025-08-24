@@ -2,6 +2,41 @@
 
 Bu dosya MBDF-IT projesindeki tüm önemli değişiklikleri listeler.
 
+## [2025-01-29] - Documents API 403 Error Fix & Read-Only Access Implementation
+
+### Düzeltilen
+- **Documents API endpoints 403 hatası çözüldü**
+  - `/api/documents` GET endpoint'i 403 hatası veriyordu
+  - `/api/documents/upload` POST endpoint'i 403 hatası veriyordu
+  - Sorun: RLS politikaları nedeniyle membership kontrolü kısır döngüye giriyordu
+  - `mbdf_member` tablosunun RLS politikası, membership kontrolü için zaten üye olmanızı gerektiriyordu
+
+### Eklenen
+- **Üye olmayanlar için read-only access**
+  - Odaya üye olmayanlar dokümanları görüntüleyebilir ve indirebilir
+  - Sadece üyeler doküman yükleme ve silme işlemi yapabilir
+  - UI'da üyelik durumuna göre conditional rendering
+  - Üye olmayanlara bilgilendirme mesajı gösteriliyor
+
+### Teknik Detaylar
+- RLS politikası düzeltmesi: `sql/fix-document-access-policies.sql`
+  - mbdf_member circular dependency çözüldü
+  - Yeni politikalar: "Users can view their own memberships" ve "Users can view memberships in accessible rooms"
+  - Document tablosu için "Users can view documents in accessible rooms" politikası
+  - `can_view_room()` helper fonksiyonu eklendi
+- API değişiklikleri:
+  - `/api/documents` - `can_view_room` RPC kullanıyor, response'a `isMember` flag eklendi
+  - `/api/documents/upload` - Sadece üyeler yükleyebilir
+- UI değişiklikleri:
+  - Upload butonu sadece üyelere gösteriliyor
+  - Silme seçeneği sadece üyelere gösteriliyor
+  - Üye olmayanlara bilgilendirme banner'ı
+
+### Güvenlik
+- Admin client kullanımı kaldırıldı
+- RLS politikaları düzgün şekilde yapılandırıldı
+- Authentication ve authorization kontrolleri korundu
+
 ## [2025-01-28] - Dashboard Schema Validation & Stack Depth Fix
 
 ### Düzeltilen

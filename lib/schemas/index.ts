@@ -301,6 +301,7 @@ export const RoomsListResponseSchema = z.object({
 export const DocumentsListResponseSchema = z.object({
   items: z.array(DocumentWithUploaderSchema),
   total: z.number(),
+  isMember: z.boolean().optional(),
 });
 
 export const MembersListResponseSchema = z.object({

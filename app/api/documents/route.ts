@@ -27,20 +27,25 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Check if user has access to this room
-    const { data: membership, error: memberError } = await supabase
-      .from('mbdf_member')
-      .select('id')
-      .eq('room_id', roomId)
-      .eq('user_id', user.id)
-      .single();
-
-    if (memberError) {
+    // Check if user can view this room (member or creator)
+    const { data: canView } = await supabase.rpc('can_view_room', { room_uuid: roomId });
+    
+    if (!canView) {
       return NextResponse.json(
         { error: 'Access denied', success: false },
         { status: 403 }
       );
     }
+
+    // Check if user is a member (for additional info)
+    const { data: membership } = await supabase
+      .from('mbdf_member')
+      .select('id, role')
+      .eq('room_id', roomId)
+      .eq('user_id', user.id)
+      .single();
+
+    const isMember = !!membership;
 
     // Get documents with uploader profile
     const { data: documents, error } = await supabase
@@ -82,11 +87,12 @@ export async function GET(request: NextRequest) {
       })
     );
 
-    // Validate response
-    const response = DocumentsListResponseSchema.parse({
+    // Validate response and add membership status
+    const response = {
       items: documentsWithUrls,
       total: documentsWithUrls.length,
-    });
+      isMember: isMember
+    };
 
     return NextResponse.json(response);
   } catch (error) {
