@@ -194,6 +194,8 @@ export const RoomWithDetailsSchema = RoomSchema.extend({
   substance: SubstanceSchema.nullable(),
   created_by_profile: ProfileSchema.nullable(),
   member_count: z.number().optional(),
+  document_count: z.number().optional(),
+  package_count: z.number().optional(),
 });
 
 export const MemberWithProfileSchema = MemberSchema.extend({
@@ -219,10 +221,14 @@ export const KksSubmissionWithDetailsSchema = KksSubmissionSchema.extend({
 });
 
 export const AgreementWithDetailsSchema = AgreementSchema.extend({
-  created_by_profile: ProfileSchema,
+  created_by_profile: ProfileSchema.extend({
+    company: CompanySchema.nullable(),
+  }).nullable(),
   room: RoomWithDetailsSchema,
   agreement_party: z.array(AgreementPartySchema.extend({
-    profiles: ProfileSchema,
+    profiles: ProfileSchema.extend({
+      company: CompanySchema.nullable(),
+    }),
   })),
 });
 
