@@ -92,6 +92,18 @@ export function DocumentsTab({ roomId, isArchived = false }: DocumentsTabProps) 
     return <FileText className="h-4 w-4 text-blue-500" />;
   };
 
+  const handleView = (document: any) => {
+    if (document.download_url) {
+      window.open(document.download_url, '_blank');
+      return;
+    }
+    toast({
+      title: "Hata",
+      description: "Görüntüleme linki oluşturulamadı.",
+      variant: "destructive",
+    });
+  };
+
   const handleDownload = (document: any) => {
     if (document.download_url) {
       window.open(document.download_url, '_blank');
@@ -330,7 +342,7 @@ export function DocumentsTab({ roomId, isArchived = false }: DocumentsTabProps) 
                             <Download className="mr-2 h-4 w-4" />
                             İndir
                           </DropdownMenuItem>
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleView(document)}>
                             <Eye className="mr-2 h-4 w-4" />
                             Görüntüle
                           </DropdownMenuItem>

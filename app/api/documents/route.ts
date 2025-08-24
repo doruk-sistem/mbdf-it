@@ -65,13 +65,17 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Create signed URLs for file downloads
+    // Create signed URLs for file downloads (normalize stored path if it includes bucket prefix)
     const documentsWithUrls = await Promise.all(
       (documents || []).map(async (doc) => {
         try {
+          const storagePath = doc.file_path?.startsWith('docs/')
+            ? doc.file_path.replace(/^docs\//, '')
+            : doc.file_path;
+
           const { data: signedUrlData, error: urlError } = await supabase.storage
             .from('docs')
-            .createSignedUrl(doc.file_path, 3600); // 1 hour expiry
+            .createSignedUrl(storagePath, 3600); // 1 hour expiry
 
           return {
             ...doc,

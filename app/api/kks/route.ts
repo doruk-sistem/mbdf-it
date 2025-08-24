@@ -30,9 +30,9 @@ export async function GET(request: NextRequest) {
       .select(`
         *,
         created_by_profile:profiles!kks_submission_created_by_fkey (*),
-        room:rooms!kks_submission_room_id_fkey (
+        room:mbdf_room!kks_submission_room_id_fkey (
           *,
-          substance:substances!rooms_substance_id_fkey (*)
+          substance:substance!mbdf_room_substance_id_fkey (*)
         )
       `)
       .order('created_at', { ascending: false });

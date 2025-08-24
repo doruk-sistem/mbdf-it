@@ -29,9 +29,9 @@ export async function GET(request: NextRequest) {
       .select(`
         *,
         created_by_profile:profiles!agreement_created_by_fkey (*),
-        room:rooms!agreement_room_id_fkey (
+        room:mbdf_room!agreement_room_id_fkey (
           *,
-          substance:substances!rooms_substance_id_fkey (*)
+          substance:substance!mbdf_room_substance_id_fkey (*)
         ),
         agreement_party (
           *,

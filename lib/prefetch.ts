@@ -196,19 +196,23 @@ export async function prefetchDocuments(queryClient: QueryClient, roomId: string
       return;
     }
 
-    // Create signed URLs for documents (server-side)
+    // Create signed URLs for documents (server-side) and normalize path if needed
     const documentsWithUrls = await Promise.all(
       (documents || []).map(async (doc) => {
         try {
+          const storagePath = doc.file_path?.startsWith('docs/')
+            ? doc.file_path.replace(/^docs\//, '')
+            : doc.file_path;
+
           const { data: signedUrlData, error: urlError } = await supabase.storage
             .from('docs')
-            .createSignedUrl(doc.file_path, 3600);
+            .createSignedUrl(storagePath, 3600);
 
           return {
             ...doc,
             download_url: urlError ? null : signedUrlData.signedUrl,
           };
-        } catch (urlError) {
+        } catch {
           return {
             ...doc,
             download_url: null,

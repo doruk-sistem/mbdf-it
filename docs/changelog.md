@@ -1,4 +1,43 @@
 # Changelog
+## [2025-08-25] - Documents: View action and download link fix
+
+## [2025-08-25] - Agreements API: Wrong FK hint fix
+
+## [2025-08-25] - KKS API: Wrong FK hint fix
+
+### Düzeltilen
+- `/api/kks` GET çağrısında 500 hata: PGRST200 - `rooms`/`substances` yerine doğru tablolar `mbdf_room`/`substance` kullanılmadığı için ilişki bulunamıyordu.
+
+### Değişiklikler
+- `app/api/kks/route.ts`:
+  - Join ifadeleri `room:mbdf_room!kks_submission_room_id_fkey` ve `substance:substance!mbdf_room_substance_id_fkey` olarak düzeltildi.
+
+### Etki
+- KKS gönderimleri listesi artık hatasız yükleniyor ve oda/madde bilgileri doğru geliyor.
+
+### Düzeltilen
+- `/api/agreements` GET çağrısında 500 hata: PGRST200 - `rooms`/`substances` yerine doğru tablolar `mbdf_room`/`substance` kullanılmadığı için ilişki bulunamıyordu.
+
+### Değişiklikler
+- `app/api/agreements/route.ts`:
+  - Join ifadeleri `room:mbdf_room!agreement_room_id_fkey` ve `substance:substance!mbdf_room_substance_id_fkey` olarak düzeltildi.
+
+### Etki
+- Anlaşmalar listesi artık hatasız yükleniyor ve oda/madde bilgileri doğru geliyor.
+
+### Düzeltilen
+- "Doküman indir" seçeneğinde bazı dosyalar için "İndirme linki oluşturulamadı" hatası.
+- "Görüntüle" menü aksiyonu tıklanınca hiçbir şey olmaması.
+
+### Değişiklikler
+- `app/api/documents/route.ts`: Signed URL oluştururken `file_path` normalize edildi (varsayılan olarak Supabase `docs` bucket prefix'i kaldırılarak `createSignedUrl`'a relative path veriliyor).
+- `lib/prefetch.ts`: SSR prefetch sırasında da aynı normalizasyon uygulandı ve `download_url` alanı eklendi.
+- `lib/schemas/index.ts`: `DocumentWithUploaderSchema` şemasına opsiyonel `download_url` (nullable) alanı eklendi.
+- `components/room/tabs/documents-tab.tsx`: "Görüntüle" aksiyonu `download_url` ile yeni sekmede açacak şekilde bağlandı.
+
+### Etki
+- Doküman indirme ve görüntüleme tüm dosyalar için güvenilir şekilde çalışır.
+
 ## [2025-08-25] - Room Stats: Document and Package Counts Fixed
 
 ### Düzeltilen

@@ -215,6 +215,7 @@ export const AccessRequestWithDetailsSchema = AccessRequestSchema.extend({
 
 export const DocumentWithUploaderSchema = DocumentSchema.extend({
   profiles: ProfileSchema,
+  download_url: z.string().url().nullable().optional(),
 });
 
 // Now we can reference RoomWithDetailsSchema safely
