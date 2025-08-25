@@ -6,6 +6,8 @@ export const keys = {
     byId: (id: string) => ['rooms', 'byId', id] as const,
     details: (id: string) => ['rooms', 'details', id] as const,
     archiveCheck: (roomId: string) => ['rooms', 'archive', 'check', roomId] as const,
+    publicList: ['rooms','public','list'] as const,
+    publicById: (id: string) => ['rooms','public','byId', id] as const,
   },
 
   // Members
@@ -118,6 +120,11 @@ export const keys = {
     list: ['notifications', 'list'] as const,
     unread: ['notifications', 'unread'] as const,
     byUserId: (userId: string) => ['notifications', 'byUserId', userId] as const,
+  },
+
+  // Join Requests (company-based)
+  join: {
+    list: (roomId: string) => ['join','list',roomId] as const,
   },
 } as const;
 

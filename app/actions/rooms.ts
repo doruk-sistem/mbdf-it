@@ -542,7 +542,11 @@ export async function getRoomMembers(roomId: string) {
     const membership = await checkMembership(roomId, user.id);
 
     if (!membership) {
-      throw new Error("Not a member of this room");
+      // Gracefully handle non-members: return empty list and a safe default role
+      return { 
+        members: [], 
+        currentUserRole: 'member' as Database['public']['Enums']['user_role'] 
+      };
     }
 
     // Get all members with profile and company data using admin client

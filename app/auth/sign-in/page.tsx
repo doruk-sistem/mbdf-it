@@ -11,7 +11,6 @@ export default async function SignInPage() {
   const { data: { user: authUser }, error } = await supabase.auth.getUser();
 
   console.log("authUser", authUser);
-  console.log("aaa");
   
   if (authUser && !error) {
     redirect("/");

@@ -30,25 +30,19 @@ export async function GET(
     const adminSupabase = createAdminSupabase();
 
     // First check if user has access to this room using admin client
+    // We will NOT block non-members from seeing basic room details; feature tabs enforce permissions.
     const { data: membership, error: memberError } = await adminSupabase
       .from('mbdf_member')
       .select('id')
       .eq('room_id', roomId)
       .eq('user_id', user.id)
-      .single();
+      .maybeSingle();
 
     if (memberError && memberError.code !== 'PGRST116') {
       console.error('Error checking membership:', memberError);
       return NextResponse.json(
         { error: 'Failed to verify access', success: false },
         { status: 500 }
-      );
-    }
-
-    if (!membership) {
-      return NextResponse.json(
-        { error: 'Access denied', success: false },
-        { status: 403 }
       );
     }
 

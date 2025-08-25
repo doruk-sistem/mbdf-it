@@ -1,12 +1,8 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { createServerSupabase, createAdminSupabase } from '@/lib/supabase';
-import { sendMail } from '@/lib/email';
-import { emailTemplates } from '@/lib/email-templates';
-import type { Database } from '@/types/supabase';
 
 interface OnboardingData {
   fullName: string;
@@ -20,6 +16,10 @@ interface OnboardingData {
 // Send magic link for authentication
 export async function sendMagicLink(email: string) {
   const supabase = createServerSupabase();
+
+  // Compute a safe redirect URL that matches Supabase allowlist
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+  const emailRedirectTo = `${siteUrl}/auth/callback`;
 
   try {
     // Check if we have custom email service configured
@@ -55,7 +55,7 @@ export async function sendMagicLink(email: string) {
         email,
         options: {
           shouldCreateUser: true,
-          emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+          emailRedirectTo,
         },
       });
 
@@ -79,6 +79,147 @@ export async function sendMagicLink(email: string) {
     };
   }
 }
+
+// Sign in with email and password
+export const signInWithPassword = async (params: { email: string; password: string }) => {
+  const supabase = createServerSupabase();
+
+  try {
+    if (!params?.email || !params?.password) {
+      return { success: false, error: "E-posta ve şifre gereklidir." };
+    }
+
+    if (params.password.length < 8) {
+      return { success: false, error: "Şifre en az 8 karakter olmalıdır." };
+    }
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: params.email,
+      password: params.password,
+    });
+
+    if (error) {
+      const message =
+        error.message === 'Invalid login credentials'
+          ? 'E-posta veya şifre hatalı.'
+          : error.message === 'Email not confirmed'
+          ? 'E-posta adresiniz doğrulanmamış. Lütfen e-postanızı kontrol edin.'
+          : 'Giriş başarısız. Lütfen tekrar deneyin.';
+      return { success: false, error: message };
+    }
+
+    if (!data.session || !data.user) {
+      return { success: false, error: "Oturum oluşturulamadı." };
+    }
+
+    // Check onboarding requirement
+    let needsOnboarding = true;
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name, company_id')
+        .eq('id', data.user.id)
+        .single();
+      needsOnboarding = !profile?.full_name || !profile?.company_id;
+    } catch (e) {
+      // If we cannot read profile for any reason, default to onboarding
+      needsOnboarding = true;
+    }
+
+    return { success: true, needsOnboarding };
+  } catch (error) {
+    console.error("Sign in error:", error);
+    return { success: false, error: "Beklenmeyen bir hata oluştu." };
+  }
+};
+
+// Sign up with email and password
+export const signUpWithPassword = async (params: { email: string; password: string }) => {
+  const supabase = createServerSupabase();
+
+  try {
+    if (!params?.email || !params?.password) {
+      return { success: false, error: "E-posta ve şifre gereklidir." };
+    }
+
+    if (params.password.length < 8) {
+      return { success: false, error: "Şifre en az 8 karakter olmalıdır." };
+    }
+
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+    const { data, error } = await supabase.auth.signUp({
+      email: params.email,
+      password: params.password,
+      options: {
+        emailRedirectTo: `${siteUrl}/auth/callback`,
+      },
+    });
+
+    if (error) {
+      const message =
+        error.message.includes('User already registered')
+          ? 'Bu e-posta ile başka bir hesap mevcut.'
+          : 'Kayıt başarısız. Lütfen tekrar deneyin.';
+      return { success: false, error: message };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Sign up error:", error);
+    return { success: false, error: "Beklenmeyen bir hata oluştu." };
+  }
+};
+
+// Send password reset email
+export const sendPasswordReset = async (email: string) => {
+  const supabase = createServerSupabase();
+  try {
+    if (!email) {
+      return { success: false, error: "E-posta gereklidir." };
+    }
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${siteUrl}/auth/callback?next=/auth/reset-password`,
+    });
+    if (error) {
+      const message =
+        error.message === 'Email rate limit exceeded'
+          ? 'Çok sık denediniz. Lütfen biraz sonra tekrar deneyin.'
+          : 'E-posta gönderimi başarısız. Lütfen tekrar deneyin.';
+      return { success: false, error: message };
+    }
+    return { success: true };
+  } catch (error) {
+    console.error("Reset password error:", error);
+    return { success: false, error: "Beklenmeyen bir hata oluştu." };
+  }
+};
+
+// Update user's password (requires active session)
+export const updatePassword = async (newPassword: string) => {
+  const supabase = createServerSupabase();
+  try {
+    if (!newPassword || newPassword.length < 8) {
+      return { success: false, error: "Şifre en az 8 karakter olmalıdır." };
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return { success: false, error: "Oturum bulunamadı. Lütfen bağlantıyı yeniden açın." };
+    }
+
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) {
+      return { success: false, error: "Şifre güncellenemedi. Lütfen tekrar deneyin." };
+    }
+
+    // Successful update → redirect home
+    redirect('/');
+  } catch (error) {
+    console.error('Update password error:', error);
+    return { success: false, error: "Beklenmeyen bir hata oluştu." };
+  }
+};
 
 // Complete user onboarding
 export async function completeOnboarding(data: OnboardingData) {

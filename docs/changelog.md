@@ -1,3 +1,27 @@
+## 2025-08-25
+
+- Auth: Fixed magic link failures ("Database error finding user") during sign-in
+  - Added localhost/0.0.0.0 variants to Supabase `additional_redirect_urls` in `supabase/config.toml`
+  - Normalized `emailRedirectTo` in `app/actions/auth.ts` using `NEXT_PUBLIC_SITE_URL` fallback
+  - Improved error handling to surface clearer messages to the user
+
+### Fixed
+- Room access: New users hitting room detail saw "Not a member of this room" and 403.
+  - `app/actions/rooms.ts`: `getRoomMembers` non-member case now returns empty list and default role instead of throwing.
+  - `app/api/rooms/[roomId]/route.ts`: GET no longer blocks non-members; returns room details, while write actions remain protected.
+  - UX: Members tab now loads without crashing for non-members; privileged actions remain gated by role.
+
+### Added
+- Dual auth support: Magic Link + Email/Password
+- Auth pages: sign-up, forgot-password, reset-password with shadcn/ui
+- Unified `/auth/callback` using `exchangeCodeForSession` and onboarding redirect
+- Server actions: `signInWithPassword`, `signUpWithPassword`, `sendPasswordReset`, `updatePassword`
+- Middleware updated to allow `/auth/*` and protect app routes
+- SQL trigger idempotency for profile creation
+
+### Changed
+- `components/auth/sign-in-card.tsx` now includes Tabs for Magic Link and Email/Password
+
 # Changelog
 ## [2025-08-25] - Documents: View action and download link fix
 

@@ -13,12 +13,13 @@ export async function middleware(request: NextRequest) {
 
   // Define protected and public routes
   const protectedRoutes = ['/mbdf', '/agreements', '/kks', '/settings', '/onboarding'];
-  const authRoutes = ['/auth/sign-in', '/auth/callback'];
+  const authBase = '/auth';
+  const authRoutes = ['/auth/sign-in', '/auth/sign-up', '/auth/forgot-password', '/auth/reset-password', '/auth/callback'];
   const publicRoutes = ['/api', '/_next', '/favicon.ico'];
 
   // Check if the current path is protected
   const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route));
-  const isAuthRoute = authRoutes.some(route => pathname.startsWith(route));
+  const isAuthRoute = pathname.startsWith(authBase);
   const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route));
 
   // Allow public routes and API routes
@@ -29,7 +30,7 @@ export async function middleware(request: NextRequest) {
   // Handle authentication routes
   if (isAuthRoute) {
     // If user is already authenticated and trying to access auth pages, redirect to dashboard
-    if (user && !error && pathname === '/auth/sign-in') {
+    if (user && !error && (pathname === '/auth/sign-in' || pathname === '/auth/sign-up' || pathname === '/auth/forgot-password' || pathname === '/auth/reset-password')) {
       return NextResponse.redirect(new URL('/', request.url));
     }
     return response;

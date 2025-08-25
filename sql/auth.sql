@@ -8,10 +8,11 @@ begin
   values (
     new.id,
     new.email,
-    new.raw_user_meta_data->>'full_name',
+    null,
     'member',
     now()
-  );
+  )
+  on conflict (id) do nothing;
   return new;
 end;
 $$ language plpgsql security definer;
