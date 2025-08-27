@@ -264,6 +264,10 @@ export const API_ENDPOINTS = {
   rooms: '/api/rooms',
   room: (id: string) => `/api/rooms/${id}`,
 
+  // Member-only detailed rooms (internal)
+  memberRooms: '/api/member-rooms',
+  memberRoom: (id: string) => `/api/member-rooms/${id}`,
+
   // Documents
   documents: '/api/documents',
   document: (id: string) => `/api/documents/${id}`,
@@ -280,6 +284,12 @@ export const API_ENDPOINTS = {
   accessRequest: (id: string) => `/api/access-requests/${id}`,
   approveRequest: (id: string) => `/api/access-requests/${id}/approve`,
   rejectRequest: (id: string) => `/api/access-requests/${id}/reject`,
+
+  // Join Requests
+  joinRequests: '/api/join-requests',
+  joinRequest: (id: string) => `/api/join-requests/${id}`,
+  approveJoinRequest: (id: string) => `/api/join-requests/${id}/approve`,
+  rejectJoinRequest: (id: string) => `/api/join-requests/${id}/reject`,
 
   // Voting
   votes: '/api/votes',

@@ -16,102 +16,35 @@ export async function GET(
   try {
     const supabase = createServerSupabase();
     const { roomId } = params;
-    
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
+
+    // Public meta via RPC (no auth required)
+    const { data, error } = await supabase.rpc('get_room_meta', { p_room: roomId });
+
+    if (error) {
+      console.error('Error fetching room meta:', error);
       return NextResponse.json(
-        { error: 'Unauthorized', success: false },
-        { status: 401 }
-      );
-    }
-
-    // Use admin client to bypass RLS
-    const adminSupabase = createAdminSupabase();
-
-    // First check if user has access to this room using admin client
-    // We will NOT block non-members from seeing basic room details; feature tabs enforce permissions.
-    const { data: membership, error: memberError } = await adminSupabase
-      .from('mbdf_member')
-      .select('id')
-      .eq('room_id', roomId)
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    if (memberError && memberError.code !== 'PGRST116') {
-      console.error('Error checking membership:', memberError);
-      return NextResponse.json(
-        { error: 'Failed to verify access', success: false },
+        { error: 'Failed to fetch room meta', success: false },
         { status: 500 }
       );
     }
 
-    // Get room basic data using admin client
-    const { data: room, error: roomError } = await adminSupabase
-      .from('mbdf_room')
-      .select('*')
-      .eq('id', roomId)
-      .single() as { data: any; error: any };
-
-    if (roomError) {
-      if (roomError.code === 'PGRST116') {
-        return NextResponse.json(
-          { error: 'Room not found', success: false },
-          { status: 404 }
-        );
-      }
-      
-      console.error('Error fetching room:', roomError);
-      return NextResponse.json(
-        { error: 'Failed to fetch room', success: false },
-        { status: 500 }
-      );
+    const meta = Array.isArray(data) ? data[0] : data;
+    if (!meta) {
+      return NextResponse.json({ error: 'Room not found' }, { status: 404 });
     }
 
-    // Get related data separately to avoid stack depth issues
-    const [substanceResult, profileResult, memberCountResult, documentCountResult, packageCountResult] = await Promise.all([
-      adminSupabase
-        .from('substance')
-        .select('*')
-        .eq('id', room.substance_id)
-        .single(),
-      adminSupabase
-        .from('profiles')
-        .select('*')
-        .eq('id', room.created_by)
-        .single(),
-      adminSupabase
-        .from('mbdf_member')
-        .select('*', { count: 'exact', head: true })
-        .eq('room_id', roomId),
-      adminSupabase
-        .from('document')
-        .select('*', { count: 'exact', head: true })
-        .eq('room_id', roomId),
-      adminSupabase
-        .from('access_package')
-        .select('*', { count: 'exact', head: true })
-        .eq('room_id', roomId)
-    ]);
-
-    // Transform data to include all related data
-    const roomWithCount = {
-      ...room,
-      substance: substanceResult.data || null,
-      created_by_profile: profileResult.data || null,
-      member_count: memberCountResult.count || 0,
-      document_count: documentCountResult.count || 0,
-      package_count: packageCountResult.count || 0,
-      // Ensure archive fields exist with null values if not present (for backwards compatibility)
-      archived_at: room.archived_at || null,
-      archive_reason: room.archive_reason || null,
-      archive_initiated_by: room.archive_initiated_by || null,
+    const dto = {
+      roomId: meta.room_id,
+      substanceName: meta.substance_name,
+      ec: meta.ec,
+      cas: meta.cas,
+      memberCount: meta.member_count,
+      lrSelected: meta.lr_selected,
+      createdAt: meta.created_at,
+      shortDescription: meta.short_description,
     };
 
-    // Validate response
-    const validatedRoom = RoomWithDetailsSchema.parse(roomWithCount);
-
-    return NextResponse.json(validatedRoom);
+    return NextResponse.json(dto);
   } catch (error) {
     console.error('API Error in GET /api/rooms/[roomId]:', error);
     

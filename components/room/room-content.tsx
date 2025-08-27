@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Users, FileText, Package, Vote, Settings, MoreVertical, Archive } from "lucide-react";
-import { useRoom } from "@/hooks/use-rooms";
+import { useMemberRoom } from "@/hooks/use-rooms";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { Badge } from "@/components/ui/badge";
@@ -36,7 +36,7 @@ export function RoomContent({ roomId }: RoomContentProps) {
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   
   // Query hooks
-  const { data: room, isLoading, error } = useRoom(roomId);
+  const { data: room, isLoading, error } = useMemberRoom(roomId);
   
   // Get user role and permissions for this specific room
   const canArchive = useCanArchiveRoom(roomId);

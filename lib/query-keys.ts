@@ -3,11 +3,11 @@ export const keys = {
   rooms: {
     all: ['rooms'] as const,
     list: () => ['rooms', 'list'] as const,
+    metaList: ['rooms','meta','list'] as const,
+    metaById: (id: string) => ['rooms','meta','byId', id] as const,
     byId: (id: string) => ['rooms', 'byId', id] as const,
     details: (id: string) => ['rooms', 'details', id] as const,
     archiveCheck: (roomId: string) => ['rooms', 'archive', 'check', roomId] as const,
-    publicList: ['rooms','public','list'] as const,
-    publicById: (id: string) => ['rooms','public','byId', id] as const,
   },
 
   // Members
@@ -122,10 +122,10 @@ export const keys = {
     byUserId: (userId: string) => ['notifications', 'byUserId', userId] as const,
   },
 
-  // Join Requests (company-based)
+  // Join requests (per room)
   join: {
-    list: (roomId: string) => ['join','list',roomId] as const,
-  },
+    list: (roomId: string) => ['join','list', roomId] as const,
+  }
 } as const;
 
 // Helper functions for invalidating related keys

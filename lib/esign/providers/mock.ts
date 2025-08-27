@@ -24,7 +24,7 @@ export class MockESignatureProvider implements ESignatureProvider {
     });
 
     // Mock sign URL (in real implementation, this would be from the provider)
-    const signUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/esign/mock/sign/${signatureId}`;
+    const signUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/esign/mock/sign/${signatureId}`;
 
     return {
       success: true,

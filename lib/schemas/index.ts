@@ -201,6 +201,23 @@ export const RoomWithDetailsSchema = RoomSchema.extend({
   package_count: z.number().optional(),
 });
 
+// Public rooms meta DTOs
+export const RoomMetaSchema = z.object({
+  roomId: IdSchema,
+  substanceName: z.string(),
+  ec: z.string().nullable().optional(),
+  cas: z.string().nullable().optional(),
+  memberCount: z.number(),
+  lrSelected: z.boolean(),
+  createdAt: DateSchema,
+  shortDescription: z.string().nullable().optional(),
+});
+
+export const RoomsMetaListResponseSchema = z.object({
+  items: z.array(RoomMetaSchema),
+  total: z.number(),
+});
+
 export const MemberWithProfileSchema = MemberSchema.extend({
   profiles: ProfileSchema.extend({
     company: CompanySchema.nullable(),
@@ -363,6 +380,7 @@ export type KksEvidence = z.infer<typeof KksEvidenceSchema>;
 export type Message = z.infer<typeof MessageSchema>;
 
 export type RoomWithDetails = z.infer<typeof RoomWithDetailsSchema>;
+export type RoomMeta = z.infer<typeof RoomMetaSchema>;
 export type MemberWithProfile = z.infer<typeof MemberWithProfileSchema>;
 export type AccessRequestWithDetails = z.infer<typeof AccessRequestWithDetailsSchema>;
 export type DocumentWithUploader = z.infer<typeof DocumentWithUploaderSchema>;

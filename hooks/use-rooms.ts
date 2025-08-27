@@ -61,18 +61,36 @@ type UnarchiveResponse = z.infer<typeof UnarchiveResponseSchema>;
 // Query hooks
 export function useRooms() {
   return useQuery({
-    queryKey: keys.rooms.list(),
-    queryFn: () => get(API_ENDPOINTS.rooms).then(data => RoomsListResponseSchema.parse(data)),
+    queryKey: keys.rooms.metaList,
+    queryFn: () => get(API_ENDPOINTS.rooms),
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }
 
 export function useRoom(roomId: string) {
   return useQuery({
-    queryKey: keys.rooms.byId(roomId),
-    queryFn: () => get(API_ENDPOINTS.room(roomId)).then(data => RoomWithDetailsSchema.parse(data)),
+    queryKey: keys.rooms.metaById(roomId),
+    queryFn: () => get(API_ENDPOINTS.room(roomId)),
     enabled: !!roomId,
     staleTime: 1000 * 60 * 5, // 5 minutes
+  });
+}
+
+// Member-only detailed list/byId for interior pages
+export function useMemberRooms() {
+  return useQuery({
+    queryKey: keys.rooms.list(),
+    queryFn: () => get(API_ENDPOINTS.memberRooms).then(data => RoomsListResponseSchema.parse(data)),
+    staleTime: 1000 * 60 * 5,
+  });
+}
+
+export function useMemberRoom(roomId: string) {
+  return useQuery({
+    queryKey: keys.rooms.byId(roomId),
+    queryFn: () => get(API_ENDPOINTS.memberRoom(roomId)).then(data => RoomWithDetailsSchema.parse(data)),
+    enabled: !!roomId,
+    staleTime: 1000 * 60 * 5,
   });
 }
 

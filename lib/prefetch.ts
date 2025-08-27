@@ -17,68 +17,22 @@ import {
 
 export async function prefetchRooms(queryClient: QueryClient) {
   const supabase = createServerSupabase();
-  
   try {
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return;
-    }
-
-    // Use admin client to completely bypass RLS and avoid stack depth issues
-    const adminSupabase = createAdminSupabase();
-    
-    // Get rooms with minimal data first
-    const { data: rooms, error } = await adminSupabase
-      .from('mbdf_room')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error prefetching rooms:', error);
-      return;
-    }
-
-    // Get all related data separately using admin client
-    const roomsWithDetails = await Promise.all((rooms || []).map(async (room: any) => {
-      // Get substance
-      const { data: substance } = await adminSupabase
-        .from('substance')
-        .select('id, name, cas_number, ec_number')
-        .eq('id', room.substance_id)
-        .single();
-      
-      // Get creator profile
-      const { data: created_by_profile } = await adminSupabase
-        .from('profiles')
-        .select('id, full_name, email')
-        .eq('id', room.created_by)
-        .single();
-      
-      // Get member count
-      const { count } = await adminSupabase
-        .from('mbdf_member')
-        .select('*', { count: 'exact', head: true })
-        .eq('room_id', room.id);
-      
-      return {
-        ...room,
-        substance: substance || null,
-        created_by_profile: created_by_profile || null,
-        member_count: count || 0
-      };
+    const { data, error } = await supabase.rpc('list_rooms_meta');
+    if (error) return;
+    const items = (data || []).map((r: any) => ({
+      roomId: r.room_id,
+      substanceName: r.substance_name,
+      ec: r.ec,
+      cas: r.cas,
+      memberCount: r.member_count,
+      lrSelected: r.lr_selected,
+      createdAt: r.created_at,
     }));
-
-    // Return response without validation to avoid stack depth issues
-    const response = {
-      items: roomsWithDetails,
-      total: roomsWithDetails.length,
-    };
-
     await queryClient.prefetchQuery({
-      queryKey: keys.rooms.list(),
-      queryFn: () => Promise.resolve(response),
-      staleTime: 1000 * 60 * 5, // 5 minutes
+      queryKey: keys.rooms.metaList,
+      queryFn: () => Promise.resolve({ items, total: items.length }),
+      staleTime: 1000 * 60 * 5,
     });
   } catch (error) {
     console.error('Error in prefetchRooms:', error);
@@ -87,72 +41,25 @@ export async function prefetchRooms(queryClient: QueryClient) {
 
 export async function prefetchRoom(queryClient: QueryClient, roomId: string) {
   const supabase = createServerSupabase();
-  
   try {
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return;
-    }
-
-    // Check membership
-    const { data: membership, error: memberError } = await supabase
-      .from('mbdf_member')
-      .select('id')
-      .eq('room_id', roomId)
-      .eq('user_id', user.id)
-      .single();
-
-    if (memberError) {
-      return;
-    }
-
-    // Use admin client to bypass RLS
-    const adminSupabase = createAdminSupabase();
-
-    // Get room basic data using admin client
-    const { data: room, error } = await adminSupabase
-      .from('mbdf_room')
-      .select('*')
-      .eq('id', roomId)
-      .single() as { data: any; error: any };
-
-    if (error) {
-      console.error('Error prefetching room:', error);
-      return;
-    }
-
-    // Get related data separately to avoid stack depth issues
-    const [substanceResult, profileResult, memberCountResult] = await Promise.all([
-      adminSupabase
-        .from('substance')
-        .select('*')
-        .eq('id', room.substance_id)
-        .single(),
-      adminSupabase
-        .from('profiles')
-        .select('*')
-        .eq('id', room.created_by)
-        .single(),
-      adminSupabase
-        .from('mbdf_member')
-        .select('*', { count: 'exact', head: true })
-        .eq('room_id', roomId)
-    ]);
-
-    const roomWithCount = {
-      ...room,
-      substance: substanceResult.data || null,
-      created_by_profile: profileResult.data || null,
-      member_count: memberCountResult.count || 0,
+    const { data, error } = await supabase.rpc('get_room_meta', { p_room: roomId });
+    if (error) return;
+    const meta = Array.isArray(data) ? data[0] : data;
+    if (!meta) return;
+    const dto = {
+      roomId: meta.room_id,
+      substanceName: meta.substance_name,
+      ec: meta.ec,
+      cas: meta.cas,
+      memberCount: meta.member_count,
+      lrSelected: meta.lr_selected,
+      createdAt: meta.created_at,
+      shortDescription: meta.short_description,
     };
-
-    const validatedRoom = RoomWithDetailsSchema.parse(roomWithCount);
-
     await queryClient.prefetchQuery({
-      queryKey: keys.rooms.byId(roomId),
-      queryFn: () => Promise.resolve(validatedRoom),
-      staleTime: 1000 * 60 * 5, // 5 minutes
+      queryKey: keys.rooms.metaById(roomId),
+      queryFn: () => Promise.resolve(dto),
+      staleTime: 1000 * 60 * 5,
     });
   } catch (error) {
     console.error('Error in prefetchRoom:', error);

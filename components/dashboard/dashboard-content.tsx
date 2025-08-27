@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Building2, Users, FileText, Clock, ArrowRight, Plus } from "lucide-react";
-import { useRooms } from "@/hooks/use-rooms";
+import { useMemberRooms } from "@/hooks/use-rooms";
 import { DashboardSkeleton } from "./dashboard-skeleton";
 
 import { Button } from "@/components/ui/button";
@@ -28,7 +28,7 @@ interface DashboardActivity {
 }
 
 export function DashboardContent() {
-  const { data: roomsData, isLoading, error } = useRooms();
+  const { data: roomsData, isLoading, error } = useMemberRooms();
 
   if (isLoading) {
     return <DashboardSkeleton />;

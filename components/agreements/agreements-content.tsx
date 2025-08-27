@@ -15,7 +15,7 @@ import {
   PenTool
 } from "lucide-react";
 import { useAgreements, useCreateAgreement, useRequestSignature, useSendKep } from "@/hooks/use-agreements";
-import { useRooms } from "@/hooks/use-rooms";
+import { useMemberRooms } from "@/hooks/use-rooms";
 import { AgreementsSkeleton } from "./agreements-skeleton";
 
 import { Badge } from "@/components/ui/badge";
@@ -65,7 +65,7 @@ export function AgreementsContent() {
 
   // Query hooks
   const { data: agreementsData, isLoading, error } = useAgreements();
-  const { data: roomsData } = useRooms();
+  const { data: roomsData } = useMemberRooms();
   const createAgreementMutation = useCreateAgreement();
   const requestSignatureMutation = useRequestSignature();
   const sendKepMutation = useSendKep();

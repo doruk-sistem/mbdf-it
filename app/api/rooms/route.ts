@@ -6,82 +6,29 @@ import { z } from 'zod';
 export async function GET(request: NextRequest) {
   try {
     const supabase = createServerSupabase();
-    
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized', success: false },
-        { status: 401 }
-      );
-    }
 
-    // Use admin client to completely bypass RLS and avoid stack depth issues
-    const adminSupabase = createAdminSupabase();
-    
-    // Get rooms with minimal data first
-    const { data: rooms, error } = await adminSupabase
-      .from('mbdf_room')
-      .select('*')
-      .order('created_at', { ascending: false });
+    // Public meta list via RPC (no auth required)
+    const { data, error } = await supabase.rpc('list_rooms_meta');
 
     if (error) {
-      console.error('Error fetching rooms:', error);
+      console.error('Error fetching public rooms meta:', error);
       return NextResponse.json(
         { error: 'Failed to fetch rooms', success: false },
         { status: 500 }
       );
     }
 
-    // Get all related data separately using admin client
-    const roomsWithDetails = await Promise.all((rooms || []).map(async (room: any) => {
-      // Get substance
-      const { data: substance } = await adminSupabase
-        .from('substance')
-        .select('id, name, cas_number, ec_number')
-        .eq('id', room.substance_id)
-        .single();
-      
-      // Get creator profile
-      const { data: created_by_profile } = await adminSupabase
-        .from('profiles')
-        .select('id, full_name, email')
-        .eq('id', room.created_by)
-        .single();
-      
-      // Get counts
-      const [{ count: memberCount }, { count: documentCount }, { count: packageCount }] = await Promise.all([
-        adminSupabase
-        .from('mbdf_member')
-        .select('*', { count: 'exact', head: true })
-        .eq('room_id', room.id),
-        adminSupabase
-          .from('document')
-          .select('*', { count: 'exact', head: true })
-          .eq('room_id', room.id),
-        adminSupabase
-          .from('access_package')
-          .select('*', { count: 'exact', head: true })
-          .eq('room_id', room.id),
-      ]);
-      
-      return {
-        ...room,
-        substance: substance || null,
-        created_by_profile: created_by_profile || null,
-        member_count: memberCount || 0,
-        document_count: documentCount || 0,
-        package_count: packageCount || 0,
-      };
+    const items = (data || []).map((r: any) => ({
+      roomId: r.room_id,
+      substanceName: r.substance_name,
+      ec: r.ec,
+      cas: r.cas,
+      memberCount: r.member_count,
+      lrSelected: r.lr_selected,
+      createdAt: r.created_at,
     }));
 
-    // Return response without validation to avoid stack depth issues
-    const response = {
-      items: roomsWithDetails,
-      total: roomsWithDetails.length,
-    };
-
-    return NextResponse.json(response);
+    return NextResponse.json({ items, total: items.length });
   } catch (error) {
     console.error('API Error in GET /api/rooms:', error);
     

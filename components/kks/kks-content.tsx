@@ -15,7 +15,7 @@ import {
   Archive
 } from "lucide-react";
 import { useKKSSubmissions, useCreateKKSSubmission, useGenerateEvidence, useSendKKS } from "@/hooks/use-kks";
-import { useRooms } from "@/hooks/use-rooms";
+import { useMemberRooms } from "@/hooks/use-rooms";
 import { KKSSkeleton } from "./kks-skeleton";
 
 import { Badge } from "@/components/ui/badge";
@@ -63,7 +63,7 @@ export function KKSContent() {
 
   // Query hooks
   const { data: submissionsData, isLoading, error } = useKKSSubmissions();
-  const { data: roomsData } = useRooms();
+  const { data: roomsData } = useMemberRooms();
   const createSubmissionMutation = useCreateKKSSubmission();
   const generateEvidenceMutation = useGenerateEvidence();
   const sendKKSMutation = useSendKKS();
