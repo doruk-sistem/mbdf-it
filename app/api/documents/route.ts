@@ -3,6 +3,8 @@ import { createServerSupabase, createAdminSupabase } from '@/lib/supabase';
 import { DocumentsListResponseSchema } from '@/lib/schemas';
 import { z } from 'zod';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = createServerSupabase();
