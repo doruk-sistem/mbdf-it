@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Send, MessageCircle, User, Plus, Search, X } from "lucide-react";
+import { Send, MessageCircle, User, Plus, Search, X, Trash2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,6 +12,8 @@ import { useToast } from "@/components/ui/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface ForumMessage {
   id: string;
@@ -39,8 +41,27 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
   const [newTopic, setNewTopic] = useState("");
   const [showNewTopicInput, setShowNewTopicInput] = useState(false);
   const [topicSearchTerm, setTopicSearchTerm] = useState("");
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Get current user ID
+  useEffect(() => {
+    const getUser = async () => {
+      try {
+        const response = await fetch('/api/profile');
+        if (response.ok) {
+          const userData = await response.json();
+          setCurrentUserId(userData.user?.id || null);
+        }
+      } catch (error) {
+        console.error('Error fetching user:', error);
+      }
+    };
+    getUser();
+  }, []);
 
   // Fetch forum topics
   const { data: topics } = useQuery({
@@ -76,7 +97,11 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
         throw new Error("Failed to fetch forum messages");
       }
       const data = await response.json();
-      return data.messages as ForumMessage[];
+      // Sort messages by created_at (oldest first, newest last)
+      const sortedMessages = (data.messages as ForumMessage[]).sort((a, b) => 
+        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      );
+      return sortedMessages;
     },
     refetchInterval: (query) => {
       // Only refetch if we have data (user has access)
@@ -127,6 +152,70 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
     },
   });
 
+  // Delete message mutation
+  const deleteMessageMutation = useMutation({
+    mutationFn: async (messageId: string) => {
+      const response = await fetch(`/api/rooms/${roomId}/forum/${messageId}`, {
+        method: "DELETE",
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to delete message");
+      }
+      
+      return response.json();
+    },
+    onMutate: async (messageId) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ["forum-messages", roomId, selectedTopic] });
+
+      // Snapshot the previous value
+      const previousMessages = queryClient.getQueryData(["forum-messages", roomId, selectedTopic]);
+
+      // Optimistically update to the new value
+      queryClient.setQueryData(["forum-messages", roomId, selectedTopic], (old: ForumMessage[] | undefined) => {
+        if (!old) return old;
+        return old.filter(message => message.id !== messageId);
+      });
+
+      // Return a context object with the snapshotted value
+      return { previousMessages };
+    },
+    onSuccess: () => {
+      // Force refetch all forum-related queries
+      queryClient.invalidateQueries({ 
+        queryKey: ["forum-messages", roomId, selectedTopic],
+        refetchType: "active"
+      });
+      
+      queryClient.invalidateQueries({ 
+        queryKey: ["forum-messages", roomId],
+        refetchType: "active"
+      });
+      
+      queryClient.invalidateQueries({ 
+        queryKey: ["forum-topics", roomId],
+        refetchType: "active"
+      });
+      
+      toast({
+        title: "Mesaj silindi",
+        description: "Mesajınız başarıyla silindi.",
+      });
+    },
+    onError: (err, messageId, context) => {
+      // If the mutation fails, use the context returned from onMutate to roll back
+      if (context?.previousMessages) {
+        queryClient.setQueryData(["forum-messages", roomId, selectedTopic], context.previousMessages);
+      }
+      toast({
+        title: "Hata",
+        description: "Mesaj silinirken bir hata oluştu.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleSendMessage = () => {
     if (newMessage.trim() && !isArchived) {
       sendMessageMutation.mutate({ 
@@ -134,6 +223,24 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
         topic: selectedTopic 
       });
     }
+  };
+
+  const handleDeleteMessage = (messageId: string) => {
+    setMessageToDelete(messageId);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteMessage = () => {
+    if (messageToDelete) {
+      deleteMessageMutation.mutate(messageToDelete);
+      setDeleteDialogOpen(false);
+      setMessageToDelete(null);
+    }
+  };
+
+  const cancelDeleteMessage = () => {
+    setDeleteDialogOpen(false);
+    setMessageToDelete(null);
   };
 
   const handleAddNewTopic = () => {
@@ -355,13 +462,25 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm">
-                        {message.profiles?.full_name || "Unknown User"}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(message.created_at).toLocaleString("tr-TR")}
-                      </span>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-sm">
+                          {message.profiles?.full_name || "Unknown User"}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(message.created_at).toLocaleString("tr-TR")}
+                        </span>
+                      </div>
+                      {currentUserId === message.sender_id && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteMessage(message.id)}
+                          className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      )}
                     </div>
                     <div className="bg-muted/50 rounded-lg p-3">
                       <p className="text-sm whitespace-pre-wrap">{message.content}</p>
@@ -412,6 +531,38 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
           )}
         </CardContent>
       </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Mesajı Sil</DialogTitle>
+            <DialogDescription>
+              Bu işlem geri alınamaz. Mesajınızı silmek istediğinizden emin misiniz?
+            </DialogDescription>
+          </DialogHeader>
+          
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              <strong>Uyarı:</strong> Bu mesaj kalıcı olarak silinecektir ve geri alınamaz.
+            </AlertDescription>
+          </Alert>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={cancelDeleteMessage}>
+              İptal
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={confirmDeleteMessage}
+              disabled={deleteMessageMutation.isPending}
+            >
+              {deleteMessageMutation.isPending ? "Siliniyor..." : "Sil"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
