@@ -27,6 +27,9 @@ interface ForumMessage {
     id: string;
     full_name: string;
     avatar_url?: string;
+    company?: {
+      name: string;
+    } | null;
   } | null;
 }
 
@@ -466,6 +469,11 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-sm">
                           {message.profiles?.full_name || "Unknown User"}
+                          {message.profiles?.company?.name && (
+                            <span className="text-muted-foreground ml-1">
+                              - {message.profiles.company.name}
+                            </span>
+                          )}
                         </span>
                         <span className="text-xs text-muted-foreground">
                           {new Date(message.created_at).toLocaleString("tr-TR")}

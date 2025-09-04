@@ -69,7 +69,14 @@ export async function GET(
       const adminSupabase = createAdminSupabase();
       const { data: profilesData, error: profilesError } = await adminSupabase
         .from("profiles")
-        .select("id, full_name, avatar_url")
+        .select(`
+          id, 
+          full_name, 
+          avatar_url,
+          company:company_id (
+            name
+          )
+        `)
         .in("id", senderIds);
       
       if (profilesError) {
