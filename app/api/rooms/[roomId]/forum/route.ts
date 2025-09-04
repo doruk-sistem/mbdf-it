@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createMiddlewareSupabaseClient } from "@/lib/supabase";
+import { createMiddlewareSupabaseClient, createAdminSupabase } from "@/lib/supabase";
 import { z } from "zod";
 
 const createMessageSchema = z.object({
@@ -58,10 +58,17 @@ export async function GET(
     let profiles: any[] = [];
     
     if (senderIds.length > 0) {
-      const { data: profilesData } = await supabase
+      // Use admin client to bypass RLS for profiles
+      const adminSupabase = createAdminSupabase();
+      const { data: profilesData, error: profilesError } = await adminSupabase
         .from("profiles")
         .select("id, full_name, avatar_url")
         .in("id", senderIds);
+      
+      if (profilesError) {
+        console.error("Error fetching profiles:", profilesError);
+      }
+      
       profiles = profilesData || [];
     }
 
@@ -136,11 +143,17 @@ export async function POST(
     }
 
     // Get sender profile
-    const { data: profile } = await supabase
+    // Use admin client to bypass RLS for profiles
+    const adminSupabase = createAdminSupabase();
+    const { data: profile, error: profileError } = await adminSupabase
       .from("profiles")
       .select("id, full_name, avatar_url")
       .eq("id", user.id)
       .single();
+    
+    if (profileError) {
+      console.error("Error fetching profile:", profileError);
+    }
 
     const messageWithProfile = {
       ...(message as any),
