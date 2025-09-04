@@ -2,18 +2,21 @@
 
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Send, MessageCircle, User } from "lucide-react";
+import { Send, MessageCircle, User, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/use-toast";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 
 interface ForumMessage {
   id: string;
   content: string;
   message_type: string;
+  topic: string;
   created_at: string;
   updated_at: string;
   sender_id: string;
@@ -31,14 +34,39 @@ interface ForumTabProps {
 
 export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
   const [newMessage, setNewMessage] = useState("");
+  const [selectedTopic, setSelectedTopic] = useState("Genel");
+  const [newTopic, setNewTopic] = useState("");
+  const [showNewTopicInput, setShowNewTopicInput] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Fetch forum topics
+  const { data: topics } = useQuery({
+    queryKey: ["forum-topics", roomId],
+    queryFn: async () => {
+      const response = await fetch(`/api/rooms/${roomId}/forum/topics`);
+      if (!response.ok) {
+        if (response.status === 403) {
+          throw new Error("ACCESS_DENIED");
+        }
+        throw new Error("Failed to fetch forum topics");
+      }
+      const data = await response.json();
+      return data.topics as string[];
+    },
+    retry: (failureCount, error) => {
+      if (error.message === "ACCESS_DENIED") {
+        return false;
+      }
+      return failureCount < 3;
+    },
+  });
+
   // Fetch forum messages
   const { data: messages, isLoading, error } = useQuery({
-    queryKey: ["forum-messages", roomId],
+    queryKey: ["forum-messages", roomId, selectedTopic],
     queryFn: async () => {
-      const response = await fetch(`/api/rooms/${roomId}/forum`);
+      const response = await fetch(`/api/rooms/${roomId}/forum?topic=${encodeURIComponent(selectedTopic)}`);
       if (!response.ok) {
         if (response.status === 403) {
           throw new Error("ACCESS_DENIED");
@@ -64,13 +92,13 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
 
   // Send new message mutation
   const sendMessageMutation = useMutation({
-    mutationFn: async (content: string) => {
+    mutationFn: async ({ content, topic }: { content: string; topic: string }) => {
       const response = await fetch(`/api/rooms/${roomId}/forum`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ content, message_type: "forum" }),
+        body: JSON.stringify({ content, message_type: "forum", topic }),
       });
 
       if (!response.ok) {
@@ -81,7 +109,8 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
     },
     onSuccess: () => {
       setNewMessage("");
-      queryClient.invalidateQueries({ queryKey: ["forum-messages", roomId] });
+      queryClient.invalidateQueries({ queryKey: ["forum-messages", roomId, selectedTopic] });
+      queryClient.invalidateQueries({ queryKey: ["forum-topics", roomId] });
       toast({
         title: "Mesaj gönderildi",
         description: "Forum mesajınız başarıyla gönderildi.",
@@ -98,7 +127,25 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
 
   const handleSendMessage = () => {
     if (newMessage.trim() && !isArchived) {
-      sendMessageMutation.mutate(newMessage.trim());
+      sendMessageMutation.mutate({ 
+        content: newMessage.trim(), 
+        topic: selectedTopic 
+      });
+    }
+  };
+
+  const handleAddNewTopic = () => {
+    if (newTopic.trim() && topics && !topics.includes(newTopic.trim())) {
+      const newTopicName = newTopic.trim();
+      setSelectedTopic(newTopicName);
+      setNewTopic("");
+      setShowNewTopicInput(false);
+      
+      // Optimistically update the topics list
+      queryClient.setQueryData(["forum-topics", roomId], (oldTopics: string[] | undefined) => {
+        if (!oldTopics) return [newTopicName];
+        return [...oldTopics, newTopicName].sort();
+      });
     }
   };
 
@@ -171,6 +218,63 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Topic Selection */}
+          <div className="flex gap-2 items-center">
+            <Select value={selectedTopic} onValueChange={setSelectedTopic}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Konu seçin" />
+              </SelectTrigger>
+              <SelectContent>
+                {topics?.map((topic) => (
+                  <SelectItem key={topic} value={topic}>
+                    {topic}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowNewTopicInput(!showNewTopicInput)}
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Yeni Konu
+            </Button>
+          </div>
+
+          {/* New Topic Input */}
+          {showNewTopicInput && (
+            <div className="flex gap-2 items-center">
+              <Input
+                placeholder="Yeni konu adı..."
+                value={newTopic}
+                onChange={(e) => setNewTopic(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === "Enter") {
+                    handleAddNewTopic();
+                  }
+                }}
+                className="w-48"
+              />
+              <Button
+                size="sm"
+                onClick={handleAddNewTopic}
+                disabled={!newTopic.trim()}
+              >
+                Ekle
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setShowNewTopicInput(false);
+                  setNewTopic("");
+                }}
+              >
+                İptal
+              </Button>
+            </div>
+          )}
           {/* Messages List */}
           <div className="space-y-4 max-h-96 overflow-y-auto">
             {messages && messages.length > 0 ? (
@@ -204,7 +308,7 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
             ) : (
               <div className="text-center py-8 text-muted-foreground">
                 <MessageCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>Henüz forum mesajı yok.</p>
+                <p>"{selectedTopic}" konusunda henüz mesaj yok.</p>
                 <p className="text-sm">İlk mesajı sen gönder!</p>
               </div>
             )}
@@ -212,23 +316,28 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
 
           {/* Message Input */}
           {!isArchived && (
-            <div className="flex gap-2">
-              <Textarea
-                placeholder="Forum mesajınızı yazın..."
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                onKeyPress={handleKeyPress}
-                className="min-h-[80px] resize-none"
-                disabled={sendMessageMutation.isPending}
-              />
-              <Button
-                onClick={handleSendMessage}
-                disabled={!newMessage.trim() || sendMessageMutation.isPending}
-                size="icon"
-                className="self-end"
-              >
-                <Send className="h-4 w-4" />
-              </Button>
+            <div className="space-y-2">
+              <div className="text-sm text-muted-foreground">
+                "{selectedTopic}" konusuna mesaj yazıyorsunuz
+              </div>
+              <div className="flex gap-2">
+                <Textarea
+                  placeholder="Forum mesajınızı yazın..."
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  className="min-h-[80px] resize-none"
+                  disabled={sendMessageMutation.isPending}
+                />
+                <Button
+                  onClick={handleSendMessage}
+                  disabled={!newMessage.trim() || sendMessageMutation.isPending}
+                  size="icon"
+                  className="self-end"
+                >
+                  <Send className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           )}
 

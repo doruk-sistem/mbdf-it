@@ -4,7 +4,8 @@ import { z } from "zod";
 
 const createMessageSchema = z.object({
   content: z.string().min(1, "Mesaj içeriği boş olamaz"),
-  message_type: z.string().default("forum")
+  message_type: z.string().default("forum"),
+  topic: z.string().min(1, "Konu seçimi gereklidir").default("Genel")
 });
 
 export async function GET(
@@ -33,19 +34,25 @@ export async function GET(
       return NextResponse.json({ error: "Access denied", code: "ACCESS_DENIED" }, { status: 403 });
     }
 
-    // Get forum messages for the room (without join to avoid stack depth issues)
+    // Get topic from query parameters
+    const { searchParams } = new URL(request.url);
+    const topic = searchParams.get('topic') || 'Genel';
+
+    // Get forum messages for the room and topic
     const { data: messages, error } = await supabase
       .from("message")
       .select(`
         id,
         content,
         message_type,
+        topic,
         created_at,
         updated_at,
         sender_id
       `)
       .eq("room_id", params.roomId)
       .eq("message_type", "forum")
+      .eq("topic", topic)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -116,7 +123,7 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { content, message_type } = createMessageSchema.parse(body);
+    const { content, message_type, topic } = createMessageSchema.parse(body);
 
     // Create new forum message
     const { data: message, error } = await supabase
@@ -125,12 +132,14 @@ export async function POST(
         room_id: params.roomId,
         sender_id: user.id,
         content,
-        message_type: message_type || "forum"
+        message_type: message_type || "forum",
+        topic: topic || "Genel"
       } as any)
       .select(`
         id,
         content,
         message_type,
+        topic,
         created_at,
         updated_at,
         sender_id
