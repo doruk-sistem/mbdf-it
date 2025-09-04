@@ -30,7 +30,7 @@ export async function GET(
       .single();
 
     if (!membership) {
-      return NextResponse.json({ error: "Access denied" }, { status: 403 });
+      return NextResponse.json({ error: "Access denied", code: "ACCESS_DENIED" }, { status: 403 });
     }
 
     // Get forum messages for the room (without join to avoid stack depth issues)
@@ -105,7 +105,7 @@ export async function POST(
       .single();
 
     if (!membership) {
-      return NextResponse.json({ error: "Access denied" }, { status: 403 });
+      return NextResponse.json({ error: "Access denied", code: "ACCESS_DENIED" }, { status: 403 });
     }
 
     const body = await request.json();

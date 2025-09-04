@@ -155,11 +155,11 @@ export function useDeleteRoom(roomId: string) {
 }
 
 // Archive-related hooks
-export function useArchivePrecheck(roomId: string) {
+export function useArchivePrecheck(roomId: string, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: keys.rooms.archiveCheck(roomId),
     queryFn: () => get(API_ENDPOINTS.archiveCheck(roomId)).then(data => ArchivePrecheckResponseSchema.parse(data)),
-    enabled: !!roomId,
+    enabled: !!roomId && (options?.enabled !== false),
     staleTime: 1000 * 30, // 30 seconds - should be fresh for archive operations
   });
 }

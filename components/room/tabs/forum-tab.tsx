@@ -40,12 +40,26 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
     queryFn: async () => {
       const response = await fetch(`/api/rooms/${roomId}/forum`);
       if (!response.ok) {
+        if (response.status === 403) {
+          throw new Error("ACCESS_DENIED");
+        }
         throw new Error("Failed to fetch forum messages");
       }
       const data = await response.json();
       return data.messages as ForumMessage[];
     },
-    refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
+    refetchInterval: (query) => {
+      // Only refetch if we have data (user has access)
+      // Don't refetch if there's an error (access denied)
+      return query.state.data ? 5000 : false;
+    },
+    retry: (failureCount, error) => {
+      // Don't retry if access is denied
+      if (error.message === "ACCESS_DENIED") {
+        return false;
+      }
+      return failureCount < 3;
+    },
   });
 
   // Send new message mutation
@@ -122,6 +136,8 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
   }
 
   if (error) {
+    const isAccessDenied = error.message === "ACCESS_DENIED";
+    
     return (
       <Card>
         <CardHeader>
@@ -131,7 +147,15 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-destructive">Forum mesajları yüklenirken bir hata oluştu.</p>
+          {isAccessDenied ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <MessageCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p className="font-medium">Bu odaya erişim yetkiniz yok</p>
+              <p className="text-sm">Forum mesajlarını görüntülemek için oda üyesi olmanız gerekiyor.</p>
+            </div>
+          ) : (
+            <p className="text-destructive">Forum mesajları yüklenirken bir hata oluştu.</p>
+          )}
         </CardContent>
       </Card>
     );
