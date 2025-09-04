@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Send, MessageCircle, User, Plus } from "lucide-react";
+import { Send, MessageCircle, User, Plus, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 
 interface ForumMessage {
   id: string;
@@ -37,6 +38,7 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
   const [selectedTopic, setSelectedTopic] = useState("Genel");
   const [newTopic, setNewTopic] = useState("");
   const [showNewTopicInput, setShowNewTopicInput] = useState(false);
+  const [topicSearchTerm, setTopicSearchTerm] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -149,6 +151,22 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
     }
   };
 
+  // Filter topics based on search term
+  const filteredTopics = topics?.filter(topic =>
+    topic.toLowerCase().includes(topicSearchTerm.toLowerCase())
+  ) || [];
+
+  // Show topics based on search state
+  const displayTopics = topicSearchTerm ? filteredTopics : topics || [];
+
+  // Auto-select first matching topic when searching
+  useEffect(() => {
+    if (topicSearchTerm && filteredTopics.length > 0) {
+      setSelectedTopic(filteredTopics[0]);
+    }
+  }, [topicSearchTerm, filteredTopics]);
+
+
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -218,28 +236,74 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Topic Selection */}
-          <div className="flex gap-2 items-center">
-            <Select value={selectedTopic} onValueChange={setSelectedTopic}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Konu seçin" />
-              </SelectTrigger>
-              <SelectContent>
-                {topics?.map((topic) => (
-                  <SelectItem key={topic} value={topic}>
-                    {topic}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowNewTopicInput(!showNewTopicInput)}
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              Yeni Konu
-            </Button>
+          {/* Topic Search and Selection */}
+          <div className="space-y-3">
+            {/* Search, Dropdown and New Topic Button */}
+            <div className="flex gap-2 items-center">
+              <div className="relative flex-1 max-w-sm">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                <Input
+                  placeholder="Konu ara..."
+                  value={topicSearchTerm}
+                  onChange={(e) => setTopicSearchTerm(e.target.value)}
+                  className="pl-9"
+                />
+                {topicSearchTerm && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
+                    onClick={() => setTopicSearchTerm("")}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                )}
+              </div>
+              
+              <Select 
+                value={selectedTopic} 
+                onValueChange={(value) => {
+                  setSelectedTopic(value);
+                  setTopicSearchTerm(""); // Clear search when topic selected
+                }}
+              >
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Konu seçin" />
+                </SelectTrigger>
+                <SelectContent>
+                  {displayTopics.length > 0 ? (
+                    displayTopics.map((topic) => (
+                      <SelectItem key={topic} value={topic}>
+                        {topic}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                      Konu bulunamadı
+                    </div>
+                  )}
+                </SelectContent>
+              </Select>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowNewTopicInput(!showNewTopicInput)}
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Yeni Konu
+              </Button>
+            </div>
+            
+            {/* Search Results Info */}
+            {topicSearchTerm && (
+              <div className="text-sm text-muted-foreground">
+                {filteredTopics.length > 0 
+                  ? `${filteredTopics.length} konu bulundu`
+                  : `"${topicSearchTerm}" için konu bulunamadı`
+                }
+              </div>
+            )}
           </div>
 
           {/* New Topic Input */}
