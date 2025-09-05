@@ -32,8 +32,6 @@ export function CreateRoomForm() {
   const { data: substancesData, isLoading: substancesLoading } = useSubstances();
   const createRoomMutation = useCreateRoom();
 
-  console.log("substancesData", substancesData);
-
   // Extract substances from query response
   const substances = substancesData?.items || [];
 

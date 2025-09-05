@@ -47,8 +47,8 @@ export function DashboardContent() {
   // Calculate stats from rooms data
   const stats: DashboardStats = {
     total_rooms: rooms.length,
-    active_rooms: rooms.filter(room => room.status === 'active').length,
-    total_members: rooms.reduce((sum, room) => sum + (room.member_count || 0), 0),
+    active_rooms: rooms.filter((room: any) => room.status === 'active').length,
+    total_members: rooms.reduce((sum: number, room: any) => sum + (room.member_count || 0), 0),
     pending_requests: 0, // This would need a separate API call
   };
 
@@ -238,7 +238,7 @@ export function DashboardContent() {
           <CardContent>
             {rooms.length > 0 ? (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {rooms.map((room, index) => (
+                {rooms.map((room: any, index: number) => (
                   <motion.div
                     key={room.id}
                     initial={{ opacity: 0, scale: 0.9 }}
