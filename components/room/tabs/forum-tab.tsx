@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Send, MessageCircle, User, Plus, Search, X, Trash2, AlertTriangle } from "lucide-react";
+import { Send, MessageCircle, User, Plus, Search, X, Trash2, AlertTriangle, ArrowLeft, Hash } from "lucide-react";
 import { useMembers } from "@/hooks/use-members";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { RichTextEditor } from "@/components/ui/rich-text-editor";
 
 interface ForumMessage {
   id: string;
@@ -41,13 +42,16 @@ interface ForumTabProps {
 
 export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
   const [newMessage, setNewMessage] = useState("");
-  const [selectedTopic, setSelectedTopic] = useState("Genel");
+  const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [newTopic, setNewTopic] = useState("");
   const [showNewTopicInput, setShowNewTopicInput] = useState(false);
   const [topicSearchTerm, setTopicSearchTerm] = useState("");
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'topics' | 'messages'>('topics');
+  const [currentPage, setCurrentPage] = useState(1);
+  const topicsPerPage = 5;
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -102,6 +106,7 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
   const { data: messages, isLoading, error } = useQuery<ForumMessage[]>({
     queryKey: ["forum-messages", roomId, selectedTopic],
     queryFn: async (): Promise<ForumMessage[]> => {
+      if (!selectedTopic) return [];
       const response = await fetch(`/api/rooms/${roomId}/forum?topic=${encodeURIComponent(selectedTopic)}`);
       if (!response.ok) {
         throw new Error("Failed to fetch forum messages");
@@ -113,6 +118,7 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
       );
       return sortedMessages;
     },
+    enabled: !!selectedTopic,
     refetchInterval: 5000, // Refetch every 5 seconds
     retry: (failureCount, error) => {
       return failureCount < 3;
@@ -231,7 +237,7 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
   });
 
   const handleSendMessage = () => {
-    if (newMessage.trim() && !isArchived) {
+    if (newMessage.trim() && !isArchived && selectedTopic) {
       sendMessageMutation.mutate({ 
         content: newMessage.trim(), 
         topic: selectedTopic 
@@ -263,6 +269,7 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
       setSelectedTopic(newTopicName);
       setNewTopic("");
       setShowNewTopicInput(false);
+      setViewMode('messages');
       
       // Optimistically update the topics list
       queryClient.setQueryData(["forum-topics", roomId], (oldTopics: string[] | undefined) => {
@@ -270,6 +277,17 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
         return [...oldTopics, newTopicName].sort();
       });
     }
+  };
+
+  const handleTopicSelect = (topic: string) => {
+    setSelectedTopic(topic);
+    setViewMode('messages');
+    setTopicSearchTerm("");
+  };
+
+  const handleBackToTopics = () => {
+    setViewMode('topics');
+    setSelectedTopic(null);
   };
 
   // Filter topics based on search term
@@ -280,12 +298,16 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
   // Show topics based on search state
   const displayTopics = topicSearchTerm ? filteredTopics : (topics || []);
 
-  // Auto-select first matching topic when searching
+  // Pagination logic
+  const totalPages = Math.ceil(displayTopics.length / topicsPerPage);
+  const startIndex = (currentPage - 1) * topicsPerPage;
+  const endIndex = startIndex + topicsPerPage;
+  const paginatedTopics = displayTopics.slice(startIndex, endIndex);
+
+  // Reset to first page when search changes
   useEffect(() => {
-    if (topicSearchTerm && filteredTopics.length > 0) {
-      setSelectedTopic(filteredTopics[0]);
-    }
-  }, [topicSearchTerm, filteredTopics]);
+    setCurrentPage(1);
+  }, [topicSearchTerm]);
 
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -347,19 +369,19 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
     );
   }
 
-  return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MessageCircle className="h-5 w-5" />
-            Forum
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Topic Search and Selection */}
-          <div className="space-y-3">
-            {/* Search, Dropdown and New Topic Button */}
+  // Topics List View
+  if (viewMode === 'topics') {
+    return (
+      <div className="space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MessageCircle className="h-5 w-5" />
+              Forum Konuları
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Search and New Topic */}
             <div className="flex gap-2 items-center">
               <div className="relative flex-1 max-w-sm">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
@@ -381,31 +403,6 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
                 )}
               </div>
               
-              <Select 
-                value={selectedTopic} 
-                onValueChange={(value) => {
-                  setSelectedTopic(value);
-                  setTopicSearchTerm(""); // Clear search when topic selected
-                }}
-              >
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="Konu seçin" />
-                </SelectTrigger>
-                <SelectContent>
-                  {displayTopics.length > 0 ? (
-                    displayTopics.map((topic) => (
-                      <SelectItem key={topic} value={topic}>
-                        {topic}
-                      </SelectItem>
-                    ))
-                  ) : (
-                    <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                      Konu bulunamadı
-                    </div>
-                  )}
-                </SelectContent>
-              </Select>
-              
               {isMember && (
                 <Button
                   variant="outline"
@@ -417,51 +414,137 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
                 </Button>
               )}
             </div>
-            
-            {/* Search Results Info */}
-            {topicSearchTerm && (
-              <div className="text-sm text-muted-foreground">
-                {filteredTopics.length > 0 
-                  ? `${filteredTopics.length} konu bulundu`
-                  : `"${topicSearchTerm}" için konu bulunamadı`
-                }
+
+            {/* New Topic Input */}
+            {showNewTopicInput && isMember && (
+              <div className="flex gap-2 items-center">
+                <Input
+                  placeholder="Yeni konu adı..."
+                  value={newTopic}
+                  onChange={(e) => setNewTopic(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === "Enter") {
+                      handleAddNewTopic();
+                    }
+                  }}
+                  className="w-48"
+                />
+                <Button
+                  size="sm"
+                  onClick={handleAddNewTopic}
+                  disabled={!newTopic.trim()}
+                >
+                  Ekle
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setShowNewTopicInput(false);
+                    setNewTopic("");
+                  }}
+                >
+                  İptal
+                </Button>
               </div>
             )}
-          </div>
 
-          {/* New Topic Input */}
-          {showNewTopicInput && isMember && (
-            <div className="flex gap-2 items-center">
-              <Input
-                placeholder="Yeni konu adı..."
-                value={newTopic}
-                onChange={(e) => setNewTopic(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === "Enter") {
-                    handleAddNewTopic();
-                  }
-                }}
-                className="w-48"
-              />
-              <Button
-                size="sm"
-                onClick={handleAddNewTopic}
-                disabled={!newTopic.trim()}
-              >
-                Ekle
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setShowNewTopicInput(false);
-                  setNewTopic("");
-                }}
-              >
-                İptal
-              </Button>
+            {/* Topics List */}
+            <div className="space-y-2">
+              {paginatedTopics.length > 0 ? (
+                paginatedTopics.map((topic) => (
+                  <div
+                    key={topic}
+                    onClick={() => handleTopicSelect(topic)}
+                    className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors"
+                  >
+                    <Hash className="h-4 w-4 text-muted-foreground" />
+                    <div className="flex-1">
+                      <h3 className="font-medium">{topic}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Konuya tıklayarak mesajları görüntüleyin
+                      </p>
+                    </div>
+                    <MessageCircle className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <MessageCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>Henüz forum konusu yok.</p>
+                  {isMember && (
+                    <p className="text-sm">İlk konuyu sen oluştur!</p>
+                  )}
+                </div>
+              )}
             </div>
-          )}
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between pt-4">
+                <div className="text-sm text-muted-foreground">
+                  {displayTopics.length} konudan {startIndex + 1}-{Math.min(endIndex, displayTopics.length)} arası gösteriliyor
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                  >
+                    Önceki
+                  </Button>
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <Button
+                        key={page}
+                        variant={currentPage === page ? "default" : "ghost"}
+                        size="sm"
+                        onClick={() => setCurrentPage(page)}
+                        className="h-8 w-8 p-0"
+                      >
+                        {page}
+                      </Button>
+                    ))}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                  >
+                    Sonraki
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Messages View
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleBackToTopics}
+              className="p-1 h-8 w-8"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <CardTitle className="flex items-center gap-2">
+              <Hash className="h-5 w-5" />
+              {selectedTopic}
+            </CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
           {/* Messages List */}
           <div className="space-y-4 max-h-96 overflow-y-auto">
             {messages && messages.length > 0 ? (
@@ -504,7 +587,10 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
                       )}
                     </div>
                     <div className="bg-muted/50 rounded-lg p-3">
-                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                      <div 
+                        className="text-sm prose prose-sm max-w-none"
+                        dangerouslySetInnerHTML={{ __html: message.content }}
+                      />
                     </div>
                   </div>
                 </div>
@@ -535,23 +621,25 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
                 </div>
               )}
               
-              <div className="flex gap-2">
-                <Textarea
+              <div className="space-y-3">
+                <RichTextEditor
+                  content={newMessage}
+                  onChange={setNewMessage}
                   placeholder={isMember === false ? "Üye olmadığınız için mesaj yazamazsınız..." : "Forum mesajınızı yazın..."}
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  className="min-h-[80px] resize-none"
                   disabled={sendMessageMutation.isPending || isMember === false}
+                  className="min-h-[120px]"
                 />
-                <Button
-                  onClick={handleSendMessage}
-                  disabled={!newMessage.trim() || sendMessageMutation.isPending || isMember === false}
-                  size="icon"
-                  className="self-end"
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
+                <div className="flex justify-end">
+                  <Button
+                    onClick={handleSendMessage}
+                    disabled={!newMessage.trim() || sendMessageMutation.isPending || isMember === false}
+                    size="sm"
+                    className="flex items-center gap-2"
+                  >
+                    <Send className="h-4 w-4" />
+                    Gönder
+                  </Button>
+                </div>
               </div>
             </div>
           )}
