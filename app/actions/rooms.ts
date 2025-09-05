@@ -541,13 +541,8 @@ export async function getRoomMembers(roomId: string) {
     // Check if user is a member of the room
     const membership = await checkMembership(roomId, user.id);
 
-    if (!membership) {
-      // Gracefully handle non-members: return empty list and a safe default role
-      return { 
-        members: [], 
-        currentUserRole: 'member' as Database['public']['Enums']['user_role'] 
-      };
-    }
+    // Allow non-members to view members, but with limited role
+    const currentUserRole = membership?.role || 'member' as Database['public']['Enums']['user_role'];
 
     // Get all members with profile and company data using admin client
     const { data: members, error } = await adminSupabase
@@ -557,6 +552,7 @@ export async function getRoomMembers(roomId: string) {
         role,
         joined_at,
         profiles:user_id (
+          id,
           full_name,
           email,
           avatar_url,
@@ -574,7 +570,7 @@ export async function getRoomMembers(roomId: string) {
       throw new Error("Failed to get room members");
     }
 
-    return { members: members || [], currentUserRole: membership.role };
+    return { members: members || [], currentUserRole };
   } catch (error) {
     console.error("Get room members error:", error);
     throw new Error("Failed to get room members");

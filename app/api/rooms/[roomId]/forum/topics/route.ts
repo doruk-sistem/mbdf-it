@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createMiddlewareSupabaseClient } from "@/lib/supabase";
+import { createMiddlewareSupabaseClient, createAdminSupabase } from "@/lib/supabase";
 
 export async function GET(
   request: NextRequest,
@@ -15,20 +15,14 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Check if user is member of the room
-    const { data: membership } = await supabase
-      .from("mbdf_member")
-      .select("id")
-      .eq("room_id", params.roomId)
-      .eq("user_id", user.id)
-      .single();
+    // Use admin client to bypass RLS for viewing topics
+    const adminSupabase = createAdminSupabase();
 
-    if (!membership) {
-      return NextResponse.json({ error: "Access denied", code: "ACCESS_DENIED" }, { status: 403 });
-    }
+    // Allow all authenticated users to view forum topics
+    // No membership check needed for viewing
 
-    // Get unique topics for this room's forum messages
-    const { data: topics, error } = await supabase
+    // Get unique topics for this room's forum messages using admin client
+    const { data: topics, error } = await adminSupabase
       .from("message")
       .select("topic")
       .eq("room_id", params.roomId)
@@ -41,7 +35,7 @@ export async function GET(
     }
 
     // Extract unique topics and sort them
-    const uniqueTopics = Array.from(new Set(topics?.map(t => t.topic) || []))
+    const uniqueTopics = Array.from(new Set(topics?.map((t: any) => t.topic) || []))
       .filter(topic => topic && topic.trim() !== "")
       .sort();
 

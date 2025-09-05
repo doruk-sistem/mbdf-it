@@ -32,7 +32,8 @@ export async function GET(request: NextRequest) {
     // Use admin client to bypass RLS for access check
     const adminSupabase = createAdminSupabase();
     
-    // Check if user can view this room (member or creator)
+    // Allow all authenticated users to view documents
+    // Check if user is a member for role-based permissions
     const { data: membership, error: memberError } = await adminSupabase
       .from('mbdf_member')
       .select('id, role')
@@ -48,33 +49,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Check if user is creator of the room
-    const { data: room, error: roomError } = await adminSupabase
-      .from('mbdf_room')
-      .select('created_by')
-      .eq('id', roomId)
-      .single();
-
-    if (roomError) {
-      console.error('Error fetching room:', roomError);
-      return NextResponse.json(
-        { error: 'Room not found', success: false },
-        { status: 404 }
-      );
-    }
-
     const isMember = !!membership;
-    const isCreator = (room as any).created_by === user.id;
-
-    // Allow access if user is member or creator
-    if (!isMember && !isCreator) {
-      return NextResponse.json(
-        { error: 'Access denied', success: false },
-        { status: 403 }
-      );
-    }
-
-    // Get user's role if they are a member
     const userRole = (membership as any)?.role;
 
     // Get documents with uploader profile using admin client to bypass RLS
@@ -95,10 +70,19 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Create signed URLs for file downloads (normalize stored path if it includes bucket prefix)
+    // Create signed URLs for file downloads (only for members)
     const documentsWithUrls = await Promise.all(
       ((documents || []) as any[]).map(async (doc: any) => {
         try {
+          // Only create download URLs for members
+          if (!isMember) {
+            return {
+              ...doc,
+              download_url: null,
+              download_error: "Bu odaya üye olmadığınız için dokümanı indiremezsiniz. İndirmek için odaya üye olmanız gerekmektedir."
+            };
+          }
+
           const storagePath = doc.file_path?.startsWith('docs/')
             ? doc.file_path.replace(/^docs\//, '')
             : doc.file_path;
@@ -110,12 +94,14 @@ export async function GET(request: NextRequest) {
           return {
             ...doc,
             download_url: urlError ? null : signedUrlData.signedUrl,
+            download_error: urlError ? "İndirme linki oluşturulamadı." : null,
           };
         } catch (urlError) {
           console.error('Error creating signed URL for:', doc.file_path, urlError);
           return {
             ...doc,
             download_url: null,
+            download_error: "İndirme linki oluşturulamadı.",
           };
         }
       })
