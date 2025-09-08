@@ -387,6 +387,8 @@ export async function updateUserProfile(formData: FormData) {
 
   const fullName = formData.get("fullName") as string;
   const phone = formData.get("phone") as string;
+  const tonnageStr = formData.get("tonnage") as string;
+  const tonnage = tonnageStr && tonnageStr.trim() ? parseFloat(tonnageStr) : null;
 
   try {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -398,7 +400,7 @@ export async function updateUserProfile(formData: FormData) {
     // Get old values for audit
     const { data: oldProfile } = await supabase
       .from("profiles")
-      .select("full_name, phone")
+      .select("full_name, phone, tonnage")
       .eq("id", user.id)
       .single();
 
@@ -408,6 +410,7 @@ export async function updateUserProfile(formData: FormData) {
       .update({
         full_name: fullName,
         phone: phone || null,
+        tonnage: tonnage,
         updated_at: new Date().toISOString(),
       })
       .eq("id", user.id);
@@ -426,7 +429,7 @@ export async function updateUserProfile(formData: FormData) {
         resource_type: "profile",
         resource_id: user.id,
         old_values: oldProfile,
-        new_values: { full_name: fullName, phone },
+        new_values: { full_name: fullName, phone, tonnage },
       });
 
     revalidatePath("/settings");
