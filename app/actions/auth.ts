@@ -11,6 +11,7 @@ interface OnboardingData {
   vatNumber?: string | null;
   address?: string | null;
   contactPhone?: string | null;
+  tonnage?: number | null;
 }
 
 // Send magic link for authentication
@@ -278,6 +279,7 @@ export async function completeOnboarding(data: OnboardingData) {
       .update({
         full_name: data.fullName,
         company_id: companyId,
+        tonnage: data.tonnage,
       })
       .eq("id", user.id);
 
