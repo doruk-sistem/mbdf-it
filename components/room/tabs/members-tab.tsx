@@ -315,6 +315,7 @@ export function MembersTab({ roomId, isArchived = false }: MembersTabProps) {
               <TableRow>
                 <TableHead>Üye</TableHead>
                 <TableHead>Şirket</TableHead>
+                <TableHead>Tonaj</TableHead>
                 <TableHead>Rol</TableHead>
                 <TableHead>Katılım Tarihi</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
@@ -350,6 +351,11 @@ export function MembersTab({ roomId, isArchived = false }: MembersTabProps) {
                   <TableCell>
                     <span className="text-sm">
                       {member.profiles?.company?.name || "Şirket bilgisi yok"}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-sm">
+                      {(member.profiles as any)?.tonnage ? `${(member.profiles as any).tonnage} ton` : "Belirtilmemiş"}
                     </span>
                   </TableCell>
                   <TableCell>

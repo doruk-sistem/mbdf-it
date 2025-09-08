@@ -552,6 +552,7 @@ export interface Database {
           id: string
           phone: string | null
           role: Database["public"]["Enums"]["user_role"]
+          tonnage: number | null
           updated_at: string
         }
         Insert: {
@@ -563,6 +564,7 @@ export interface Database {
           id: string
           phone?: string | null
           role?: Database["public"]["Enums"]["user_role"]
+          tonnage?: number | null
           updated_at?: string
         }
         Update: {
@@ -574,6 +576,7 @@ export interface Database {
           id?: string
           phone?: string | null
           role?: Database["public"]["Enums"]["user_role"]
+          tonnage?: number | null
           updated_at?: string
         }
       }

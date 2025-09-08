@@ -556,6 +556,7 @@ export async function getRoomMembers(roomId: string) {
           full_name,
           email,
           avatar_url,
+          tonnage,
           company:company_id (
             name,
             vat_number
