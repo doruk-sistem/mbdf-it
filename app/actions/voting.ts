@@ -176,7 +176,7 @@ export async function finalizeLRSelection(roomId: string, candidateId: string) {
   const supabase = createServerSupabase();
 
   try {
-    // Check if user has permission (admin only)
+    // Check if user is a member of the room
     const { data: membership } = await supabase
       .from("mbdf_member")
       .select("role")
@@ -184,9 +184,11 @@ export async function finalizeLRSelection(roomId: string, candidateId: string) {
       .eq("user_id", user.id)
       .single();
 
-    if (!membership || membership.role !== "admin") {
-      throw new Error("Only administrators can finalize LR selection");
+    if (!membership) {
+      throw new Error("You must be a member of this room to finalize LR selection");
     }
+
+    // Any room member can finalize LR selection (democratic process)
 
     // Reset all candidates
     await supabase

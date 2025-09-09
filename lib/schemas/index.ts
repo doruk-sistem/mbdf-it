@@ -118,11 +118,11 @@ export const LrVoteSchema = z.object({
   room_id: IdSchema,
   candidate_id: IdSchema,
   voter_id: IdSchema,
-  technical_score: z.number().min(1).max(5).nullable(),
-  experience_score: z.number().min(1).max(5).nullable(),
-  communication_score: z.number().min(1).max(5).nullable(),
-  leadership_score: z.number().min(1).max(5).nullable(),
-  availability_score: z.number().min(1).max(5).nullable(),
+  technical_score: z.number().min(0).max(5).nullable(),
+  experience_score: z.number().min(0).max(5).nullable(),
+  communication_score: z.number().min(0).max(5).nullable(),
+  leadership_score: z.number().min(0).max(5).nullable(),
+  availability_score: z.number().min(0).max(5).nullable(),
   created_at: DateSchema,
   updated_at: DateSchema,
 });
@@ -273,11 +273,11 @@ export const RejectAccessRequestSchema = z.object({
 
 export const SubmitVoteSchema = z.object({
   candidate_id: IdSchema,
-  technical_score: z.number().min(1).max(5),
-  experience_score: z.number().min(1).max(5),
-  communication_score: z.number().min(1).max(5),
-  leadership_score: z.number().min(1).max(5),
-  availability_score: z.number().min(1).max(5),
+  technical_score: z.number().min(0).max(5),
+  experience_score: z.number().min(0).max(5),
+  communication_score: z.number().min(0).max(5),
+  leadership_score: z.number().min(0).max(5),
+  availability_score: z.number().min(0).max(5),
 });
 
 export const CreateAgreementSchema = z.object({
