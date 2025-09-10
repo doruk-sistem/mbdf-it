@@ -190,12 +190,12 @@ export async function POST(request: NextRequest) {
     // Use admin client to bypass RLS for vote submission
     const adminSupabase = createAdminSupabase();
 
-    // Get room ID from candidate using admin client
+    // Get room ID and creation time from candidate using admin client
     const { data: candidate, error: candidateError } = await adminSupabase
       .from('lr_candidate')
-      .select('room_id')
+      .select('room_id, created_at')
       .eq('id', validatedData.candidate_id)
-      .single() as { data: { room_id: string } | null; error: any };
+      .single() as { data: { room_id: string; created_at: string } | null; error: any };
 
     if (candidateError || !candidate) {
       console.error('Error fetching candidate:', candidateError);
@@ -205,6 +205,37 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Server-side voting time validation - use first candidate's time
+    const now = new Date();
+    
+    // Get the first candidate (earliest created) for timing
+    const { data: firstCandidate } = await adminSupabase
+      .from('lr_candidate')
+      .select('created_at')
+      .eq('room_id', candidate.room_id)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .single() as { data: { created_at: string } | null; error: any };
+    
+    if (!firstCandidate) {
+      return NextResponse.json(
+        { error: 'No candidates found', success: false },
+        { status: 404 }
+      );
+    }
+    
+    const firstCandidateCreatedAt = new Date(firstCandidate.created_at);
+    const votingStartTime = new Date(firstCandidateCreatedAt.getTime() + (60 * 1000)); // +1 minute
+    const votingEndTime = new Date(votingStartTime.getTime() + (60 * 1000) + (5 * 1000)); // +1 minute + 5 seconds tolerance
+    
+    // Only check if voting has started, allow voting even after time expires
+    if (now < votingStartTime) {
+      return NextResponse.json(
+        { error: 'Voting has not started yet', success: false },
+        { status: 400 }
+      );
+    }
+    
     // Check if user has access to this room using admin client
     const { data: membership, error: memberError } = await adminSupabase
       .from('mbdf_member')

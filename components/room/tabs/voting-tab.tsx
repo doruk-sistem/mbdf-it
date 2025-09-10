@@ -369,10 +369,10 @@ export function VotingTab({ roomId }: VotingTabProps) {
         
         // Check if we have enough votes for majority (this is the real finalization trigger)
         const requiredVotesForMajority = Math.ceil(expectedTotalVotes * 0.51);
-        if (actualTotalVotes >= requiredVotesForMajority) {
+        if (actualTotalVotes >= requiredVotesForMajority && !isFinalized) {
           // Additional check: Make sure we have enough votes for all candidates
           const expectedVotesForAllCandidates = eligibleVoters * candidates.length;
-          if (actualTotalVotes < expectedVotesForAllCandidates) {
+          if (actualTotalVotes < expectedVotesForAllCandidates && !isFinalized) {
             toast({
               title: "⚠️ Eksik Oylar",
               description: "Tüm üyeler tüm adaylara oy vermeli.",
@@ -380,11 +380,13 @@ export function VotingTab({ roomId }: VotingTabProps) {
             });
             return;
           }
-          
-          toast({
-            title: "Tüm değerlendirmeler tamamlandı!",
-            description: "LR seçimi otomatik olarak yapılacak.",
-          });
+
+          if (!isFinalized) {
+            toast({
+              title: "Tüm değerlendirmeler tamamlandı!",
+              description: "LR seçimi otomatik olarak yapılacak.",
+            });
+          }
           
           // Auto-finalize if all votes are in and no tie - BUT WAIT LONGER
           const timeoutId = setTimeout(() => {
@@ -580,7 +582,7 @@ export function VotingTab({ roomId }: VotingTabProps) {
                   {votingPhase === 'voting' && actualTotalVotes >= expectedTotalVotes && "Oylama tamamlandı - LR seçimi yapılacak"}
                   {votingPhase === 'voting' && actualTotalVotes < expectedTotalVotes && "Oylama dönemi - Lider Kayıtçı adaylarını değerlendirin (0-5 puan)"}
                   {votingPhase === 'completed' && actualTotalVotes >= expectedTotalVotes && "Oylama tamamlandı - LR seçildi"}
-                  {votingPhase === 'completed' && actualTotalVotes < expectedTotalVotes && "Oylama devam ediyor - Tüm üyeler oy vermeli"}
+                  {votingPhase === 'completed' && actualTotalVotes < expectedTotalVotes && !isFinalized && "Oylama devam ediyor - Tüm üyeler oy vermeli"}
                 </CardDescription>
                 {votingPhase === 'nomination' && votingStartTime && (
                   <div className="mt-2">
@@ -881,8 +883,8 @@ export function VotingTab({ roomId }: VotingTabProps) {
                 <CardTitle>Sonuçlar</CardTitle>
                 <CardDescription>
                   {isFinalized && actualTotalVotes >= expectedTotalVotes
-                    ? "Oylama tamamlandı - LR seçildi" 
-                    : isFinalized && actualTotalVotes < expectedTotalVotes
+                    ? "🎉 Oylama tamamlandı - LR seçildi" 
+                    : isFinalized && actualTotalVotes < expectedTotalVotes && !isFinalized
                     ? "Oylama devam ediyor - Tüm üyeler oy vermeli"
                     : hasTie
                     ? `🔄 Eşit puanlar! Tekrar oylama gerekli (${maxScore.toFixed(1)}/5.0)`
