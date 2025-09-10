@@ -70,24 +70,62 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get candidate's voting results for logging
-    const { data: votes } = await adminSupabase
+    // Get all voting results for tie checking
+    const { data: allVotes } = await adminSupabase
       .from('lr_vote')
-      .select('technical_score, experience_score, availability_score, communication_score, leadership_score')
-      .eq('candidate_id', validatedData.candidate_id);
+      .select('candidate_id, technical_score, experience_score, availability_score, communication_score, leadership_score')
+      .eq('room_id', validatedData.room_id);
 
-    let totalScore = 0;
-    let voteCount = votes?.length || 0;
+    // Calculate scores for all candidates
+    const candidateScores: { [key: string]: number } = {};
+    
+    if (allVotes && allVotes.length > 0) {
+      // Group votes by candidate
+      const votesByCandidate = allVotes.reduce((acc: any, vote: any) => {
+        if (!acc[vote.candidate_id]) {
+          acc[vote.candidate_id] = [];
+        }
+        acc[vote.candidate_id].push(vote);
+        return acc;
+      }, {});
 
-    if (votes && votes.length > 0) {
-      const voteAverages = votes.map((vote: any) => {
-        const voteTotal = (vote.technical_score || 0) + (vote.experience_score || 0) + 
-                         (vote.availability_score || 0) + (vote.communication_score || 0) + 
-                         (vote.leadership_score || 0);
-        return voteTotal / 5; // 5 criteria per vote
+      // Calculate average score for each candidate
+      Object.keys(votesByCandidate).forEach(candidateId => {
+        const candidateVotes = votesByCandidate[candidateId];
+        const voteAverages = candidateVotes.map((vote: any) => {
+          const voteTotal = (vote.technical_score || 0) + (vote.experience_score || 0) + 
+                           (vote.availability_score || 0) + (vote.communication_score || 0) + 
+                           (vote.leadership_score || 0);
+          return voteTotal / 5; // 5 criteria per vote
+        });
+        candidateScores[candidateId] = voteAverages.reduce((sum: number, avg: number) => sum + avg, 0) / candidateVotes.length;
       });
-      totalScore = voteAverages.reduce((sum: number, avg: number) => sum + avg, 0) / votes.length;
     }
+
+    // Check for tie (multiple candidates with same highest score)
+    const scores = Object.values(candidateScores);
+    const maxScore = scores.length > 0 ? Math.max(...scores) : 0;
+    const topCandidates = Object.keys(candidateScores).filter(candidateId => 
+      candidateScores[candidateId] === maxScore
+    );
+
+    // Prevent finalization if there's a tie
+    if (topCandidates.length > 1 && maxScore > 0) {
+      return NextResponse.json(
+        { 
+          error: 'Cannot finalize: Multiple candidates have the same highest score. Please resolve the tie first.', 
+          success: false,
+          tie_detected: true,
+          top_candidates: topCandidates,
+          max_score: maxScore
+        },
+        { status: 409 }
+      );
+    }
+
+    // Get selected candidate's score for logging
+    const selectedCandidateScore = candidateScores[validatedData.candidate_id] || 0;
+    const selectedCandidateVotes = allVotes?.filter((vote: any) => vote.candidate_id === validatedData.candidate_id) || [];
 
     // Start transaction-like operations
     try {
@@ -136,8 +174,8 @@ export async function POST(request: NextRequest) {
           resource_id: validatedData.candidate_id,
           new_values: { 
             candidate_user_id: candidate.user_id,
-            total_score: totalScore,
-            vote_count: voteCount
+            total_score: selectedCandidateScore,
+            vote_count: selectedCandidateVotes.length
           }
         } as any);
 
@@ -160,8 +198,8 @@ export async function POST(request: NextRequest) {
           candidate_id: validatedData.candidate_id,
           candidate_name: profile?.full_name || 'Unknown',
           candidate_email: profile?.email || 'Unknown',
-          total_score: totalScore,
-          vote_count: voteCount
+          total_score: selectedCandidateScore,
+          vote_count: selectedCandidateVotes.length
         }
       });
 

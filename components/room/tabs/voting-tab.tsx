@@ -13,7 +13,7 @@ import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/components/ui/use-toast";
-import { useVotes, useCandidates, useSubmitVote, useSubmitAllVotes, useNominateCandidate, useFinalizeLR } from "@/hooks/use-votes";
+import { useVotes, useCandidates, useSubmitVote, useSubmitAllVotes, useNominateCandidate, useFinalizeLR, useResetVotes } from "@/hooks/use-votes";
 import { useMembers } from "@/hooks/use-members";
 import { useCurrentUser } from "@/hooks/use-user";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -48,6 +48,7 @@ export function VotingTab({ roomId }: VotingTabProps) {
   const [currentVotingCandidate, setCurrentVotingCandidate] = useState<any>(null);
   const [evaluatedCandidates, setEvaluatedCandidates] = useState<Set<string>>(new Set());
   const [isTieDetected, setIsTieDetected] = useState(false);
+  const [finalizeTimeoutRef, setFinalizeTimeoutRef] = useState<NodeJS.Timeout | null>(null);
   
   const { toast } = useToast();
 
@@ -62,6 +63,7 @@ export function VotingTab({ roomId }: VotingTabProps) {
   const submitAllVotesMutation = useSubmitAllVotes();
   const nominateCandidateMutation = useNominateCandidate();
   const finalizeLRMutation = useFinalizeLR();
+  const resetVotesMutation = useResetVotes();
 
   const candidates = candidatesData?.items || [];
   const members = (membersData as any)?.items || [];
@@ -76,26 +78,93 @@ export function VotingTab({ roomId }: VotingTabProps) {
   const currentUser = members.find((member: any) => member.profiles?.email === user?.profile?.email);
   const isCurrentUserCandidate = candidates.some((candidate: any) => candidate.user_id === currentUser?.user_id);
 
-  // Check for tie (equal scores)
+  // Check for tie (equal scores) - but only if we're not already in a tie state
   const maxScore = votingResults.length > 0 ? Math.max(...votingResults.map(r => r.total_score)) : 0;
   const topCandidates = votingResults.filter(r => r.total_score === maxScore);
-  const hasTie = topCandidates.length > 1 && maxScore > 0;
+  const hasTie = !isTieDetected && topCandidates.length > 1 && maxScore > 0;
+  
+  // Debug logging
+  console.log('🔍 TIE DEBUG:', {
+    votingResults_length: votingResults.length,
+    maxScore,
+    topCandidates_count: topCandidates.length,
+    topCandidates_ids: topCandidates.map(t => t.candidate_id),
+    hasTie,
+    isTieDetected,
+    evaluatedCandidates_size: evaluatedCandidates.size,
+    candidates_length: candidates.length
+  });
   
   // Reset evaluated candidates when tie is detected
   React.useEffect(() => {
+    console.log('🔍 TIE EFFECT TRIGGERED:', { hasTie, isTieDetected });
+    
     if (hasTie && !isTieDetected) {
+      console.log('🚨 TIE DETECTED - Starting reset process');
       setIsTieDetected(true);
       setEvaluatedCandidates(new Set());
-      toast({
-        title: "🔄 Tekrar Oylama Gerekli",
-        description: `En yüksek puanlı adaylar eşit (${maxScore.toFixed(1)}/5.0)! Lütfen tekrar değerlendirin.`,
-        variant: "default",
-        duration: 10000,
+      
+      // Cancel any pending finalize timeout
+      if (finalizeTimeoutRef) {
+        console.log('⏹️ CANCELLING FINALIZE TIMEOUT');
+        clearTimeout(finalizeTimeoutRef);
+        setFinalizeTimeoutRef(null);
+      }
+      
+      // Check if voting time is still active
+      const now = Date.now();
+      const isVotingTimeActive = votingEndTime && now < votingEndTime.getTime();
+      
+      console.log('⏰ TIME CHECK:', {
+        now: new Date(now).toISOString(),
+        votingEndTime: votingEndTime?.toISOString(),
+        isVotingTimeActive
       });
-    } else if (!hasTie && isTieDetected) {
+      
+      // Reset votes in database when tie is detected - THIS MUST HAPPEN FIRST
+      console.log('🔄 RESETTING VOTES...');
+      resetVotesMutation.mutate({ roomId }, {
+        onSuccess: () => {
+          console.log('✅ VOTES RESET SUCCESS');
+          // Refresh data after reset
+          refetchVotes();
+          refetchCandidates();
+          
+          // Wait a bit longer to ensure data is fully refreshed
+          setTimeout(() => {
+            console.log('🔄 FORCE REFRESH AFTER RESET');
+            // Force another refresh to make sure we have clean data
+            refetchVotes();
+            refetchCandidates();
+          }, 2000);
+        },
+        onError: (error) => {
+          console.error('❌ VOTES RESET ERROR:', error);
+        }
+      });
+      
+      if (isVotingTimeActive) {
+        toast({
+          title: "🔄 Tekrar Oylama Gerekli",
+          description: `En yüksek puanlı adaylar eşit (${maxScore.toFixed(1)}/5.0)! Oylar sıfırlandı, lütfen tekrar değerlendirin.`,
+          variant: "default",
+          duration: 10000,
+        });
+      } else {
+        toast({
+          title: "🔄 Eşit Puan - Süre Doldu",
+          description: `En yüksek puanlı adaylar eşit (${maxScore.toFixed(1)}/5.0)! Oylar sıfırlandı. Tüm adaylara oy verilmesi gerekiyor.`,
+          variant: "default",
+          duration: 10000,
+        });
+      }
+    } else if (!hasTie && isTieDetected && votingResults.length === 0) {
+      // Reset tie detection when votes are cleared
+      console.log('🔄 RESETTING TIE STATE - Votes cleared');
       setIsTieDetected(false);
+      setEvaluatedCandidates(new Set());
     }
-  }, [hasTie, isTieDetected]); // Remove maxScore and toast from dependencies
+  }, [hasTie, isTieDetected, votingResults.length]); // Remove votingEndTime from dependencies
 
   // Check if voting is complete (all eligible voters have voted for all candidates)
   const candidateUserIds = candidates.map((c: any) => c.user_id);
@@ -292,48 +361,146 @@ export function VotingTab({ roomId }: VotingTabProps) {
           evaluatedCandidates.has(c.id) || c.id === currentVotingCandidate.id
         );
         
+        console.log('🔍 ALL EVALUATED CHECK:', {
+          allEvaluated,
+          candidates_length: candidates.length,
+          evaluatedCandidates_size: evaluatedCandidates.size,
+          currentVotingCandidate_id: currentVotingCandidate?.id,
+          isTieDetected,
+          hasTie
+        });
+        
         if (allEvaluated) {
+          console.log('🎯 ALL EVALUATED - Checking for finalization');
+          console.log('🔍 FINALIZE CHECK:', { hasTie, isTieDetected, votingResults_length: votingResults.length });
+          
+          // Check for tie BEFORE attempting finalization
+          if (hasTie || isTieDetected) {
+            console.log('🚨 TIE DETECTED - Preventing finalization');
+            toast({
+              title: "🔄 Eşit Puan Tespit Edildi",
+              description: "Oylar sıfırlanıyor, lütfen tekrar değerlendirin.",
+              variant: "default",
+            });
+            return; // Don't finalize if there's a tie
+          }
+          
+          // Additional check: Make sure we have enough votes for all candidates
+          const expectedVotesForAllCandidates = eligibleVoters * candidates.length;
+          if (actualTotalVotes < expectedVotesForAllCandidates) {
+            console.log('⚠️ NOT ALL VOTES IN - Preventing finalization', {
+              actualTotalVotes,
+              expectedVotesForAllCandidates,
+              eligibleVoters,
+              candidates_length: candidates.length
+            });
+            toast({
+              title: "⚠️ Eksik Oylar",
+              description: "Tüm üyeler tüm adaylara oy vermeli.",
+              variant: "default",
+            });
+            return;
+          }
+          
+          console.log('✅ NO TIE - Proceeding with finalization');
           toast({
             title: "Tüm değerlendirmeler tamamlandı!",
             description: "LR seçimi otomatik olarak yapılacak.",
           });
-          // Auto-finalize if all votes are in
-          setTimeout(() => {
+          
+          // Auto-finalize if all votes are in and no tie - BUT WAIT LONGER
+          const timeoutId = setTimeout(() => {
+            console.log('⏰ FINALIZE TIMEOUT STARTED (3s)');
             // Get the best candidate and finalize
             refetchVotes().then(() => {
               refetchCandidates().then(() => {
-                // Find the candidate with highest score
-                if (votingResults.length === 0) return;
-                
-                const maxScore = Math.max(...votingResults.map(r => r.total_score));
-                const topCandidates = votingResults.filter(r => r.total_score === maxScore);
-                
-                // Only finalize if there's exactly one top candidate (no tie)
-                if (topCandidates.length === 1) {
-                  const bestCandidate = candidates.find((c: any) => c.id === topCandidates[0].candidate_id);
+                // Wait a bit more to ensure all data is fresh
+                setTimeout(() => {
+                  console.log('⏰ FINALIZE TIMEOUT PHASE 2 (1.5s)');
+                  console.log('🔍 FINALIZE REFETCH CHECK:', { hasTie, isTieDetected, votingResults_length: votingResults.length });
                   
-                  if (bestCandidate) {
-                    finalizeLRMutation.mutate({
-                      roomId: roomId,
-                      candidateId: bestCandidate.id
-                    }, {
-                      onSuccess: () => {
-                        // Force phase update
-                        setForcePhaseUpdate(prev => prev + 1);
-                      },
-                      onError: (error: any) => {
-                        toast({
-                          title: 'Finalize Hatası',
-                          description: error?.data?.error || 'LR seçimi tamamlanamadı',
-                          variant: 'destructive',
-                        });
-                      }
+                  // Triple-check for tie after refetch
+                  if (hasTie || isTieDetected) {
+                    console.log('🚨 TIE DETECTED AFTER REFETCH - Canceling finalization');
+                    toast({
+                      title: "🔄 Eşit Puan Tespit Edildi",
+                      description: "Finalize işlemi iptal edildi.",
+                      variant: "default",
+                    });
+                    return;
+                  }
+                  
+                  // Find the candidate with highest score
+                  if (votingResults.length === 0) {
+                    console.log('⚠️ NO VOTING RESULTS - Canceling finalization');
+                    toast({
+                      title: "⚠️ Oylar Bulunamadı",
+                      description: "Finalize işlemi iptal edildi.",
+                      variant: "default",
+                    });
+                    return;
+                  }
+                  
+                  const maxScore = Math.max(...votingResults.map(r => r.total_score));
+                  const topCandidates = votingResults.filter(r => r.total_score === maxScore);
+                  
+                  console.log('🎯 FINALIZE CANDIDATE CHECK:', {
+                    maxScore,
+                    topCandidates_count: topCandidates.length,
+                    topCandidates_ids: topCandidates.map(t => t.candidate_id)
+                  });
+                  
+                  // Only finalize if there's exactly one top candidate (no tie)
+                  if (topCandidates.length === 1) {
+                    const bestCandidate = candidates.find((c: any) => c.id === topCandidates[0].candidate_id);
+                    
+                    if (bestCandidate) {
+                      console.log('🎯 FINALIZING LR:', {
+                        candidate_id: bestCandidate.id,
+                        candidate_name: bestCandidate.profiles?.full_name
+                      });
+                      
+                      // Final check before finalizing
+                      toast({
+                        title: "🎯 Lider Seçiliyor",
+                        description: `${bestCandidate.profiles?.full_name || 'Aday'} lider olarak seçiliyor...`,
+                        variant: "default",
+                      });
+                      
+                      finalizeLRMutation.mutate({
+                        roomId: roomId,
+                        candidateId: bestCandidate.id
+                      }, {
+                        onSuccess: () => {
+                          console.log('✅ FINALIZE SUCCESS');
+                          // Force phase update
+                          setForcePhaseUpdate(prev => prev + 1);
+                        },
+                        onError: (error: any) => {
+                          console.error('❌ FINALIZE ERROR:', error);
+                          toast({
+                            title: 'Finalize Hatası',
+                            description: error?.data?.error || 'LR seçimi tamamlanamadı',
+                            variant: 'destructive',
+                          });
+                        }
+                      });
+                    }
+                  } else {
+                    console.log('🚨 TIE DETECTED IN FINALIZE - Multiple top candidates');
+                    toast({
+                      title: "🔄 Eşit Puan Tespit Edildi",
+                      description: `${topCandidates.length} aday eşit puan aldı. Finalize işlemi iptal edildi.`,
+                      variant: "default",
                     });
                   }
-                }
+                }, 1500); // Additional 1.5 second delay
               });
             });
-          }, 1000);
+          }, 3000); // Increased from 1000ms to 3000ms
+          
+          // Store timeout reference for potential cancellation
+          setFinalizeTimeoutRef(timeoutId);
         }
       }
     });
@@ -475,32 +642,56 @@ export function VotingTab({ roomId }: VotingTabProps) {
                         // Only run once - check if we already processed this
                         if (forcePhaseUpdate === 0) {
                           setForcePhaseUpdate(1);
-                          // Auto-finalize when time is up - but only if all members have voted AND no tie exists
-                          if (votingResults.length > 0 && actualTotalVotes >= expectedTotalVotes && !hasTie) {
-                            // Find the candidate with highest score
-                            const maxScore = Math.max(...votingResults.map(r => r.total_score));
-                            const topCandidates = votingResults.filter(r => r.total_score === maxScore);
-                            
-                            // Only finalize if there's exactly one top candidate (no tie)
-                            if (topCandidates.length === 1) {
-                              const bestCandidate = candidates.find((c: any) => c.id === topCandidates[0].candidate_id);
+                          
+                          // Check if all members have voted for all candidates
+                          if (actualTotalVotes >= expectedTotalVotes) {
+                            // All votes are in, check for tie
+                            if (votingResults.length > 0) {
+                              const maxScore = Math.max(...votingResults.map(r => r.total_score));
+                              const topCandidates = votingResults.filter(r => r.total_score === maxScore);
                               
-                              if (bestCandidate) {
-                                finalizeLRMutation.mutate({
-                                  roomId: roomId,
-                                  candidateId: bestCandidate.id
-                                }, {
+                              if (topCandidates.length === 1) {
+                                // No tie, finalize
+                                const bestCandidate = candidates.find((c: any) => c.id === topCandidates[0].candidate_id);
+                                
+                                if (bestCandidate) {
+                                  toast({
+                                    title: '🎯 Süre Doldu - Lider Seçiliyor',
+                                    description: `Tüm oylar tamamlandı. ${bestCandidate.profiles?.full_name || 'Aday'} lider olarak seçiliyor.`,
+                                    variant: 'default',
+                                  });
+                                  
+                                  finalizeLRMutation.mutate({
+                                    roomId: roomId,
+                                    candidateId: bestCandidate.id
+                                  }, {
+                                    onSuccess: () => {
+                                      // Force phase update after finalization
+                                      setForcePhaseUpdate(prev => prev + 1);
+                                    },
+                                    onError: (error: any) => {
+                                      // Show error message to user
+                                      toast({
+                                        title: 'Finalize Hatası',
+                                        description: error?.data?.error || 'LR seçimi tamamlanamadı',
+                                        variant: 'destructive',
+                                      });
+                                    }
+                                  });
+                                }
+                              } else {
+                                // Tie detected, reset votes
+                                toast({
+                                  title: '🔄 Eşit Puan - Oylar Sıfırlanıyor',
+                                  description: `${topCandidates.length} aday eşit puan aldı. Oylar sıfırlanıyor, lütfen tekrar değerlendirin.`,
+                                  variant: 'default',
+                                  duration: 8000,
+                                });
+                                
+                                resetVotesMutation.mutate({ roomId }, {
                                   onSuccess: () => {
-                                    // Force phase update after finalization
-                                    setForcePhaseUpdate(prev => prev + 1);
-                                  },
-                                  onError: (error: any) => {
-                                    // Show error message to user
-                                    toast({
-                                      title: 'Finalize Hatası',
-                                      description: error?.data?.error || 'LR seçimi tamamlanamadı',
-                                      variant: 'destructive',
-                                    });
+                                    refetchVotes();
+                                    refetchCandidates();
                                   }
                                 });
                               }

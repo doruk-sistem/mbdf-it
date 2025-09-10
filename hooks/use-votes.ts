@@ -341,3 +341,37 @@ export function useFinalizeLR() {
     },
   });
 }
+
+export function useResetVotes() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (data: { roomId: string }) => {
+      return post('/api/votes/reset', {
+        room_id: data.roomId
+      });
+    },
+    onSuccess: (data, variables) => {
+      // Invalidate voting-related queries
+      invalidationHelpers.vote(variables.roomId).forEach(key => {
+        queryClient.invalidateQueries({ queryKey: key });
+      });
+      
+      toast({
+        title: "🔄 Oylar Sıfırlandı",
+        description: "Eşit puan nedeniyle oylar temizlendi. Tekrar değerlendirin.",
+        variant: "default",
+        duration: 8000,
+      });
+    },
+    onError: (error: any) => {
+      console.error('Reset votes error:', error);
+      toast({
+        title: "Sıfırlama Hatası",
+        description: error?.data?.error || "Oylar sıfırlanamadı",
+        variant: "destructive",
+      });
+    }
+  });
+}
