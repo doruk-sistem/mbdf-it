@@ -83,30 +83,15 @@ export function VotingTab({ roomId }: VotingTabProps) {
   const topCandidates = votingResults.filter(r => r.total_score === maxScore);
   const hasTie = !isTieDetected && topCandidates.length > 1 && maxScore > 0;
   
-  // Debug logging
-  console.log('🔍 TIE DEBUG:', {
-    votingResults_length: votingResults.length,
-    maxScore,
-    topCandidates_count: topCandidates.length,
-    topCandidates_ids: topCandidates.map(t => t.candidate_id),
-    hasTie,
-    isTieDetected,
-    evaluatedCandidates_size: evaluatedCandidates.size,
-    candidates_length: candidates.length
-  });
   
   // Reset evaluated candidates when tie is detected
   React.useEffect(() => {
-    console.log('🔍 TIE EFFECT TRIGGERED:', { hasTie, isTieDetected });
-    
     if (hasTie && !isTieDetected) {
-      console.log('🚨 TIE DETECTED - Starting reset process');
       setIsTieDetected(true);
       setEvaluatedCandidates(new Set());
       
       // Cancel any pending finalize timeout
       if (finalizeTimeoutRef) {
-        console.log('⏹️ CANCELLING FINALIZE TIMEOUT');
         clearTimeout(finalizeTimeoutRef);
         setFinalizeTimeoutRef(null);
       }
@@ -115,24 +100,15 @@ export function VotingTab({ roomId }: VotingTabProps) {
       const now = Date.now();
       const isVotingTimeActive = votingEndTime && now < votingEndTime.getTime();
       
-      console.log('⏰ TIME CHECK:', {
-        now: new Date(now).toISOString(),
-        votingEndTime: votingEndTime?.toISOString(),
-        isVotingTimeActive
-      });
-      
       // Reset votes in database when tie is detected - THIS MUST HAPPEN FIRST
-      console.log('🔄 RESETTING VOTES...');
       resetVotesMutation.mutate({ roomId }, {
         onSuccess: () => {
-          console.log('✅ VOTES RESET SUCCESS');
           // Refresh data after reset
           refetchVotes();
           refetchCandidates();
           
           // Wait a bit longer to ensure data is fully refreshed
           setTimeout(() => {
-            console.log('🔄 FORCE REFRESH AFTER RESET');
             // Force another refresh to make sure we have clean data
             refetchVotes();
             refetchCandidates();
@@ -160,7 +136,6 @@ export function VotingTab({ roomId }: VotingTabProps) {
       }
     } else if (!hasTie && isTieDetected && votingResults.length === 0) {
       // Reset tie detection when votes are cleared
-      console.log('🔄 RESETTING TIE STATE - Votes cleared');
       setIsTieDetected(false);
       setEvaluatedCandidates(new Set());
     }
@@ -356,27 +331,26 @@ export function VotingTab({ roomId }: VotingTabProps) {
         setShowVoteModal(false);
         setCurrentVotingCandidate(null);
         
-        // Check if all candidates are evaluated
-        const allEvaluated = candidates.every((c: any) => 
+        // Check if current user has evaluated all candidates
+        const currentUserEvaluatedAll = candidates.every((c: any) => 
           evaluatedCandidates.has(c.id) || c.id === currentVotingCandidate.id
         );
         
-        console.log('🔍 ALL EVALUATED CHECK:', {
-          allEvaluated,
-          candidates_length: candidates.length,
-          evaluatedCandidates_size: evaluatedCandidates.size,
-          currentVotingCandidate_id: currentVotingCandidate?.id,
-          isTieDetected,
-          hasTie
-        });
         
-        if (allEvaluated) {
-          console.log('🎯 ALL EVALUATED - Checking for finalization');
-          console.log('🔍 FINALIZE CHECK:', { hasTie, isTieDetected, votingResults_length: votingResults.length });
-          
+        // Only show completion message for current user, don't auto-finalize
+        if (currentUserEvaluatedAll) {
+          toast({
+            title: "✅ Tüm Adayları Değerlendirdiniz",
+            description: "Tüm adayları değerlendirdiniz. Diğer üyeler de oy verene kadar bekleyin.",
+            variant: "default",
+          });
+        }
+        
+        // Check if we have enough votes for majority (this is the real finalization trigger)
+        const requiredVotesForMajority = Math.ceil(expectedTotalVotes * 0.51);
+        if (actualTotalVotes >= requiredVotesForMajority) {
           // Check for tie BEFORE attempting finalization
           if (hasTie || isTieDetected) {
-            console.log('🚨 TIE DETECTED - Preventing finalization');
             toast({
               title: "🔄 Eşit Puan Tespit Edildi",
               description: "Oylar sıfırlanıyor, lütfen tekrar değerlendirin.",
@@ -388,12 +362,6 @@ export function VotingTab({ roomId }: VotingTabProps) {
           // Additional check: Make sure we have enough votes for all candidates
           const expectedVotesForAllCandidates = eligibleVoters * candidates.length;
           if (actualTotalVotes < expectedVotesForAllCandidates) {
-            console.log('⚠️ NOT ALL VOTES IN - Preventing finalization', {
-              actualTotalVotes,
-              expectedVotesForAllCandidates,
-              eligibleVoters,
-              candidates_length: candidates.length
-            });
             toast({
               title: "⚠️ Eksik Oylar",
               description: "Tüm üyeler tüm adaylara oy vermeli.",
@@ -402,7 +370,6 @@ export function VotingTab({ roomId }: VotingTabProps) {
             return;
           }
           
-          console.log('✅ NO TIE - Proceeding with finalization');
           toast({
             title: "Tüm değerlendirmeler tamamlandı!",
             description: "LR seçimi otomatik olarak yapılacak.",
@@ -410,18 +377,13 @@ export function VotingTab({ roomId }: VotingTabProps) {
           
           // Auto-finalize if all votes are in and no tie - BUT WAIT LONGER
           const timeoutId = setTimeout(() => {
-            console.log('⏰ FINALIZE TIMEOUT STARTED (3s)');
             // Get the best candidate and finalize
             refetchVotes().then(() => {
               refetchCandidates().then(() => {
                 // Wait a bit more to ensure all data is fresh
                 setTimeout(() => {
-                  console.log('⏰ FINALIZE TIMEOUT PHASE 2 (1.5s)');
-                  console.log('🔍 FINALIZE REFETCH CHECK:', { hasTie, isTieDetected, votingResults_length: votingResults.length });
-                  
                   // Triple-check for tie after refetch
                   if (hasTie || isTieDetected) {
-                    console.log('🚨 TIE DETECTED AFTER REFETCH - Canceling finalization');
                     toast({
                       title: "🔄 Eşit Puan Tespit Edildi",
                       description: "Finalize işlemi iptal edildi.",
@@ -432,7 +394,6 @@ export function VotingTab({ roomId }: VotingTabProps) {
                   
                   // Find the candidate with highest score
                   if (votingResults.length === 0) {
-                    console.log('⚠️ NO VOTING RESULTS - Canceling finalization');
                     toast({
                       title: "⚠️ Oylar Bulunamadı",
                       description: "Finalize işlemi iptal edildi.",
@@ -444,22 +405,11 @@ export function VotingTab({ roomId }: VotingTabProps) {
                   const maxScore = Math.max(...votingResults.map(r => r.total_score));
                   const topCandidates = votingResults.filter(r => r.total_score === maxScore);
                   
-                  console.log('🎯 FINALIZE CANDIDATE CHECK:', {
-                    maxScore,
-                    topCandidates_count: topCandidates.length,
-                    topCandidates_ids: topCandidates.map(t => t.candidate_id)
-                  });
-                  
                   // Only finalize if there's exactly one top candidate (no tie)
                   if (topCandidates.length === 1) {
                     const bestCandidate = candidates.find((c: any) => c.id === topCandidates[0].candidate_id);
                     
                     if (bestCandidate) {
-                      console.log('🎯 FINALIZING LR:', {
-                        candidate_id: bestCandidate.id,
-                        candidate_name: bestCandidate.profiles?.full_name
-                      });
-                      
                       // Final check before finalizing
                       toast({
                         title: "🎯 Lider Seçiliyor",
@@ -472,7 +422,6 @@ export function VotingTab({ roomId }: VotingTabProps) {
                         candidateId: bestCandidate.id
                       }, {
                         onSuccess: () => {
-                          console.log('✅ FINALIZE SUCCESS');
                           // Force phase update
                           setForcePhaseUpdate(prev => prev + 1);
                         },
@@ -487,7 +436,6 @@ export function VotingTab({ roomId }: VotingTabProps) {
                       });
                     }
                   } else {
-                    console.log('🚨 TIE DETECTED IN FINALIZE - Multiple top candidates');
                     toast({
                       title: "🔄 Eşit Puan Tespit Edildi",
                       description: `${topCandidates.length} aday eşit puan aldı. Finalize işlemi iptal edildi.`,
@@ -887,8 +835,11 @@ export function VotingTab({ roomId }: VotingTabProps) {
             ) : votingPhase === 'voting' && evaluatedCandidates.size === candidates.length ? (
               <div className="text-center py-6 bg-green-50 border border-green-200 rounded-lg">
                 <CheckCircle className="h-12 w-12 mx-auto mb-3 text-green-600" />
-                <h3 className="text-lg font-semibold text-green-800 mb-2">🎉 Tüm Değerlendirmeler Tamamlandı!</h3>
-                <p className="text-green-700">LR seçimi otomatik olarak yapılacak.</p>
+                <h3 className="text-lg font-semibold text-green-800 mb-2">✅ Tüm Adayları Değerlendirdiniz</h3>
+                <p className="text-green-700">Tüm adayları değerlendirdiniz. Diğer üyeler de oy verene kadar bekleyin.</p>
+                <p className="text-sm text-green-600 mt-2">
+                  Çoğunluk sağlandığında LR seçimi otomatik olarak yapılacak.
+                </p>
               </div>
             ) : votingPhase === 'voting' ? (
               <div className="text-center py-6 bg-blue-50 border border-blue-200 rounded-lg">
