@@ -22,7 +22,6 @@ export async function POST(request: NextRequest) {
 
     // Parse and validate request body
     const body = await request.json();
-    console.log('Finalize LR body:', body);
     const validatedData = FinalizeLRSchema.parse(body);
 
     // Use admin client to bypass RLS

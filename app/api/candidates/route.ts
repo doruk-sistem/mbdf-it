@@ -103,7 +103,6 @@ export async function POST(request: NextRequest) {
 
     // Parse and validate request body
     const body = await request.json();
-    console.log('Candidate nomination body:', body);
     const validatedData = CreateCandidateSchema.parse(body);
 
     // Use admin client to bypass RLS
