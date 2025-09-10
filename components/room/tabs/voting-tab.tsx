@@ -83,10 +83,20 @@ export function VotingTab({ roomId }: VotingTabProps) {
   const topCandidates = votingResults.filter(r => r.total_score === maxScore);
   const hasTie = !isTieDetected && topCandidates.length > 1 && maxScore > 0;
   
+
+  // Check if voting is complete (all eligible voters have voted for all candidates)
+  const candidateUserIds = candidates.map((c: any) => c.user_id);
+  const eligibleVoters = members.length - candidateUserIds.length; // Non-candidate members
+  const expectedTotalVotes = eligibleVoters * candidates.length;
+  const actualTotalVotes = votingResults.reduce((sum, result) => sum + result.vote_count, 0);
+  const isVotingComplete = eligibleVoters > 0 && actualTotalVotes >= expectedTotalVotes && !isFinalized;
   
-  // Reset evaluated candidates when tie is detected
+  // Check if all votes are completed
+  const allVotesCompleted = actualTotalVotes >= expectedTotalVotes;
+
+  // Reset evaluated candidates when tie is detected - BUT ONLY WHEN ALL VOTES ARE COMPLETED
   React.useEffect(() => {
-    if (hasTie && !isTieDetected) {
+    if (hasTie && !isTieDetected && allVotesCompleted) {
       setIsTieDetected(true);
       setEvaluatedCandidates(new Set());
       
@@ -139,17 +149,10 @@ export function VotingTab({ roomId }: VotingTabProps) {
       setIsTieDetected(false);
       setEvaluatedCandidates(new Set());
     }
-  }, [hasTie, isTieDetected, votingResults.length]); // Remove votingEndTime from dependencies
-
-  // Check if voting is complete (all eligible voters have voted for all candidates)
-  const candidateUserIds = candidates.map((c: any) => c.user_id);
-  const eligibleVoters = members.length - candidateUserIds.length; // Non-candidate members
-  const expectedTotalVotes = eligibleVoters * candidates.length;
-  const actualTotalVotes = votingResults.reduce((sum, result) => sum + result.vote_count, 0);
-  const isVotingComplete = eligibleVoters > 0 && actualTotalVotes >= expectedTotalVotes && !isFinalized;
+  }, [hasTie, isTieDetected, allVotesCompleted, votingResults.length]); // Only check tie when all votes are completed
 
   // Voting phase logic based on first candidate creation time
-  const getVotingPhase = (actualVotes: number, expectedVotes: number) => {
+  const getVotingPhase = (actualVotes: number, expectedVotes: number): 'no-candidates' | 'nomination' | 'voting' | 'completed' => {
     if (candidates.length === 0) {
       return 'no-candidates';
     }
@@ -349,16 +352,6 @@ export function VotingTab({ roomId }: VotingTabProps) {
         // Check if we have enough votes for majority (this is the real finalization trigger)
         const requiredVotesForMajority = Math.ceil(expectedTotalVotes * 0.51);
         if (actualTotalVotes >= requiredVotesForMajority) {
-          // Check for tie BEFORE attempting finalization
-          if (hasTie || isTieDetected) {
-            toast({
-              title: "🔄 Eşit Puan Tespit Edildi",
-              description: "Oylar sıfırlanıyor, lütfen tekrar değerlendirin.",
-              variant: "default",
-            });
-            return; // Don't finalize if there's a tie
-          }
-          
           // Additional check: Make sure we have enough votes for all candidates
           const expectedVotesForAllCandidates = eligibleVoters * candidates.length;
           if (actualTotalVotes < expectedVotesForAllCandidates) {
@@ -801,6 +794,17 @@ export function VotingTab({ roomId }: VotingTabProps) {
                 <h3 className="text-lg font-semibold text-blue-800 mb-2">Adaysınız</h3>
                 <p className="text-blue-700">Aday olarak kendinize oy veremezsiniz. Diğer üyeler sizi değerlendirecek.</p>
               </div>
+            ) : votingPhase === 'nomination' ? (
+              <div className="text-center py-6 bg-blue-50 border border-blue-200 rounded-lg">
+                <Users className="h-12 w-12 mx-auto mb-3 text-blue-600" />
+                <h3 className="text-lg font-semibold text-blue-800 mb-2">📋 Aday Gösterme Dönemi</h3>
+                <p className="text-blue-700 mb-2">
+                  Oylama henüz başlamadı. Adaylar gösteriliyor.
+                </p>
+                <p className="text-blue-600 text-sm">
+                  Aday sayısı: {candidates.length} aday
+                </p>
+              </div>
             ) : actualTotalVotes < expectedTotalVotes ? (
               <div className="text-center py-6 bg-orange-50 border border-orange-200 rounded-lg">
                 <Users className="h-12 w-12 mx-auto mb-3 text-orange-600" />
@@ -820,17 +824,6 @@ export function VotingTab({ roomId }: VotingTabProps) {
                 <Users className="h-12 w-12 mx-auto mb-3 text-blue-600" />
                 <h3 className="text-lg font-semibold text-blue-800 mb-2">Aday Gösterin</h3>
                 <p className="text-blue-700">LR oylaması için aday göstermek isteyenler kendilerini aday gösterebilir.</p>
-              </div>
-            ) : votingPhase === 'nomination' ? (
-              <div className="text-center py-6 bg-blue-50 border border-blue-200 rounded-lg">
-                <Users className="h-12 w-12 mx-auto mb-3 text-blue-600" />
-                <h3 className="text-lg font-semibold text-blue-800 mb-2">Aday Gösterme Dönemi</h3>
-                <p className="text-blue-700">Oylama henüz başlamadı. Aday göstermek isteyenler kendilerini aday gösterebilir.</p>
-                {votingStartTime && (
-                  <div className="mt-3">
-                    <CountdownTimer targetTime={votingStartTime} />
-                  </div>
-                )}
               </div>
             ) : votingPhase === 'voting' && evaluatedCandidates.size === candidates.length ? (
               <div className="text-center py-6 bg-green-50 border border-green-200 rounded-lg">
