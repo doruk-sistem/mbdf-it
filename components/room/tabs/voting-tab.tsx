@@ -46,7 +46,6 @@ export function VotingTab({ roomId }: VotingTabProps) {
   const [forcePhaseUpdate, setForcePhaseUpdate] = useState(0);
   const [showVoteModal, setShowVoteModal] = useState(false);
   const [currentVotingCandidate, setCurrentVotingCandidate] = useState<any>(null);
-  const [evaluatedCandidates, setEvaluatedCandidates] = useState<Set<string>>(new Set());
   const [isTieDetected, setIsTieDetected] = useState(false);
   const [finalizeTimeoutRef, setFinalizeTimeoutRef] = useState<NodeJS.Timeout | null>(null);
   
@@ -78,27 +77,45 @@ export function VotingTab({ roomId }: VotingTabProps) {
   const currentUser = members.find((member: any) => member.profiles?.email === user?.profile?.email);
   const isCurrentUserCandidate = candidates.some((candidate: any) => candidate.user_id === currentUser?.user_id);
 
+  // Calculate evaluated candidates from database instead of local state
+  const evaluatedCandidates = React.useMemo(() => {
+    if (!myVote) return new Set();
+    
+    // Get candidates that current user has voted for
+    const votedCandidates = new Set<string>();
+    if (Array.isArray(myVote)) {
+      myVote.forEach((vote: any) => {
+        votedCandidates.add(vote.candidate_id);
+      });
+    } else if (myVote && typeof myVote === 'object' && 'candidate_id' in myVote) {
+      votedCandidates.add((myVote as any).candidate_id);
+    }
+    
+    return votedCandidates;
+  }, [myVote]);
+
   // Check for tie (equal scores) - but only if we're not already in a tie state
   const maxScore = votingResults.length > 0 ? Math.max(...votingResults.map(r => r.total_score)) : 0;
   const topCandidates = votingResults.filter(r => r.total_score === maxScore);
-  const hasTie = !isTieDetected && topCandidates.length > 1 && maxScore > 0;
   
-
-  // Check if voting is complete (all eligible voters have voted for all candidates)
+  // Check if all votes are completed first
   const candidateUserIds = candidates.map((c: any) => c.user_id);
   const eligibleVoters = members.length - candidateUserIds.length; // Non-candidate members
   const expectedTotalVotes = eligibleVoters * candidates.length;
   const actualTotalVotes = votingResults.reduce((sum, result) => sum + result.vote_count, 0);
-  const isVotingComplete = eligibleVoters > 0 && actualTotalVotes >= expectedTotalVotes && !isFinalized;
-  
-  // Check if all votes are completed
   const allVotesCompleted = actualTotalVotes >= expectedTotalVotes;
+  
+  // Only check for tie if all votes are completed
+  const hasTie = !isTieDetected && allVotesCompleted && topCandidates.length > 1 && maxScore > 0;
+  
+
+  // Check if voting is complete (all eligible voters have voted for all candidates)
+  const isVotingComplete = eligibleVoters > 0 && actualTotalVotes >= expectedTotalVotes && !isFinalized;
 
   // Reset evaluated candidates when tie is detected - BUT ONLY WHEN ALL VOTES ARE COMPLETED
   React.useEffect(() => {
     if (hasTie && !isTieDetected && allVotesCompleted) {
       setIsTieDetected(true);
-      setEvaluatedCandidates(new Set());
       
       // Cancel any pending finalize timeout
       if (finalizeTimeoutRef) {
@@ -113,6 +130,9 @@ export function VotingTab({ roomId }: VotingTabProps) {
       // Reset votes in database when tie is detected - THIS MUST HAPPEN FIRST
       resetVotesMutation.mutate({ roomId }, {
         onSuccess: () => {
+          // Clear local state immediately
+          setVotes({});
+          
           // Refresh data after reset
           refetchVotes();
           refetchCandidates();
@@ -147,7 +167,6 @@ export function VotingTab({ roomId }: VotingTabProps) {
     } else if (!hasTie && isTieDetected && votingResults.length === 0) {
       // Reset tie detection when votes are cleared
       setIsTieDetected(false);
-      setEvaluatedCandidates(new Set());
     }
   }, [hasTie, isTieDetected, allVotesCompleted, votingResults.length]); // Only check tie when all votes are completed
 
@@ -330,7 +349,6 @@ export function VotingTab({ roomId }: VotingTabProps) {
     }, {
       onSuccess: () => {
         // Mark candidate as evaluated
-        setEvaluatedCandidates(prev => new Set(Array.from(prev).concat(currentVotingCandidate.id)));
         setShowVoteModal(false);
         setCurrentVotingCandidate(null);
         
@@ -557,10 +575,10 @@ export function VotingTab({ roomId }: VotingTabProps) {
               <div>
                 <CardTitle>LR Oylaması</CardTitle>
                 <CardDescription>
-                  {votingPhase === 'no-candidates' && "Lider Kayıtçı adaylarını değerlendirin (0-5 puan)"}
+                  {votingPhase === 'no-candidates' && "Aday gösterme dönemi"}
                   {votingPhase === 'nomination' && "Aday gösterme dönemi - Oylama 1 gün sonra başlayacak"}
-                  {votingPhase === 'voting' && actualTotalVotes >= expectedTotalVotes && "Oylama dönemi - Lider Kayıtçı adaylarını değerlendirin (0-5 puan)"}
-                  {votingPhase === 'voting' && actualTotalVotes < expectedTotalVotes && "Oylama süresi doldu - Eksik oyları tamamlayın"}
+                  {votingPhase === 'voting' && actualTotalVotes >= expectedTotalVotes && "Oylama tamamlandı - LR seçimi yapılacak"}
+                  {votingPhase === 'voting' && actualTotalVotes < expectedTotalVotes && "Oylama dönemi - Lider Kayıtçı adaylarını değerlendirin (0-5 puan)"}
                   {votingPhase === 'completed' && actualTotalVotes >= expectedTotalVotes && "Oylama tamamlandı - LR seçildi"}
                   {votingPhase === 'completed' && actualTotalVotes < expectedTotalVotes && "Oylama devam ediyor - Tüm üyeler oy vermeli"}
                 </CardDescription>
@@ -631,6 +649,9 @@ export function VotingTab({ roomId }: VotingTabProps) {
                                 
                                 resetVotesMutation.mutate({ roomId }, {
                                   onSuccess: () => {
+                                    // Clear local state immediately
+                                    setVotes({});
+                                    
                                     refetchVotes();
                                     refetchCandidates();
                                   }
@@ -675,21 +696,15 @@ export function VotingTab({ roomId }: VotingTabProps) {
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Candidates List */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label>Adayları Değerlendirin:</Label>
-                <Badge variant="outline" className="text-xs">
-                  {candidates.length} aday
-                </Badge>
-              </div>
-              {candidates.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>Henüz aday yok</p>
-                  <p className="text-sm">Aday eklemek için yukarıdaki butonu kullanın</p>
+            {/* Candidates List - Only show when there are candidates */}
+            {candidates.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label>Adayları Değerlendirin:</Label>
+                  <Badge variant="outline" className="text-xs">
+                    {candidates.length} aday
+                  </Badge>
                 </div>
-              ) : (
                 <div className="space-y-3">
                   {candidates.map((candidate: any) => {
                     const isEvaluated = evaluatedCandidates.has(candidate.id);
@@ -751,7 +766,7 @@ export function VotingTab({ roomId }: VotingTabProps) {
                                   }}
                                   size="sm"
                                   variant="outline"
-                                  disabled={isFinalized || votingPhase !== 'voting' || isCurrentUserCandidate}
+                                  disabled={isFinalized || votingPhase !== 'voting' || isCurrentUserCandidate || isEvaluated}
                                 >
                                   <Vote className="mr-2 h-4 w-4" />
                                   Değerlendir
@@ -764,8 +779,8 @@ export function VotingTab({ roomId }: VotingTabProps) {
                   );
                   })}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
 
             {isFinalized ? (
@@ -805,12 +820,17 @@ export function VotingTab({ roomId }: VotingTabProps) {
                   Aday sayısı: {candidates.length} aday
                 </p>
               </div>
-            ) : actualTotalVotes < expectedTotalVotes ? (
+            ) : votingPhase === 'voting' && actualTotalVotes < expectedTotalVotes && votingEndTime && Date.now() > votingEndTime.getTime() ? (
               <div className="text-center py-6 bg-orange-50 border border-orange-200 rounded-lg">
                 <Users className="h-12 w-12 mx-auto mb-3 text-orange-600" />
-                <h3 className="text-lg font-semibold text-orange-800 mb-2">⚠️ Tüm Üyeler Oy Vermedi</h3>
+                <h3 className="text-lg font-semibold text-orange-800 mb-2">
+                  {actualTotalVotes === 0 ? "🔄 Eşit Puan - Tekrar Oylama" : "⚠️ Oylama Süresi Doldu"}
+                </h3>
                 <p className="text-orange-700 mb-2">
-                  LR seçimi için tüm üyelerin oy vermesi gerekiyor.
+                  {actualTotalVotes === 0 
+                    ? "Tüm adaylar eşit puan (0.0/5.0). Tekrar oylama yapılması gerekiyor."
+                    : "LR seçimi için tüm üyelerin oy vermesi gerekiyor."
+                  }
                 </p>
                 <p className="text-orange-600 text-sm">
                   Oy veren: {actualTotalVotes}/{expectedTotalVotes} (Beklenen: {eligibleVoters} üye × {candidates.length} aday)
@@ -823,7 +843,7 @@ export function VotingTab({ roomId }: VotingTabProps) {
               <div className="text-center py-6 bg-blue-50 border border-blue-200 rounded-lg">
                 <Users className="h-12 w-12 mx-auto mb-3 text-blue-600" />
                 <h3 className="text-lg font-semibold text-blue-800 mb-2">Aday Gösterin</h3>
-                <p className="text-blue-700">LR oylaması için aday göstermek isteyenler kendilerini aday gösterebilir.</p>
+                <p className="text-blue-700">LR oylaması için kendinizi aday gösterebilirsiniz.</p>
               </div>
             ) : votingPhase === 'voting' && evaluatedCandidates.size === candidates.length ? (
               <div className="text-center py-6 bg-green-50 border border-green-200 rounded-lg">

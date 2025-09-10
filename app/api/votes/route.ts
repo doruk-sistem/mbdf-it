@@ -33,20 +33,19 @@ export async function GET(request: NextRequest) {
     // Use admin client to bypass RLS for reading voting data
     const adminSupabase = createAdminSupabase();
     
-    // Get voting results and user's vote
-    const [candidatesData, myVote] = await Promise.all([
+    // Get voting results and user's votes
+    const [candidatesData, myVotesResult] = await Promise.all([
       // Get candidates for this room using admin client
       adminSupabase
         .from('lr_candidate')
         .select('*')
         .eq('room_id', roomId),
-      // Get current user's vote using regular client (user can see their own vote)
+      // Get current user's votes using regular client (user can see their own votes)
       supabase
         .from('lr_vote')
         .select('*')
         .eq('room_id', roomId)
         .eq('voter_id', user.id)
-        .single()
     ]);
 
     if (candidatesData.error) {
@@ -140,7 +139,6 @@ export async function GET(request: NextRequest) {
 
     // Auto-reset is_selected if conditions are not met
     if (selectedCandidate && (!isVotingFinalized)) {
-      console.log('🔄 Auto-resetting is_selected due to incomplete voting or tie');
       await (adminSupabase as any)
         .from('lr_candidate')
         .update({ is_selected: false })
@@ -150,7 +148,7 @@ export async function GET(request: NextRequest) {
 
     const response = VotingSummaryResponseSchema.parse({
       results: candidatesWithScores,
-      my_vote: myVote.error ? null : myVote.data,
+      my_vote: myVotesResult.error ? null : myVotesResult.data,
       is_finalized: isVotingFinalized,
     });
 
@@ -187,7 +185,6 @@ export async function POST(request: NextRequest) {
 
     // Parse and validate request body
     const body = await request.json();
-    console.log('Vote submission body:', body);
     const validatedData = SubmitVoteSchema.parse(body);
 
     // Use admin client to bypass RLS for vote submission

@@ -320,7 +320,7 @@ export const AccessRequestsListResponseSchema = z.object({
 
 export const VotingSummaryResponseSchema = z.object({
   results: z.array(VotingResultSchema),
-  my_vote: LrVoteSchema.nullable(),
+  my_vote: z.array(LrVoteSchema).nullable(),
   is_finalized: z.boolean(),
 });
 
