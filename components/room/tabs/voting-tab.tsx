@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { Vote, Crown, Star, Users, CheckCircle, Plus } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -13,10 +13,11 @@ import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/components/ui/use-toast";
-import { useVotes, useCandidates, useSubmitVote, useSubmitAllVotes, useNominateCandidate } from "@/hooks/use-votes";
+import { useVotes, useCandidates, useSubmitVote, useSubmitAllVotes, useNominateCandidate, useFinalizeLR } from "@/hooks/use-votes";
 import { useMembers } from "@/hooks/use-members";
 import { useCurrentUser } from "@/hooks/use-user";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CountdownTimer } from "@/components/ui/countdown-timer";
 
 interface VotingTabProps {
   roomId: string;
@@ -42,12 +43,17 @@ export function VotingTab({ roomId }: VotingTabProps) {
   const [selectedCandidate, setSelectedCandidate] = useState<string | null>(null);
   const [showNominateDialog, setShowNominateDialog] = useState(false);
   const [selectedMemberId, setSelectedMemberId] = useState<string>("");
+  const [forcePhaseUpdate, setForcePhaseUpdate] = useState(0);
+  const [showVoteModal, setShowVoteModal] = useState(false);
+  const [currentVotingCandidate, setCurrentVotingCandidate] = useState<any>(null);
+  const [evaluatedCandidates, setEvaluatedCandidates] = useState<Set<string>>(new Set());
+  const [isTieDetected, setIsTieDetected] = useState(false);
   
   const { toast } = useToast();
 
   // Data fetching
-  const { data: votingData, isLoading: votesLoading, error: votesError } = useVotes(roomId);
-  const { data: candidatesData, isLoading: candidatesLoading, error: candidatesError } = useCandidates(roomId);
+  const { data: votingData, isLoading: votesLoading, error: votesError, refetch: refetchVotes } = useVotes(roomId);
+  const { data: candidatesData, isLoading: candidatesLoading, error: candidatesError, refetch: refetchCandidates } = useCandidates(roomId);
   const { data: membersData, isLoading: membersLoading } = useMembers(roomId);
   const { data: user } = useCurrentUser();
 
@@ -55,13 +61,16 @@ export function VotingTab({ roomId }: VotingTabProps) {
   const submitVoteMutation = useSubmitVote();
   const submitAllVotesMutation = useSubmitAllVotes();
   const nominateCandidateMutation = useNominateCandidate();
+  const finalizeLRMutation = useFinalizeLR();
 
   const candidates = candidatesData?.items || [];
   const members = (membersData as any)?.items || [];
   const votingResults = votingData?.results || [];
   const currentUserRole = (membersData as any)?.currentUserRole || 'member';
   const myVote = votingData?.my_vote;
-  const isFinalized = votingData?.is_finalized || false;
+  // More intelligent finalized check - if no candidates, it's not finalized
+  // Use API's is_finalized value which already checks if all eligible members have voted
+  const isFinalized = (votingData?.is_finalized || false) && candidates.length > 0;
   
   // Check if current user is a candidate
   const currentUser = members.find((member: any) => member.profiles?.email === user?.profile?.email);
@@ -71,6 +80,83 @@ export function VotingTab({ roomId }: VotingTabProps) {
   const maxScore = votingResults.length > 0 ? Math.max(...votingResults.map(r => r.total_score)) : 0;
   const topCandidates = votingResults.filter(r => r.total_score === maxScore);
   const hasTie = topCandidates.length > 1 && maxScore > 0;
+  
+  // Reset evaluated candidates when tie is detected
+  React.useEffect(() => {
+    if (hasTie && !isTieDetected) {
+      setIsTieDetected(true);
+      setEvaluatedCandidates(new Set());
+      toast({
+        title: "🔄 Tekrar Oylama Gerekli",
+        description: `En yüksek puanlı adaylar eşit (${maxScore.toFixed(1)}/5.0)! Lütfen tekrar değerlendirin.`,
+        variant: "default",
+        duration: 10000,
+      });
+    } else if (!hasTie && isTieDetected) {
+      setIsTieDetected(false);
+    }
+  }, [hasTie, isTieDetected]); // Remove maxScore and toast from dependencies
+
+  // Check if voting is complete (all eligible voters have voted for all candidates)
+  const candidateUserIds = candidates.map((c: any) => c.user_id);
+  const eligibleVoters = members.length - candidateUserIds.length; // Non-candidate members
+  const expectedTotalVotes = eligibleVoters * candidates.length;
+  const actualTotalVotes = votingResults.reduce((sum, result) => sum + result.vote_count, 0);
+  const isVotingComplete = eligibleVoters > 0 && actualTotalVotes >= expectedTotalVotes && !isFinalized;
+
+  // Voting phase logic based on first candidate creation time
+  const getVotingPhase = (actualVotes: number, expectedVotes: number) => {
+    if (candidates.length === 0) {
+      return 'no-candidates';
+    }
+    
+    // If there's a tie, always return 'voting' to allow re-evaluation
+    if (hasTie) {
+      return 'voting';
+    }
+    
+    // Check if all members have voted before marking as completed
+    if (isFinalized && actualVotes >= expectedVotes) {
+      return 'completed';
+    }
+    
+    // If finalized but not all members voted, continue voting
+    if (isFinalized && actualVotes < expectedVotes) {
+      // Continue with voting phase logic below
+    }
+    
+    const firstCandidate = candidates.sort((a: any, b: any) => 
+      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    )[0];
+    
+    const now = Date.now();
+    const firstCandidateTime = new Date(firstCandidate.created_at).getTime();
+    const votingStartTime = firstCandidateTime + (60 * 1000); // +1 minute for testing
+    const votingEndTime = votingStartTime + (60 * 1000); // +2 minutes for testing
+    
+    if (now < votingStartTime) {
+      return 'nomination';
+    }
+    if (now < votingEndTime) {
+      return 'voting';
+    }
+    
+    // Time expired, but check if all members have voted
+    if (actualVotes < expectedVotes) {
+      return 'voting'; // Continue voting even if time expired
+    }
+    
+    return 'completed';
+  };
+
+  const votingPhase = getVotingPhase(actualTotalVotes, expectedTotalVotes);
+  const firstCandidate = candidates.length > 0 ? candidates.sort((a: any, b: any) => 
+    new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  )[0] : null;
+  
+  const votingStartTime = firstCandidate ? new Date(new Date(firstCandidate.created_at).getTime() + (60 * 1000)) : null; // +1 minute for testing
+  const votingEndTime = votingStartTime ? new Date(votingStartTime.getTime() + (60 * 1000)) : null; // +1 minute for testing
+
 
   const handleVoteChange = (candidateId: string, criterion: string, value: number[]) => {
     setVotes(prev => ({
@@ -140,21 +226,7 @@ export function VotingTab({ roomId }: VotingTabProps) {
 
 
   const handleNominateCandidate = () => {
-    // For members, use current user ID; for admin/lr, use selected member ID
-    let userId: string;
-    
-    if (['admin', 'lr'].includes(currentUserRole)) {
-      if (!selectedMemberId) {
-        toast({
-          title: "Üye seçin",
-          description: "Aday göstermek için bir üye seçmelisiniz.",
-          variant: "destructive",
-        });
-        return;
-      }
-      userId = selectedMemberId;
-    } else {
-      // For members, we need to get current user ID from members data
+    // Always use current user ID for self-nomination
       const currentUser = members.find((member: any) => member.profiles?.email === user?.profile?.email);
       if (!currentUser) {
         toast({
@@ -163,17 +235,106 @@ export function VotingTab({ roomId }: VotingTabProps) {
           variant: "destructive",
         });
         return;
-      }
-      userId = currentUser.user_id;
     }
 
     nominateCandidateMutation.mutate({
       roomId,
-      userId
+      userId: currentUser.user_id
     }, {
       onSuccess: () => {
         setShowNominateDialog(false);
         setSelectedMemberId("");
+      }
+    });
+  };
+
+  const handleStartVoting = (candidate: any) => {
+    setCurrentVotingCandidate(candidate);
+    setShowVoteModal(true);
+    // Initialize votes for this candidate
+    initializeVotesForCandidate(candidate.id);
+  };
+
+  const handleSubmitSingleVote = () => {
+    if (!currentVotingCandidate) return;
+
+    const candidateVotes = votes[currentVotingCandidate.id];
+    if (!candidateVotes) {
+      toast({
+        title: "Hata",
+        description: "Lütfen tüm kriterleri değerlendirin.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const voteData = {
+      candidate_id: currentVotingCandidate.id,
+      technical_score: candidateVotes.technical[0],
+      experience_score: candidateVotes.experience[0],
+      availability_score: candidateVotes.availability[0],
+      communication_score: candidateVotes.communication[0],
+      leadership_score: candidateVotes.leadership[0],
+    };
+
+    submitVoteMutation.mutate({
+      roomId,
+      ...voteData
+    }, {
+      onSuccess: () => {
+        // Mark candidate as evaluated
+        setEvaluatedCandidates(prev => new Set(Array.from(prev).concat(currentVotingCandidate.id)));
+        setShowVoteModal(false);
+        setCurrentVotingCandidate(null);
+        
+        // Check if all candidates are evaluated
+        const allEvaluated = candidates.every((c: any) => 
+          evaluatedCandidates.has(c.id) || c.id === currentVotingCandidate.id
+        );
+        
+        if (allEvaluated) {
+          toast({
+            title: "Tüm değerlendirmeler tamamlandı!",
+            description: "LR seçimi otomatik olarak yapılacak.",
+          });
+          // Auto-finalize if all votes are in
+          setTimeout(() => {
+            // Get the best candidate and finalize
+            refetchVotes().then(() => {
+              refetchCandidates().then(() => {
+                // Find the candidate with highest score
+                if (votingResults.length === 0) return;
+                
+                const maxScore = Math.max(...votingResults.map(r => r.total_score));
+                const topCandidates = votingResults.filter(r => r.total_score === maxScore);
+                
+                // Only finalize if there's exactly one top candidate (no tie)
+                if (topCandidates.length === 1) {
+                  const bestCandidate = candidates.find((c: any) => c.id === topCandidates[0].candidate_id);
+                  
+                  if (bestCandidate) {
+                    finalizeLRMutation.mutate({
+                      roomId: roomId,
+                      candidateId: bestCandidate.id
+                    }, {
+                      onSuccess: () => {
+                        // Force phase update
+                        setForcePhaseUpdate(prev => prev + 1);
+                      },
+                      onError: (error: any) => {
+                        toast({
+                          title: 'Finalize Hatası',
+                          description: error?.data?.error || 'LR seçimi tamamlanamadı',
+                          variant: 'destructive',
+                        });
+                      }
+                    });
+                  }
+                }
+              });
+            });
+          }, 1000);
+        }
       }
     });
   };
@@ -230,8 +391,8 @@ export function VotingTab({ roomId }: VotingTabProps) {
 
   return (
     <div className="space-y-6">
-      {/* Current LR */}
-      {candidates.find((c: any) => c.is_selected) && (
+      {/* Current LR - Only show if no tie exists */}
+      {candidates.find((c: any) => c.is_selected) && !hasTie && (
         <Card className="border-green-200 bg-green-50 dark:bg-green-950">
           <CardHeader>
             <div className="flex items-center space-x-2">
@@ -288,25 +449,104 @@ export function VotingTab({ roomId }: VotingTabProps) {
               <div>
                 <CardTitle>LR Oylaması</CardTitle>
                 <CardDescription>
-                  Lider Kayıtçı adaylarını değerlendirin (0-5 puan)
+                  {votingPhase === 'no-candidates' && "Lider Kayıtçı adaylarını değerlendirin (0-5 puan)"}
+                  {votingPhase === 'nomination' && "Aday gösterme dönemi - Oylama 1 gün sonra başlayacak"}
+                  {votingPhase === 'voting' && actualTotalVotes >= expectedTotalVotes && "Oylama dönemi - Lider Kayıtçı adaylarını değerlendirin (0-5 puan)"}
+                  {votingPhase === 'voting' && actualTotalVotes < expectedTotalVotes && "Oylama süresi doldu - Eksik oyları tamamlayın"}
+                  {votingPhase === 'completed' && actualTotalVotes >= expectedTotalVotes && "Oylama tamamlandı - LR seçildi"}
+                  {votingPhase === 'completed' && actualTotalVotes < expectedTotalVotes && "Oylama devam ediyor - Tüm üyeler oy vermeli"}
                 </CardDescription>
+                {votingPhase === 'nomination' && votingStartTime && (
+                  <div className="mt-2">
+                    <CountdownTimer 
+                      targetTime={votingStartTime}
+                      onComplete={() => {
+                        // Force phase update
+                        setForcePhaseUpdate(prev => prev + 1);
+                      }}
+                    />
+                  </div>
+                )}
+                {votingPhase === 'voting' && votingEndTime && (
+                  <div className="mt-2">
+                    <CountdownTimer 
+                      targetTime={votingEndTime} 
+                      onComplete={() => {
+                        // Only run once - check if we already processed this
+                        if (forcePhaseUpdate === 0) {
+                          setForcePhaseUpdate(1);
+                          // Auto-finalize when time is up - but only if all members have voted AND no tie exists
+                          if (votingResults.length > 0 && actualTotalVotes >= expectedTotalVotes && !hasTie) {
+                            // Find the candidate with highest score
+                            const maxScore = Math.max(...votingResults.map(r => r.total_score));
+                            const topCandidates = votingResults.filter(r => r.total_score === maxScore);
+                            
+                            // Only finalize if there's exactly one top candidate (no tie)
+                            if (topCandidates.length === 1) {
+                              const bestCandidate = candidates.find((c: any) => c.id === topCandidates[0].candidate_id);
+                              
+                              if (bestCandidate) {
+                                finalizeLRMutation.mutate({
+                                  roomId: roomId,
+                                  candidateId: bestCandidate.id
+                                }, {
+                                  onSuccess: () => {
+                                    // Force phase update after finalization
+                                    setForcePhaseUpdate(prev => prev + 1);
+                                  },
+                                  onError: (error: any) => {
+                                    // Show error message to user
+                                    toast({
+                                      title: 'Finalize Hatası',
+                                      description: error?.data?.error || 'LR seçimi tamamlanamadı',
+                                      variant: 'destructive',
+                                    });
+                                  }
+                                });
+                              }
+                            }
+                          } else {
+                            // Not all members have voted, show warning
+                            toast({
+                              title: '⚠️ Oylama Süresi Doldu',
+                              description: `Tüm üyeler oy vermedi (${actualTotalVotes}/${expectedTotalVotes}). LR seçimi için tüm üyelerin oy vermesi gerekiyor.`,
+                              variant: 'destructive',
+                              duration: 8000,
+                            });
+                          }
+                        }
+                      }}
+                    />
+                  </div>
+                )}
               </div>
+              {(votingPhase === 'no-candidates' || votingPhase === 'nomination') && !isCurrentUserCandidate && (
               <Button
                 onClick={() => setShowNominateDialog(true)}
                 size="sm"
                 variant="outline"
-                disabled={isFinalized}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Aday Ol
+                </Button>
+              )}
+              {votingPhase === 'voting' && (
+                <Button
+                  disabled
+                  size="sm"
+                  variant="outline"
               >
                 <Plus className="mr-2 h-4 w-4" />
-                {['admin', 'lr'].includes(currentUserRole) ? 'Aday Ekle' : 'Kendimi Aday Göster'}
+                  Oylama Dönemi
               </Button>
+              )}
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* All Candidates Evaluation */}
+            {/* Candidates List */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <Label>Tüm Adayları Değerlendirin:</Label>
+                <Label>Adayları Değerlendirin:</Label>
                 <Badge variant="outline" className="text-xs">
                   {candidates.length} aday
                 </Badge>
@@ -318,19 +558,16 @@ export function VotingTab({ roomId }: VotingTabProps) {
                   <p className="text-sm">Aday eklemek için yukarıdaki butonu kullanın</p>
                 </div>
               ) : (
-                candidates.map((candidate: any) => {
-                  initializeVotesForCandidate(candidate.id);
-                  const candidateVotes = votes[candidate.id] || {
-                    technical: [4],
-                    experience: [4],
-                    availability: [4],
-                    communication: [4],
-                    leadership: [4]
-                  };
+                <div className="space-y-3">
+                  {candidates.map((candidate: any) => {
+                    const isEvaluated = evaluatedCandidates.has(candidate.id);
+                    const candidateResult = votingResults.find(r => r.candidate_id === candidate.id);
+                    const isCurrentUser = currentUser?.user_id === candidate.user_id;
                   
                   return (
-                    <Card key={candidate.id} className={candidate.is_selected ? "border-green-200" : ""}>
-                      <CardHeader className="pb-3">
+                      <Card key={candidate.id} className={`${candidate.is_selected ? "border-green-200" : ""} ${isEvaluated ? "border-blue-200 bg-blue-50" : ""}`}>
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-3">
                           <Avatar className="h-10 w-10">
                             <AvatarFallback className="text-sm">
@@ -341,46 +578,60 @@ export function VotingTab({ roomId }: VotingTabProps) {
                                 .toUpperCase() || "?"}
                             </AvatarFallback>
                           </Avatar>
-                          <div className="flex-1">
+                              <div>
                             <h3 className="font-medium">{candidate.profiles?.full_name || "Bilinmeyen"}</h3>
                             <p className="text-sm text-muted-foreground">
                               {candidate.profiles?.company?.name || "Şirket bilgisi yok"}
                             </p>
+                                {candidateResult && (
+                                  <p className="text-sm text-blue-600 font-medium">
+                                    Puan: {candidateResult.total_score.toFixed(1)}/5.0
+                                  </p>
+                                )}
+                              </div>
                           </div>
+                            <div className="flex items-center space-x-2">
                           {candidate.is_selected && (
                             <Badge variant="default">
                               <Crown className="mr-1 h-3 w-3" />
                               Seçilen
                             </Badge>
                           )}
-                        </div>
-                      </CardHeader>
-                      <CardContent className="pt-0">
-                        <div className="space-y-3">
-                          {Object.entries(scoreLabels).map(([key, label]) => (
-                            <div key={key} className="space-y-2">
-                              <div className="flex items-center justify-between">
-                                <Label className="text-sm">{label}</Label>
-                                <span className="text-sm font-medium">
-                                  {candidateVotes[key as keyof typeof candidateVotes][0]}/5
-                                </span>
-                              </div>
-                              <Slider
-                                value={candidateVotes[key as keyof typeof candidateVotes]}
-                                onValueChange={(value) => handleVoteChange(candidate.id, key, value)}
-                                max={5}
-                                min={0}
-                                step={0.5}
-                                className="w-full"
-                                disabled={isFinalized}
-                              />
+                              {isCurrentUser ? (
+                                <Badge variant="outline">
+                                  <Users className="mr-1 h-3 w-3" />
+                                  Adaysınız
+                                </Badge>
+                              ) : isCurrentUserCandidate ? (
+                                <Badge variant="outline">
+                                  <Users className="mr-1 h-3 w-3" />
+                                  Aday Olduğunuz İçin Değerlendiremezsiniz
+                                </Badge>
+                              ) : isEvaluated ? (
+                                <Badge variant="secondary">
+                                  <CheckCircle className="mr-1 h-3 w-3" />
+                                  Değerlendirildi
+                                </Badge>
+                              ) : (
+                                <Button
+                                  onClick={() => {
+                                    handleStartVoting(candidate);
+                                  }}
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={isFinalized || votingPhase !== 'voting' || isCurrentUserCandidate}
+                                >
+                                  <Vote className="mr-2 h-4 w-4" />
+                                  Değerlendir
+                                </Button>
+                              )}
                             </div>
-                          ))}
                         </div>
                       </CardContent>
                     </Card>
                   );
-                })
+                  })}
+                </div>
               )}
             </div>
 
@@ -392,28 +643,18 @@ export function VotingTab({ roomId }: VotingTabProps) {
                 <p className="text-green-700">LR seçimi başarıyla tamamlandı. Seçilen LR yukarıda görüntüleniyor.</p>
               </div>
             ) : hasTie ? (
-              <div className="space-y-4">
-                <div className="text-center py-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <Users className="h-8 w-8 mx-auto mb-2 text-yellow-600" />
+              <div className="text-center py-6 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <Users className="h-12 w-12 mx-auto mb-3 text-yellow-600" />
                   <h3 className="text-lg font-semibold text-yellow-800 mb-2">🔄 Tekrar Oylama Gerekli</h3>
                   <p className="text-yellow-700 mb-2">
                     En yüksek puanlı adaylar eşit ({maxScore.toFixed(1)}/5.0)! 
                   </p>
                   <p className="text-yellow-600 text-sm">
-                    Lütfen tüm adayları tekrar değerlendirin ve farklı puanlar verin.
-                  </p>
-                </div>
-                <Button
-                  onClick={handleSubmitAllVotes}
-                  className="w-full"
-                  disabled={candidates.length === 0 || submitAllVotesMutation.isPending}
-                >
-                  <Vote className="mr-2 h-4 w-4" />
-                  {submitAllVotesMutation.isPending 
-                    ? "Kaydediliyor..." 
-                    : "Tekrar Değerlendirmeleri Gönder"
-                  }
-                </Button>
+                  Lütfen adayları tekrar değerlendirin ve farklı puanlar verin.
+                </p>
+                <p className="text-sm text-yellow-600 mt-2">
+                  Değerlendirilen: {evaluatedCandidates.size}/{candidates.length}
+                </p>
               </div>
             ) : isCurrentUserCandidate ? (
               <div className="text-center py-6 bg-blue-50 border border-blue-200 rounded-lg">
@@ -421,20 +662,58 @@ export function VotingTab({ roomId }: VotingTabProps) {
                 <h3 className="text-lg font-semibold text-blue-800 mb-2">Adaysınız</h3>
                 <p className="text-blue-700">Aday olarak kendinize oy veremezsiniz. Diğer üyeler sizi değerlendirecek.</p>
               </div>
+            ) : actualTotalVotes < expectedTotalVotes ? (
+              <div className="text-center py-6 bg-orange-50 border border-orange-200 rounded-lg">
+                <Users className="h-12 w-12 mx-auto mb-3 text-orange-600" />
+                <h3 className="text-lg font-semibold text-orange-800 mb-2">⚠️ Tüm Üyeler Oy Vermedi</h3>
+                <p className="text-orange-700 mb-2">
+                  LR seçimi için tüm üyelerin oy vermesi gerekiyor.
+                </p>
+                <p className="text-orange-600 text-sm">
+                  Oy veren: {actualTotalVotes}/{expectedTotalVotes} (Beklenen: {eligibleVoters} üye × {candidates.length} aday)
+                </p>
+                <p className="text-orange-600 text-sm mt-1">
+                  Eksik: {expectedTotalVotes - actualTotalVotes} oy
+                </p>
+              </div>
+            ) : votingPhase === 'no-candidates' ? (
+              <div className="text-center py-6 bg-blue-50 border border-blue-200 rounded-lg">
+                <Users className="h-12 w-12 mx-auto mb-3 text-blue-600" />
+                <h3 className="text-lg font-semibold text-blue-800 mb-2">Aday Gösterin</h3>
+                <p className="text-blue-700">LR oylaması için aday göstermek isteyenler kendilerini aday gösterebilir.</p>
+              </div>
+            ) : votingPhase === 'nomination' ? (
+              <div className="text-center py-6 bg-blue-50 border border-blue-200 rounded-lg">
+                <Users className="h-12 w-12 mx-auto mb-3 text-blue-600" />
+                <h3 className="text-lg font-semibold text-blue-800 mb-2">Aday Gösterme Dönemi</h3>
+                <p className="text-blue-700">Oylama henüz başlamadı. Aday göstermek isteyenler kendilerini aday gösterebilir.</p>
+                {votingStartTime && (
+                  <div className="mt-3">
+                    <CountdownTimer targetTime={votingStartTime} />
+                  </div>
+                )}
+              </div>
+            ) : votingPhase === 'voting' && evaluatedCandidates.size === candidates.length ? (
+              <div className="text-center py-6 bg-green-50 border border-green-200 rounded-lg">
+                <CheckCircle className="h-12 w-12 mx-auto mb-3 text-green-600" />
+                <h3 className="text-lg font-semibold text-green-800 mb-2">🎉 Tüm Değerlendirmeler Tamamlandı!</h3>
+                <p className="text-green-700">LR seçimi otomatik olarak yapılacak.</p>
+              </div>
+            ) : votingPhase === 'voting' ? (
+              <div className="text-center py-6 bg-blue-50 border border-blue-200 rounded-lg">
+                <Users className="h-12 w-12 mx-auto mb-3 text-blue-600" />
+                <h3 className="text-lg font-semibold text-blue-800 mb-2">Oylama Dönemi</h3>
+                <p className="text-blue-700">Adayları tek tek değerlendirin. Yukarıdaki "Değerlendir" butonlarını kullanın.</p>
+                <p className="text-sm text-blue-600 mt-2">
+                  Değerlendirilen: {evaluatedCandidates.size}/{candidates.length}
+                </p>
+              </div>
             ) : (
-              <Button
-                onClick={handleSubmitAllVotes}
-                className="w-full"
-                disabled={candidates.length === 0 || submitAllVotesMutation.isPending}
-              >
-                <Vote className="mr-2 h-4 w-4" />
-                {submitAllVotesMutation.isPending 
-                  ? "Kaydediliyor..." 
-                  : hasTie 
-                    ? "Tekrar Değerlendirmeleri Gönder" 
-                    : "Tüm Değerlendirmeleri Gönder"
-                }
-              </Button>
+              <div className="text-center py-6 bg-gray-50 border border-gray-200 rounded-lg">
+                <CheckCircle className="h-12 w-12 mx-auto mb-3 text-gray-600" />
+                <h3 className="text-lg font-semibold text-gray-800 mb-2">Oylama Tamamlandı</h3>
+                <p className="text-gray-700">LR seçimi başarıyla tamamlandı.</p>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -446,8 +725,10 @@ export function VotingTab({ roomId }: VotingTabProps) {
               <div>
                 <CardTitle>Sonuçlar</CardTitle>
                 <CardDescription>
-                  {isFinalized 
+                  {isFinalized && actualTotalVotes >= expectedTotalVotes
                     ? "Oylama tamamlandı - LR seçildi" 
+                    : isFinalized && actualTotalVotes < expectedTotalVotes
+                    ? "Oylama devam ediyor - Tüm üyeler oy vermeli"
                     : hasTie
                     ? `🔄 Eşit puanlar! Tekrar oylama gerekli (${maxScore.toFixed(1)}/5.0)`
                     : (() => {
@@ -523,58 +804,123 @@ export function VotingTab({ roomId }: VotingTabProps) {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <Card className="w-full max-w-md mx-4">
             <CardHeader>
-              <CardTitle>{['admin', 'lr'].includes(currentUserRole) ? 'Aday Ekle' : 'Kendimi Aday Göster'}</CardTitle>
+              <CardTitle>Adaylık Başvurusu</CardTitle>
               <CardDescription>
-                {['admin', 'lr'].includes(currentUserRole) 
-                  ? 'LR adayı olarak göstermek istediğiniz üyeyi seçin'
-                  : 'Kendinizi LR adayı olarak göstermek istediğinizi onaylayın'
-                }
+                Lider Kayıtçı olmak için adaylığınızı onaylayın
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {['admin', 'lr'].includes(currentUserRole) ? (
                 <div className="space-y-2">
-                  <Label>Üye Seçin:</Label>
-                  <select
-                    value={selectedMemberId}
-                    onChange={(e) => setSelectedMemberId(e.target.value)}
-                    className="w-full p-2 border rounded-md"
-                  >
-                    <option value="">Üye seçin...</option>
-                    {members
-                      .filter((member: any) => !candidates.some((c: any) => c.user_id === member.user_id))
-                      .map((member: any) => (
-                        <option key={member.user_id} value={member.user_id}>
-                          {member.profiles?.full_name} - {member.profiles?.company?.name}
-                        </option>
-                      ))}
-                  </select>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <Label>Kendinizi Aday Gösteriyorsunuz:</Label>
+                <Label>Başvuru Detayları:</Label>
                   <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
                     <p className="text-sm text-blue-800">
-                      LR (Lead Registrant) adayı olarak kendinizi göstermek istediğinizi onaylıyor musunuz?
+                    Lider Kayıtçı olmak için adaylığınızı onaylıyor musunuz? Bu işlem geri alınamaz.
                     </p>
                   </div>
                 </div>
-              )}
               <div className="flex space-x-2">
                 <Button
                   onClick={handleNominateCandidate}
-                  disabled={(['admin', 'lr'].includes(currentUserRole) ? !selectedMemberId : false) || nominateCandidateMutation.isPending}
+                  disabled={nominateCandidateMutation.isPending}
                   className="flex-1"
                 >
                   {nominateCandidateMutation.isPending 
-                    ? "Ekleniyor..." 
-                    : (['admin', 'lr'].includes(currentUserRole) ? "Aday Ekle" : "Kendimi Aday Göster")
+                    ? "Başvuru Gönderiliyor..." 
+                    : "Adaylığımı Onayla"
                   }
                 </Button>
                 <Button
                   onClick={() => {
                     setShowNominateDialog(false);
                     setSelectedMemberId("");
+                  }}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  İptal
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Voting Modal */}
+      {showVoteModal && currentVotingCandidate && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+            <CardHeader>
+              <CardTitle>Aday Değerlendirme</CardTitle>
+              <CardDescription>
+                {currentVotingCandidate.profiles?.full_name || "Bilinmeyen"} adayını değerlendirin
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Candidate Info */}
+              <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                <Avatar className="h-12 w-12">
+                  <AvatarFallback>
+                    {currentVotingCandidate.profiles?.full_name
+                      ?.split(" ")
+                      .map((n: string) => n[0])
+                      .join("")
+                      .toUpperCase() || "?"}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <h3 className="font-medium">{currentVotingCandidate.profiles?.full_name || "Bilinmeyen"}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {currentVotingCandidate.profiles?.company?.name || "Şirket bilgisi yok"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Voting Sliders */}
+              <div className="space-y-4">
+                {Object.entries(scoreLabels).map(([key, label]) => {
+                  const candidateVotes = votes[currentVotingCandidate.id] || {
+                    technical: [4],
+                    experience: [4],
+                    availability: [4],
+                    communication: [4],
+                    leadership: [4]
+                  };
+                  
+                  return (
+                    <div key={key} className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-medium">{label}</Label>
+                        <span className="text-sm font-medium text-blue-600">
+                          {candidateVotes[key as keyof typeof candidateVotes][0]}/5
+                        </span>
+                      </div>
+                      <Slider
+                        value={candidateVotes[key as keyof typeof candidateVotes]}
+                        onValueChange={(value) => handleVoteChange(currentVotingCandidate.id, key, value)}
+                        max={5}
+                        min={0}
+                        step={0.5}
+                        className="w-full"
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex space-x-2 pt-4">
+                <Button
+                  onClick={handleSubmitSingleVote}
+                  disabled={submitVoteMutation.isPending}
+                  className="flex-1"
+                >
+                  <Vote className="mr-2 h-4 w-4" />
+                  {submitVoteMutation.isPending ? "Gönderiliyor..." : "Değerlendirmeyi Gönder"}
+                </Button>
+                <Button
+                  onClick={() => {
+                    setShowVoteModal(false);
+                    setCurrentVotingCandidate(null);
                   }}
                   variant="outline"
                   className="flex-1"

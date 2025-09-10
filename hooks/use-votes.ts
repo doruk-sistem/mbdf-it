@@ -52,14 +52,14 @@ export function useNominateCandidate() {
       queryClient.invalidateQueries({ queryKey: keys.candidates.list(variables.roomId) });
       
       toast({
-        title: 'Success',
-        description: 'Candidate nominated successfully',
+        title: 'Başarılı',
+        description: 'Adaylık başvurusu başarıyla gönderildi',
       });
     },
     onError: (error: any) => {
       toast({
-        title: 'Error',
-        description: error?.data?.message || 'Failed to nominate candidate',
+        title: 'Hata',
+        description: error?.data?.message || 'Adaylık başvurusu gönderilemedi',
         variant: 'destructive',
       });
     },
@@ -83,8 +83,8 @@ export function useSubmitVote() {
       });
       
       toast({
-        title: 'Success',
-        description: 'Vote submitted successfully',
+        title: 'Başarılı',
+        description: 'Oylama başarıyla gönderildi',
       });
 
       // Check if all members have voted and auto-finalize if needed
@@ -177,8 +177,8 @@ export function useSubmitVote() {
     },
     onError: (error: any) => {
       toast({
-        title: 'Error',
-        description: error?.data?.message || 'Failed to submit vote',
+        title: 'Hata',
+        description: error?.data?.message || 'Oylama gönderilemedi',
         variant: 'destructive',
       });
     },
@@ -206,7 +206,7 @@ export function useSubmitAllVotes() {
       });
       
       toast({
-        title: 'Success',
+        title: 'Başarılı',
         description: `Tüm adaylar için değerlendirmeleriniz kaydedildi (${variables.votes.length} aday)`,
       });
 
@@ -300,8 +300,8 @@ export function useSubmitAllVotes() {
     },
     onError: (error: any) => {
       toast({
-        title: 'Error',
-        description: error?.data?.message || 'Failed to submit votes',
+        title: 'Hata',
+        description: error?.data?.message || 'Oylamalar gönderilemedi',
         variant: 'destructive',
       });
     },
@@ -328,14 +328,14 @@ export function useFinalizeLR() {
       });
       
       toast({
-        title: 'Success',
-        description: 'Lead Registrant selection finalized successfully',
+        title: 'Başarılı',
+        description: 'Lider Kayıtçı seçimi başarıyla tamamlandı',
       });
     },
     onError: (error: any) => {
       toast({
-        title: 'Error',
-        description: error?.data?.message || 'Failed to finalize Lead Registrant selection',
+        title: 'Hata',
+        description: error?.data?.message || 'Lider Kayıtçı seçimi tamamlanamadı',
         variant: 'destructive',
       });
     },

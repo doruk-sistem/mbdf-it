@@ -102,17 +102,56 @@ export async function GET(request: NextRequest) {
       })
     );
 
-    // Check if voting is finalized (this would be a room setting)
-    const { data: roomData } = await supabase
-      .from('mbdf_room')
-      .select('status')
-      .eq('id', roomId)
+    // Check if voting is finalized by looking at lr_candidate table
+    // Voting is finalized if any candidate has is_selected = true
+    const { data: selectedCandidate } = await adminSupabase
+      .from('lr_candidate')
+      .select('is_selected')
+      .eq('room_id', roomId)
+      .eq('is_selected', true)
       .single();
+
+    // Check if all room members have voted
+    const { data: roomMembers } = await adminSupabase
+      .from('mbdf_member')
+      .select('user_id')
+      .eq('room_id', roomId);
+
+    const { data: allVotes } = await adminSupabase
+      .from('lr_vote')
+      .select('voter_id')
+      .eq('room_id', roomId);
+
+    // Get unique voters
+    const uniqueVoters = new Set(allVotes?.map((vote: any) => vote.voter_id) || []);
+    const totalMembers = roomMembers?.length || 0;
+    const totalVoters = uniqueVoters.size;
+
+    // Check for tie (equal scores)
+    const maxScore = candidatesWithScores.length > 0 ? Math.max(...candidatesWithScores.map(r => r.total_score)) : 0;
+    const topCandidates = candidatesWithScores.filter(r => r.total_score === maxScore);
+    const hasTie = topCandidates.length > 1 && maxScore > 0;
+
+    // Voting is finalized only if:
+    // 1. A candidate is selected AND
+    // 2. All members have voted AND
+    // 3. No tie exists
+    const isVotingFinalized = !!selectedCandidate && totalVoters >= totalMembers && !hasTie;
+
+    // Auto-reset is_selected if conditions are not met
+    if (selectedCandidate && (!isVotingFinalized)) {
+      console.log('🔄 Auto-resetting is_selected due to incomplete voting or tie');
+      await (adminSupabase as any)
+        .from('lr_candidate')
+        .update({ is_selected: false })
+        .eq('room_id', roomId)
+        .eq('is_selected', true);
+    }
 
     const response = VotingSummaryResponseSchema.parse({
       results: candidatesWithScores,
       my_vote: myVote.error ? null : myVote.data,
-      is_finalized: roomData?.status === 'closed',
+      is_finalized: isVotingFinalized,
     });
 
     return NextResponse.json(response);
@@ -217,11 +256,11 @@ export async function POST(request: NextRequest) {
           room_id: candidate.room_id,
           candidate_id: validatedData.candidate_id,
           voter_id: user.id,
-          technical_score: Math.round(validatedData.technical_score),
-          experience_score: Math.round(validatedData.experience_score),
-          communication_score: Math.round(validatedData.communication_score),
-          leadership_score: Math.round(validatedData.leadership_score),
-          availability_score: Math.round(validatedData.availability_score),
+          technical_score: validatedData.technical_score,
+          experience_score: validatedData.experience_score,
+          communication_score: validatedData.communication_score,
+          leadership_score: validatedData.leadership_score,
+          availability_score: validatedData.availability_score,
         },
       ] as any, {
         onConflict: 'room_id,voter_id,candidate_id'
