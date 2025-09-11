@@ -571,8 +571,8 @@ export async function removeLRCandidate(roomId: string, candidateId: string) {
       .select("*", { count: "exact", head: true })
       .eq("candidate_id", candidateId);
 
-    if (voteCount && voteCount > 0 && member.role !== "admin") {
-      throw new Error("Cannot remove candidate after voting has started (admin required)");
+    if (voteCount && voteCount > 0 && !['admin', 'lr'].includes(member.role)) {
+      throw new Error("Cannot remove candidate after voting has started (admin or LR required)");
     }
 
     // Remove all votes for this candidate first

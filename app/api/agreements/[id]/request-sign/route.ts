@@ -62,7 +62,7 @@ export async function POST(
         .eq('user_id', user.id)
         .single();
 
-      hasPermission = membership?.role === 'admin';
+      hasPermission = ['admin', 'lr'].includes(membership?.role);
     }
 
     if (!hasPermission) {

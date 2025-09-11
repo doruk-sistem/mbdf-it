@@ -319,6 +319,11 @@ export async function addMemberToRoom(roomId: string, userEmail: string, role: s
       throw new Error("Insufficient permissions");
     }
 
+    // LR can only add members with "member" role
+    if (member.role === "lr" && role !== "member") {
+      throw new Error("LR can only add members with 'member' role");
+    }
+
     // Find user by email
     const { data: targetProfile } = await supabase
       .from("profiles")
@@ -394,7 +399,7 @@ export async function removeMemberFromRoom(roomId: string, memberId: string) {
       .eq("user_id", user.id)
       .single();
 
-    if (!currentMember || currentMember.role !== "admin") {
+    if (!currentMember || !['admin', 'lr'].includes(currentMember.role)) {
       throw new Error("Insufficient permissions");
     }
 
@@ -473,7 +478,7 @@ export async function updateMemberRole(roomId: string, memberId: string, newRole
       .single();
 
     if (!currentMember || currentMember.role !== "admin") {
-      throw new Error("Insufficient permissions");
+      throw new Error("Insufficient permissions. Only admins can update member roles");
     }
 
     // Get member to be updated
