@@ -45,9 +45,21 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Onboarding check
-    const needsOnboarding = !profile?.full_name || !profile?.company_id;
-    if (needsOnboarding) {
+    // Onboarding check - both profile completion and room membership
+    const needsProfileOnboarding = !profile?.full_name || !profile?.company_id;
+    if (needsProfileOnboarding) {
+      return NextResponse.redirect(new URL('/onboarding', request.url));
+    }
+
+    // Check if user has joined any rooms (substance selection completed)
+    const { data: userRooms } = await supabase
+      .from("mbdf_member")
+      .select("room_id")
+      .eq("user_id", data.user.id)
+      .limit(1);
+
+    const needsSubstanceSelection = !userRooms || userRooms.length === 0;
+    if (needsSubstanceSelection) {
       return NextResponse.redirect(new URL('/onboarding', request.url));
     }
 

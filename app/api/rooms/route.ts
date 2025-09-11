@@ -159,14 +159,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Add creator as admin member using admin client with type assertion
+    // Add creator as member using admin client with type assertion
     const { error: memberError } = await (adminSupabase as any)
       .from('mbdf_member')
       .insert([
         {
           room_id: (room as any)?.id,
           user_id: user.id,
-          role: 'admin',
+          role: 'member',
         },
       ]);
 
