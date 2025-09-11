@@ -23,13 +23,13 @@ export const KksStatusSchema = z.enum(['draft', 'submitted', 'sent']);
 export const ProfileSchema = z.object({
   id: IdSchema,
   email: z.string().email(),
-  full_name: z.string().nullable(),
-  phone: z.string().nullable(),
-  avatar_url: z.string().url().nullable(),
-  company_id: IdSchema.nullable(),
-  role: UserRoleSchema,
-  created_at: DateSchema,
-  updated_at: DateSchema,
+  full_name: z.string().nullable().optional(),
+  phone: z.string().nullable().optional(),
+  avatar_url: z.string().nullable().optional(),
+  company_id: IdSchema.nullable().optional(),
+  role: UserRoleSchema.nullable().optional(),
+  created_at: DateSchema.nullable().optional(),
+  updated_at: DateSchema.nullable().optional(),
 });
 
 export const CompanySchema = z.object({
@@ -46,11 +46,11 @@ export const CompanySchema = z.object({
 export const SubstanceSchema = z.object({
   id: IdSchema,
   name: z.string(),
-  description: z.string().nullable(),
-  cas_number: z.string().nullable(),
-  ec_number: z.string().nullable(),
-  created_at: DateSchema,
-  updated_at: DateSchema,
+  description: z.string().nullable().optional(),
+  cas_number: z.string().nullable().optional(),
+  ec_number: z.string().nullable().optional(),
+  created_at: DateSchema.nullable().optional(),
+  updated_at: DateSchema.nullable().optional(),
 });
 
 export const RoomSchema = z.object({
