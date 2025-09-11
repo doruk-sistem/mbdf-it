@@ -42,7 +42,16 @@ export async function GET(
         topic,
         created_at,
         updated_at,
-        sender_id
+        sender_id,
+        profiles!message_sender_id_fkey (
+          id,
+          full_name,
+          avatar_url,
+          tonnage,
+          company:company_id (
+            name
+          )
+        )
       `)
       .eq("room_id", params.roomId)
       .eq("message_type", "forum")
@@ -80,6 +89,7 @@ export async function GET(
           id, 
           full_name, 
           avatar_url,
+          tonnage,
           company:company_id (
             name
           )
@@ -99,7 +109,9 @@ export async function GET(
       profiles: profiles.find(p => p.id === message.sender_id) || { 
         id: message.sender_id, 
         full_name: "Unknown User", 
-        avatar_url: null 
+        avatar_url: null,
+        tonnage: null,
+        company: null
       }
     })) || [];
 
