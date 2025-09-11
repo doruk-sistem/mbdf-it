@@ -43,6 +43,38 @@ export function useMyMembership(roomId: string, userId: string) {
 }
 
 // Mutation hooks
+export function useAddMember() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (data: { roomId: string; userEmail: string; role: 'member' | 'lr' | 'admin' }) => 
+      post(API_ENDPOINTS.members, {
+        roomId: data.roomId,
+        userEmail: data.userEmail,
+        role: data.role,
+      }),
+    onSuccess: (data, variables) => {
+      // Invalidate member-related queries
+      invalidationHelpers.member(variables.roomId).forEach(key => {
+        queryClient.invalidateQueries({ queryKey: key });
+      });
+      
+      toast({
+        title: 'Başarılı',
+        description: 'Üye başarıyla odaya eklendi.',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Hata',
+        description: error?.data?.message || 'Üye eklenirken bir hata oluştu',
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
 export function useJoinRoom() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
