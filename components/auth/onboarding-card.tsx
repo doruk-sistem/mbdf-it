@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
 import { completeOnboarding } from "@/app/actions/auth";
+import { SubstanceSelectionCard } from "./substance-selection-card";
 
 interface OnboardingCardProps {
   userEmail: string;
@@ -37,6 +38,7 @@ const countries = [
 
 export function OnboardingCard({ userEmail }: OnboardingCardProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const [currentStep, setCurrentStep] = useState<'profile' | 'substance'>('profile');
   const [formData, setFormData] = useState({
     fullName: "",
     companyName: "",
@@ -91,10 +93,10 @@ export function OnboardingCard({ userEmail }: OnboardingCardProps) {
 
       if (result.success) {
         toast({
-          title: "Hoş Geldiniz!",
+          title: "Profil Tamamlandı!",
           description: "Profil bilgileriniz başarıyla kaydedildi.",
         });
-        router.push("/");
+        setCurrentStep('substance');
       } else {
         toast({
           title: "Hata",
@@ -112,6 +114,16 @@ export function OnboardingCard({ userEmail }: OnboardingCardProps) {
       setIsLoading(false);
     }
   };
+
+  const handleSubstanceComplete = () => {
+    // Redirect to dashboard after substance selection is completed
+    router.push("/");
+  };
+
+  // Show substance selection step
+  if (currentStep === 'substance') {
+    return <SubstanceSelectionCard userEmail={userEmail} onComplete={handleSubstanceComplete} />;
+  }
 
   return (
     <Card>

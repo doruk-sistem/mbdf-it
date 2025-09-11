@@ -16,14 +16,26 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Get query parameters
+    const { searchParams } = new URL(request.url);
+    const substanceId = searchParams.get('substance_id');
+
     // Use admin client to completely bypass RLS and avoid stack depth issues
     const adminSupabase = createAdminSupabase();
     
-    // Get rooms with minimal data first
-    const { data: rooms, error } = await adminSupabase
+    // Build query
+    let query = adminSupabase
       .from('mbdf_room')
       .select('*')
+      .eq('status', 'active') // Only get active rooms
       .order('created_at', { ascending: false });
+
+    // Filter by substance_id if provided
+    if (substanceId) {
+      query = query.eq('substance_id', substanceId);
+    }
+
+    const { data: rooms, error } = await query;
 
     if (error) {
       console.error('Error fetching rooms:', error);
@@ -77,6 +89,7 @@ export async function GET(request: NextRequest) {
 
     // Return response without validation to avoid stack depth issues
     const response = {
+      success: true,
       items: roomsWithDetails,
       total: roomsWithDetails.length,
     };

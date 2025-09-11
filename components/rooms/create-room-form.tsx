@@ -19,11 +19,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useSubstances } from "@/hooks/use-substances";
 import { useCreateRoom } from "@/hooks/use-rooms";
 
-export function CreateRoomForm() {
+interface CreateRoomFormProps {
+  preselectedSubstanceId?: string;
+}
+
+export function CreateRoomForm({ preselectedSubstanceId }: CreateRoomFormProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [formData, setFormData] = useState({
     description: "",
-    substanceId: "",
+    substanceId: preselectedSubstanceId || "",
   });
   
   const router = useRouter();
