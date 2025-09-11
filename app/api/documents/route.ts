@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabase } from '@/lib/supabase';
+import { createServerSupabase, createAdminSupabase } from '@/lib/supabase';
 import { DocumentsListResponseSchema } from '@/lib/schemas';
 import { z } from 'zod';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
@@ -27,28 +29,56 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Check if user can view this room (member or creator)
-    const { data: canView } = await supabase.rpc('can_view_room', { room_uuid: roomId });
+    // Use admin client to bypass RLS for access check
+    const adminSupabase = createAdminSupabase();
     
-    if (!canView) {
+    // Check if user can view this room (member or creator)
+    const { data: membership, error: memberError } = await adminSupabase
+      .from('mbdf_member')
+      .select('id, role')
+      .eq('room_id', roomId)
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (memberError && memberError.code !== 'PGRST116') {
+      console.error('Error checking membership:', memberError);
+      return NextResponse.json(
+        { error: 'Failed to verify access', success: false },
+        { status: 500 }
+      );
+    }
+
+    // Check if user is creator of the room
+    const { data: room, error: roomError } = await adminSupabase
+      .from('mbdf_room')
+      .select('created_by')
+      .eq('id', roomId)
+      .single();
+
+    if (roomError) {
+      console.error('Error fetching room:', roomError);
+      return NextResponse.json(
+        { error: 'Room not found', success: false },
+        { status: 404 }
+      );
+    }
+
+    const isMember = !!membership;
+    const isCreator = (room as any).created_by === user.id;
+
+    // Allow access if user is member or creator
+    if (!isMember && !isCreator) {
       return NextResponse.json(
         { error: 'Access denied', success: false },
         { status: 403 }
       );
     }
 
-    // Check if user is a member (for additional info)
-    const { data: membership } = await supabase
-      .from('mbdf_member')
-      .select('id, role')
-      .eq('room_id', roomId)
-      .eq('user_id', user.id)
-      .single();
+    // Get user's role if they are a member
+    const userRole = (membership as any)?.role;
 
-    const isMember = !!membership;
-
-    // Get documents with uploader profile
-    const { data: documents, error } = await supabase
+    // Get documents with uploader profile using admin client to bypass RLS
+    const { data: documents, error } = await adminSupabase
       .from('document')
       .select(`
         *,
@@ -67,7 +97,7 @@ export async function GET(request: NextRequest) {
 
     // Create signed URLs for file downloads (normalize stored path if it includes bucket prefix)
     const documentsWithUrls = await Promise.all(
-      (documents || []).map(async (doc) => {
+      ((documents || []) as any[]).map(async (doc: any) => {
         try {
           const storagePath = doc.file_path?.startsWith('docs/')
             ? doc.file_path.replace(/^docs\//, '')

@@ -369,8 +369,7 @@ export function MembersTab({ roomId, isArchived = false }: MembersTabProps) {
                     </span>
                   </TableCell>
                   <TableCell>
-                    {(currentUserRole === "admin" ||
-                      currentUserRole === "lr") &&
+                    {currentUserRole === "admin" &&
                       member.role !== "admin" && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>

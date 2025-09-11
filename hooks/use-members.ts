@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { keys, invalidationHelpers } from '@/lib/query-keys';
-import { get, post, del, API_ENDPOINTS, withQuery } from '@/lib/api';
+import { get, post, put, del, API_ENDPOINTS, withQuery } from '@/lib/api';
 import { 
   MemberWithProfile,
   MembersListResponseSchema 
@@ -148,7 +148,7 @@ export function useUpdateMemberRole() {
       roomId: string; 
       role: 'admin' | 'lr' | 'member' 
     }) => 
-      post(`${API_ENDPOINTS.members}/${data.memberId}/role`, {
+      put(`${API_ENDPOINTS.members}/${data.memberId}/role`, {
         role: data.role,
       }),
     onSuccess: (data, variables) => {
