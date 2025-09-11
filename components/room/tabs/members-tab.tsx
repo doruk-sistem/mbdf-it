@@ -263,7 +263,9 @@ export function MembersTab({ roomId, isArchived = false }: MembersTabProps) {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="member">Üye</SelectItem>
-                        <SelectItem value="lr">LR</SelectItem>
+                        {currentUserRole === "admin" && (
+                          <SelectItem value="lr">LR</SelectItem>
+                        )}
                         {currentUserRole === "admin" && (
                           <SelectItem value="admin">Yönetici</SelectItem>
                         )}
@@ -375,7 +377,7 @@ export function MembersTab({ roomId, isArchived = false }: MembersTabProps) {
                     </span>
                   </TableCell>
                   <TableCell>
-                    {currentUserRole === "admin" &&
+                    {(currentUserRole === "admin" || currentUserRole === "lr") &&
                       member.role !== "admin" && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -391,21 +393,30 @@ export function MembersTab({ roomId, isArchived = false }: MembersTabProps) {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() =>
-                                handleUpdateRole(
-                                  member.id,
-                                  member.role === "lr" ? "member" : "lr"
-                                )
-                              }
-                              disabled={
-                                isArchived || updateRoleMutation.isPending
-                              }
-                            >
-                              {member.role === "lr"
-                                ? "LR'den Üye Yap"
-                                : "LR Yap"}
-                            </DropdownMenuItem>
+                            {currentUserRole === "admin" && (
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  handleUpdateRole(member.id, "member")
+                                }
+                                disabled={
+                                  isArchived || updateRoleMutation.isPending
+                                }
+                              >
+                                Üye Yap
+                              </DropdownMenuItem>
+                            )}
+                            {currentUserRole === "admin" && (
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  handleUpdateRole(member.id, "lr")
+                                }
+                                disabled={
+                                  isArchived || updateRoleMutation.isPending
+                                }
+                              >
+                                LR Yap
+                              </DropdownMenuItem>
+                            )}
                             {currentUserRole === "admin" && (
                               <DropdownMenuItem
                                 onClick={() =>
@@ -416,6 +427,18 @@ export function MembersTab({ roomId, isArchived = false }: MembersTabProps) {
                                 }
                               >
                                 Yönetici Yap
+                              </DropdownMenuItem>
+                            )}
+                            {currentUserRole === "lr" && member.role !== "member" && (
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  handleUpdateRole(member.id, "member")
+                                }
+                                disabled={
+                                  isArchived || updateRoleMutation.isPending
+                                }
+                              >
+                                Üye Yap
                               </DropdownMenuItem>
                             )}
                             <DropdownMenuSeparator />

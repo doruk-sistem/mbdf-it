@@ -40,10 +40,10 @@ export async function DELETE(
       }, { status: 403 });
     }
 
-    // Only admins can remove members
-    if (currentMember.role !== "admin") {
+    // Only admins and LR can remove members
+    if (!['admin', 'lr'].includes(currentMember.role)) {
       return NextResponse.json({ 
-        error: 'Insufficient permissions. Only admins can remove members' 
+        error: 'Insufficient permissions. Only admins and LR can remove members' 
       }, { status: 403 });
     }
 

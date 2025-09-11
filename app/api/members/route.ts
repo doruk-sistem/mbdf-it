@@ -120,6 +120,13 @@ export async function POST(request: NextRequest) {
       }, { status: 403 });
     }
 
+    // LR can only add members with "member" role
+    if (member.role === "lr" && role !== "member") {
+      return NextResponse.json({ 
+        error: 'LR can only add members with "member" role' 
+      }, { status: 403 });
+    }
+
     // Check if room is archived
     const { data: room, error: roomError } = await supabase
       .from("mbdf_room")

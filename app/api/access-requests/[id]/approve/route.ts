@@ -66,9 +66,9 @@ export async function POST(
       .eq('user_id', user.id)
       .single();
 
-    if (memberError || membership.role !== 'admin') {
+    if (memberError || !['admin', 'lr'].includes(membership.role)) {
       return NextResponse.json(
-        { error: 'Admin access required', success: false },
+        { error: 'Admin or LR access required', success: false },
         { status: 403 }
       );
     }
