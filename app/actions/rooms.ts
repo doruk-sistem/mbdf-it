@@ -549,6 +549,7 @@ export async function getRoomMembers(roomId: string) {
       .from("mbdf_member")
       .select(`
         id,
+        user_id,
         role,
         joined_at,
         profiles:user_id (
