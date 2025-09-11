@@ -34,7 +34,9 @@ export function ArchiveDialog({ roomId, roomName, open, onOpenChange }: ArchiveD
   const [confirmText, setConfirmText] = useState("");
   const [step, setStep] = useState<"precheck" | "confirm">("precheck");
 
-  const { data: precheck, isLoading: isLoadingPrecheck } = useArchivePrecheck(roomId);
+  const { data: precheck, isLoading: isLoadingPrecheck } = useArchivePrecheck(roomId, {
+    enabled: open, // Only fetch when dialog is open
+  });
   const archiveMutation = useArchiveRoom();
 
   const isConfirmDisabled = confirmText !== "ARCHIVE" || (reason && reason.length < 10);
