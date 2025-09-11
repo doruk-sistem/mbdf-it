@@ -176,7 +176,7 @@ export async function finalizeLRSelection(roomId: string, candidateId: string) {
   const supabase = createServerSupabase();
 
   try {
-    // Check if user has permission (admin only)
+    // Check if user is a member of the room
     const { data: membership } = await supabase
       .from("mbdf_member")
       .select("role")
@@ -184,9 +184,11 @@ export async function finalizeLRSelection(roomId: string, candidateId: string) {
       .eq("user_id", user.id)
       .single();
 
-    if (!membership || membership.role !== "admin") {
-      throw new Error("Only administrators can finalize LR selection");
+    if (!membership) {
+      throw new Error("You must be a member of this room to finalize LR selection");
     }
+
+    // Any room member can finalize LR selection (democratic process)
 
     // Reset all candidates
     await supabase
@@ -569,8 +571,8 @@ export async function removeLRCandidate(roomId: string, candidateId: string) {
       .select("*", { count: "exact", head: true })
       .eq("candidate_id", candidateId);
 
-    if (voteCount && voteCount > 0 && member.role !== "admin") {
-      throw new Error("Cannot remove candidate after voting has started (admin required)");
+    if (voteCount && voteCount > 0 && !['admin', 'lr'].includes(member.role)) {
+      throw new Error("Cannot remove candidate after voting has started (admin or LR required)");
     }
 
     // Remove all votes for this candidate first

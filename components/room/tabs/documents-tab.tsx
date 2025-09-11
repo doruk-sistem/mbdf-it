@@ -97,9 +97,15 @@ export function DocumentsTab({ roomId, isArchived = false }: DocumentsTabProps) 
       window.open(document.download_url, '_blank');
       return;
     }
+    
+    // Check if user is member, show appropriate message
+    const errorMessage = isMember 
+      ? "Görüntüleme linki oluşturulamadı."
+      : "Bu odaya üye olmadığınız için dokümanı görüntüleyemezsiniz. Görüntülemek için odaya üye olmanız gerekmektedir.";
+    
     toast({
-      title: "Hata",
-      description: "Görüntüleme linki oluşturulamadı.",
+      title: "Erişim Engellendi",
+      description: errorMessage,
       variant: "destructive",
     });
   };
@@ -108,9 +114,14 @@ export function DocumentsTab({ roomId, isArchived = false }: DocumentsTabProps) 
     if (document.download_url) {
       window.open(document.download_url, '_blank');
     } else {
+      // Check if user is member, show appropriate message
+      const errorMessage = isMember 
+        ? "İndirme linki oluşturulamadı."
+        : "Bu odaya üye olmadığınız için dokümanı indiremezsiniz. İndirmek için odaya üye olmanız gerekmektedir.";
+      
       toast({
-        title: "Hata",
-        description: "İndirme linki oluşturulamadı.",
+        title: "Erişim Engellendi",
+        description: errorMessage,
         variant: "destructive",
       });
     }

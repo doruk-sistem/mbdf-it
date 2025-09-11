@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabase } from '@/lib/supabase';
+import { createServerSupabase, createAdminSupabase } from '@/lib/supabase';
 import { DocumentsListResponseSchema } from '@/lib/schemas';
 import { z } from 'zod';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
@@ -27,28 +29,31 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Check if user can view this room (member or creator)
-    const { data: canView } = await supabase.rpc('can_view_room', { room_uuid: roomId });
+    // Use admin client to bypass RLS for access check
+    const adminSupabase = createAdminSupabase();
     
-    if (!canView) {
-      return NextResponse.json(
-        { error: 'Access denied', success: false },
-        { status: 403 }
-      );
-    }
-
-    // Check if user is a member (for additional info)
-    const { data: membership } = await supabase
+    // Allow all authenticated users to view documents
+    // Check if user is a member for role-based permissions
+    const { data: membership, error: memberError } = await adminSupabase
       .from('mbdf_member')
       .select('id, role')
       .eq('room_id', roomId)
       .eq('user_id', user.id)
-      .single();
+      .maybeSingle();
+
+    if (memberError && memberError.code !== 'PGRST116') {
+      console.error('Error checking membership:', memberError);
+      return NextResponse.json(
+        { error: 'Failed to verify access', success: false },
+        { status: 500 }
+      );
+    }
 
     const isMember = !!membership;
+    const userRole = (membership as any)?.role;
 
-    // Get documents with uploader profile
-    const { data: documents, error } = await supabase
+    // Get documents with uploader profile using admin client to bypass RLS
+    const { data: documents, error } = await adminSupabase
       .from('document')
       .select(`
         *,
@@ -65,10 +70,19 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Create signed URLs for file downloads (normalize stored path if it includes bucket prefix)
+    // Create signed URLs for file downloads (only for members)
     const documentsWithUrls = await Promise.all(
-      (documents || []).map(async (doc) => {
+      ((documents || []) as any[]).map(async (doc: any) => {
         try {
+          // Only create download URLs for members
+          if (!isMember) {
+            return {
+              ...doc,
+              download_url: null,
+              download_error: "Bu odaya üye olmadığınız için dokümanı indiremezsiniz. İndirmek için odaya üye olmanız gerekmektedir."
+            };
+          }
+
           const storagePath = doc.file_path?.startsWith('docs/')
             ? doc.file_path.replace(/^docs\//, '')
             : doc.file_path;
@@ -80,12 +94,14 @@ export async function GET(request: NextRequest) {
           return {
             ...doc,
             download_url: urlError ? null : signedUrlData.signedUrl,
+            download_error: urlError ? "İndirme linki oluşturulamadı." : null,
           };
         } catch (urlError) {
           console.error('Error creating signed URL for:', doc.file_path, urlError);
           return {
             ...doc,
             download_url: null,
+            download_error: "İndirme linki oluşturulamadı.",
           };
         }
       })

@@ -1,0 +1,230 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createServerSupabase, createAdminSupabase } from '@/lib/supabase';
+
+// GET /api/members - Get room members
+export async function GET(request: NextRequest) {
+  try {
+    const supabase = createServerSupabase();
+    
+    // Get current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Get query parameters
+    const { searchParams } = new URL(request.url);
+    const roomId = searchParams.get('roomId');
+
+    if (!roomId) {
+      return NextResponse.json(
+        { error: 'roomId parameter is required' },
+        { status: 400 }
+      );
+    }
+
+    // Check if user is a member of the room
+    const { data: membership, error: memberError } = await supabase
+      .from("mbdf_member")
+      .select("role")
+      .eq("room_id", roomId)
+      .eq("user_id", user.id)
+      .single();
+
+    if (memberError || !membership) {
+      return NextResponse.json(
+        { error: 'Access denied: You must be a member of this room' },
+        { status: 403 }
+      );
+    }
+
+    // Use admin client to bypass RLS for reading members
+    const adminSupabase = createAdminSupabase();
+    
+    // Get all members for this room
+    const { data: members, error } = await adminSupabase
+      .from('mbdf_member')
+      .select(`
+        user_id,
+        role,
+        joined_at,
+        profiles:user_id (
+          id,
+          full_name,
+          email,
+          company:company_id (
+            id,
+            name
+          )
+        )
+      `)
+      .eq('room_id', roomId)
+      .order('joined_at', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching members:', error);
+      return NextResponse.json(
+        { error: 'Failed to fetch members' },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      items: members || [],
+      total: members?.length || 0,
+      currentUserRole: membership.role
+    });
+
+  } catch (error) {
+    console.error('API Error in GET /api/members:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+// POST /api/members - Add member to room
+export async function POST(request: NextRequest) {
+  try {
+    const supabase = createServerSupabase();
+    
+    // Get current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { roomId, userEmail, role } = body;
+
+    if (!roomId || !userEmail || !role) {
+      return NextResponse.json({ 
+        error: 'Missing required fields: roomId, userEmail, role' 
+      }, { status: 400 });
+    }
+
+    // Check if current user has permission to add members
+    const { data: member, error: memberError } = await supabase
+      .from("mbdf_member")
+      .select("role")
+      .eq("room_id", roomId)
+      .eq("user_id", user.id)
+      .single();
+
+    if (memberError || !member || (member.role !== "admin" && member.role !== "lr")) {
+      return NextResponse.json({ 
+        error: 'Insufficient permissions to add members' 
+      }, { status: 403 });
+    }
+
+    // LR can only add members with "member" role
+    if (member.role === "lr" && role !== "member") {
+      return NextResponse.json({ 
+        error: 'LR can only add members with "member" role' 
+      }, { status: 403 });
+    }
+
+    // Check if room is archived
+    const { data: room, error: roomError } = await supabase
+      .from("mbdf_room")
+      .select("status, name, description")
+      .eq("id", roomId)
+      .single();
+
+    if (roomError || !room) {
+      return NextResponse.json({ error: 'Room not found' }, { status: 404 });
+    }
+
+    if (room.status === 'archived') {
+      return NextResponse.json({ 
+        error: 'Room is archived. Membership changes are disabled' 
+      }, { status: 400 });
+    }
+
+    // Use admin client to bypass RLS for profile lookup
+    const adminSupabase = createAdminSupabase();
+    
+    // Find user by email
+    const { data: targetProfile, error: profileError } = await adminSupabase
+      .from("profiles")
+      .select("id, full_name")
+      .eq("email", userEmail)
+      .single();
+
+    if (profileError || !targetProfile) {
+      return NextResponse.json({ 
+        error: 'User not found with this email address' 
+      }, { status: 404 });
+    }
+
+    // Type assertion to fix TypeScript error
+    const profile = targetProfile as { id: string; full_name: string | null };
+
+    // Check if user is already a member
+    const { data: existingMember, error: existingError } = await supabase
+      .from("mbdf_member")
+      .select("id")
+      .eq("room_id", roomId)
+      .eq("user_id", profile.id)
+      .single();
+
+    if (existingMember) {
+      return NextResponse.json({ 
+        error: 'User is already a member of this room' 
+      }, { status: 400 });
+    }
+
+    // Add user as member
+    const { error: insertError } = await supabase
+      .from("mbdf_member")
+      .insert({
+        room_id: roomId,
+        user_id: profile.id,
+        role: role
+      });
+
+    if (insertError) {
+      return NextResponse.json({ 
+        error: 'Failed to add member to room' 
+      }, { status: 500 });
+    }
+
+    // Get inviter's profile info
+    const { data: inviterProfile } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", user.id)
+      .single();
+
+
+    // Log the action
+    await supabase
+      .from("audit_log")
+      .insert({
+        room_id: roomId,
+        user_id: user.id,
+        action: "member_added",
+        resource_type: "mbdf_member",
+        new_values: { 
+          room_id: roomId, 
+          user_id: profile.id, 
+          role, 
+          added_by: user.id 
+        }
+      });
+
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Member added successfully',
+      memberId: profile.id
+    });
+
+  } catch (error) {
+    return NextResponse.json({ 
+      error: 'Internal server error' 
+    }, { status: 500 });
+  }
+}

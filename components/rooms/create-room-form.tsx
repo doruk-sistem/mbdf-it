@@ -22,7 +22,6 @@ import { useCreateRoom } from "@/hooks/use-rooms";
 export function CreateRoomForm() {
   const [searchTerm, setSearchTerm] = useState("");
   const [formData, setFormData] = useState({
-    name: "",
     description: "",
     substanceId: "",
   });
@@ -32,8 +31,6 @@ export function CreateRoomForm() {
   // Query hooks
   const { data: substancesData, isLoading: substancesLoading } = useSubstances();
   const createRoomMutation = useCreateRoom();
-
-  console.log("substancesData", substancesData);
 
   // Extract substances from query response
   const substances = substancesData?.items || [];
@@ -47,13 +44,15 @@ export function CreateRoomForm() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.name.trim() || !formData.substanceId) {
+    if (!formData.substanceId) {
       return;
     }
 
+    const roomName = generateRoomName(selectedSubstance);
+
     createRoomMutation.mutate(
       {
-        name: formData.name.trim(),
+        name: roomName,
         description: formData.description.trim(),
         substance_id: formData.substanceId,
       },
@@ -66,6 +65,15 @@ export function CreateRoomForm() {
   };
 
   const selectedSubstance = substances.find(s => s.id === formData.substanceId);
+
+  // Auto-generate room name from selected substance
+  const generateRoomName = (substance: any) => {
+    if (!substance) return "";
+    if (substance.cas_number) {
+      return `${substance.name} (CAS: ${substance.cas_number})`;
+    }
+    return substance.name;
+  };
 
   return (
     <Card>
@@ -80,22 +88,6 @@ export function CreateRoomForm() {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Room Name */}
-          <div className="space-y-2">
-            <Label htmlFor="name">
-              Oda Adı <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              id="name"
-              type="text"
-              placeholder="örn. TiO2 MBDF Çalışma Grubu"
-              value={formData.name}
-              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-              disabled={createRoomMutation.isPending}
-              required
-            />
-          </div>
-
           {/* Substance Selection */}
           <div className="space-y-2">
             <Label htmlFor="substance">
@@ -161,6 +153,7 @@ export function CreateRoomForm() {
               <div className="mt-2 p-3 bg-muted rounded-lg">
                 <div className="text-sm space-y-1">
                   <div><span className="font-medium">Seçili Madde:</span> {selectedSubstance.name}</div>
+                  <div><span className="font-medium">Oda Adı:</span> <span className="text-blue-600 dark:text-blue-400">{generateRoomName(selectedSubstance)}</span></div>
                   {selectedSubstance.ec_number && (
                     <div><span className="font-medium">EC No:</span> {selectedSubstance.ec_number}</div>
                   )}
@@ -199,7 +192,7 @@ export function CreateRoomForm() {
             >
               İptal
             </Button>
-            <Button type="submit" disabled={createRoomMutation.isPending || !formData.name.trim() || !formData.substanceId} className="flex-1">
+            <Button type="submit" disabled={createRoomMutation.isPending || !formData.substanceId} className="flex-1">
               {createRoomMutation.isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

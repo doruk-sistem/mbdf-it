@@ -164,9 +164,9 @@ export async function PUT(
       );
     }
 
-    if (membership.role !== 'admin') {
+    if (!['admin', 'lr'].includes(membership.role)) {
       return NextResponse.json(
-        { error: 'Admin access required', success: false },
+        { error: 'Admin or LR access required', success: false },
         { status: 403 }
       );
     }
@@ -295,9 +295,9 @@ export async function DELETE(
       );
     }
 
-    if (membership.role !== 'admin') {
+    if (!['admin', 'lr'].includes(membership.role)) {
       return NextResponse.json(
-        { error: 'Admin access required', success: false },
+        { error: 'Admin or LR access required', success: false },
         { status: 403 }
       );
     }

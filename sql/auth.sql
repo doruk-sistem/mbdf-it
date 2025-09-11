@@ -4,12 +4,13 @@
 create or replace function public.handle_new_user()
 returns trigger as $$
 begin
-  insert into public.profiles (id, email, full_name, role, created_at)
+  insert into public.profiles (id, email, full_name, role, tonnage, created_at)
   values (
     new.id,
     new.email,
     null,
     'member',
+    null,
     now()
   )
   on conflict (id) do nothing;

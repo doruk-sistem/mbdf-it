@@ -319,6 +319,11 @@ export async function addMemberToRoom(roomId: string, userEmail: string, role: s
       throw new Error("Insufficient permissions");
     }
 
+    // LR can only add members with "member" role
+    if (member.role === "lr" && role !== "member") {
+      throw new Error("LR can only add members with 'member' role");
+    }
+
     // Find user by email
     const { data: targetProfile } = await supabase
       .from("profiles")
@@ -394,7 +399,7 @@ export async function removeMemberFromRoom(roomId: string, memberId: string) {
       .eq("user_id", user.id)
       .single();
 
-    if (!currentMember || currentMember.role !== "admin") {
+    if (!currentMember || !['admin', 'lr'].includes(currentMember.role)) {
       throw new Error("Insufficient permissions");
     }
 
@@ -473,7 +478,7 @@ export async function updateMemberRole(roomId: string, memberId: string, newRole
       .single();
 
     if (!currentMember || currentMember.role !== "admin") {
-      throw new Error("Insufficient permissions");
+      throw new Error("Insufficient permissions. Only admins can update member roles");
     }
 
     // Get member to be updated
@@ -541,25 +546,23 @@ export async function getRoomMembers(roomId: string) {
     // Check if user is a member of the room
     const membership = await checkMembership(roomId, user.id);
 
-    if (!membership) {
-      // Gracefully handle non-members: return empty list and a safe default role
-      return { 
-        members: [], 
-        currentUserRole: 'member' as Database['public']['Enums']['user_role'] 
-      };
-    }
+    // Allow non-members to view members, but with limited role
+    const currentUserRole = membership?.role || 'member' as Database['public']['Enums']['user_role'];
 
     // Get all members with profile and company data using admin client
     const { data: members, error } = await adminSupabase
       .from("mbdf_member")
       .select(`
         id,
+        user_id,
         role,
         joined_at,
         profiles:user_id (
+          id,
           full_name,
           email,
           avatar_url,
+          tonnage,
           company:company_id (
             name,
             vat_number
@@ -574,7 +577,7 @@ export async function getRoomMembers(roomId: string) {
       throw new Error("Failed to get room members");
     }
 
-    return { members: members || [], currentUserRole: membership.role };
+    return { members: members || [], currentUserRole };
   } catch (error) {
     console.error("Get room members error:", error);
     throw new Error("Failed to get room members");

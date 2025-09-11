@@ -13,6 +13,7 @@ interface ProfileFormProps {
     email: string;
     fullName: string;
     phone: string;
+    tonnage: number | null;
   };
 }
 
@@ -21,6 +22,7 @@ export function ProfileForm({ initialData }: ProfileFormProps) {
   const [formData, setFormData] = useState({
     fullName: initialData.fullName,
     phone: initialData.phone,
+    tonnage: initialData.tonnage?.toString() || "",
   });
   
   const { toast } = useToast();
@@ -37,12 +39,27 @@ export function ProfileForm({ initialData }: ProfileFormProps) {
       return;
     }
 
+    // Validate tonnage if provided
+    if (formData.tonnage && formData.tonnage.trim()) {
+      const tonnageValue = parseFloat(formData.tonnage);
+      if (isNaN(tonnageValue) || tonnageValue < 1 || tonnageValue > 1000) {
+        toast({
+          title: "Geçersiz Tonaj",
+          description: "Tonaj 1-1000 ton arası olmalıdır.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     setIsLoading(true);
 
     try {
       const formDataToSend = new FormData();
       formDataToSend.append("fullName", formData.fullName.trim());
       formDataToSend.append("phone", formData.phone.trim());
+      formDataToSend.append("tonnage", formData.tonnage && formData.tonnage.trim() ? 
+        (isNaN(parseFloat(formData.tonnage)) ? "" : parseFloat(formData.tonnage).toString()) : "");
       
       await updateUserProfile(formDataToSend);
       
@@ -102,6 +119,24 @@ export function ProfileForm({ initialData }: ProfileFormProps) {
           onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
           disabled={isLoading}
         />
+      </div>
+      
+      <div className="space-y-2">
+        <Label htmlFor="tonnage">Tonaj (Ton)</Label>
+        <Input
+          id="tonnage"
+          type="number"
+          step="0.1"
+          min="1"
+          max="1000"
+          placeholder="Örn: 1.5"
+          value={formData.tonnage}
+          onChange={(e) => setFormData(prev => ({ ...prev, tonnage: e.target.value }))}
+          disabled={isLoading}
+        />
+        <p className="text-xs text-muted-foreground">
+          Tonaj bilginizi güncelleyebilirsiniz (1-1000 ton arası)
+        </p>
       </div>
       
       <div className="pt-4">

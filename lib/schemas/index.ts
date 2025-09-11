@@ -23,13 +23,13 @@ export const KksStatusSchema = z.enum(['draft', 'submitted', 'sent']);
 export const ProfileSchema = z.object({
   id: IdSchema,
   email: z.string().email(),
-  full_name: z.string().nullable(),
-  phone: z.string().nullable(),
-  avatar_url: z.string().url().nullable(),
-  company_id: IdSchema.nullable(),
-  role: UserRoleSchema,
-  created_at: DateSchema,
-  updated_at: DateSchema,
+  full_name: z.string().nullable().optional(),
+  phone: z.string().nullable().optional(),
+  avatar_url: z.string().nullable().optional(),
+  company_id: IdSchema.nullable().optional(),
+  role: UserRoleSchema.nullable().optional(),
+  created_at: DateSchema.nullable().optional(),
+  updated_at: DateSchema.nullable().optional(),
 });
 
 export const CompanySchema = z.object({
@@ -46,11 +46,11 @@ export const CompanySchema = z.object({
 export const SubstanceSchema = z.object({
   id: IdSchema,
   name: z.string(),
-  description: z.string().nullable(),
-  cas_number: z.string().nullable(),
-  ec_number: z.string().nullable(),
-  created_at: DateSchema,
-  updated_at: DateSchema,
+  description: z.string().nullable().optional(),
+  cas_number: z.string().nullable().optional(),
+  ec_number: z.string().nullable().optional(),
+  created_at: DateSchema.nullable().optional(),
+  updated_at: DateSchema.nullable().optional(),
 });
 
 export const RoomSchema = z.object({
@@ -118,11 +118,11 @@ export const LrVoteSchema = z.object({
   room_id: IdSchema,
   candidate_id: IdSchema,
   voter_id: IdSchema,
-  technical_score: z.number().min(1).max(5).nullable(),
-  experience_score: z.number().min(1).max(5).nullable(),
-  communication_score: z.number().min(1).max(5).nullable(),
-  leadership_score: z.number().min(1).max(5).nullable(),
-  availability_score: z.number().min(1).max(5).nullable(),
+  technical_score: z.number().min(0).max(5).nullable(),
+  experience_score: z.number().min(0).max(5).nullable(),
+  communication_score: z.number().min(0).max(5).nullable(),
+  leadership_score: z.number().min(0).max(5).nullable(),
+  availability_score: z.number().min(0).max(5).nullable(),
   created_at: DateSchema,
   updated_at: DateSchema,
 });
@@ -273,11 +273,11 @@ export const RejectAccessRequestSchema = z.object({
 
 export const SubmitVoteSchema = z.object({
   candidate_id: IdSchema,
-  technical_score: z.number().min(1).max(5),
-  experience_score: z.number().min(1).max(5),
-  communication_score: z.number().min(1).max(5),
-  leadership_score: z.number().min(1).max(5),
-  availability_score: z.number().min(1).max(5),
+  technical_score: z.number().min(0).max(5),
+  experience_score: z.number().min(0).max(5),
+  communication_score: z.number().min(0).max(5),
+  leadership_score: z.number().min(0).max(5),
+  availability_score: z.number().min(0).max(5),
 });
 
 export const CreateAgreementSchema = z.object({
@@ -320,7 +320,7 @@ export const AccessRequestsListResponseSchema = z.object({
 
 export const VotingSummaryResponseSchema = z.object({
   results: z.array(VotingResultSchema),
-  my_vote: LrVoteSchema.nullable(),
+  my_vote: z.array(LrVoteSchema).nullable(),
   is_finalized: z.boolean(),
 });
 

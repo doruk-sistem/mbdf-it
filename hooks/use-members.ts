@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { keys, invalidationHelpers } from '@/lib/query-keys';
-import { get, post, del, API_ENDPOINTS, withQuery } from '@/lib/api';
+import { get, post, put, del, API_ENDPOINTS, withQuery } from '@/lib/api';
 import { 
   MemberWithProfile,
   MembersListResponseSchema 
@@ -43,6 +43,38 @@ export function useMyMembership(roomId: string, userId: string) {
 }
 
 // Mutation hooks
+export function useAddMember() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (data: { roomId: string; userEmail: string; role: 'member' | 'lr' | 'admin' }) => 
+      post(API_ENDPOINTS.members, {
+        roomId: data.roomId,
+        userEmail: data.userEmail,
+        role: data.role,
+      }),
+    onSuccess: (data, variables) => {
+      // Invalidate member-related queries
+      invalidationHelpers.member(variables.roomId).forEach(key => {
+        queryClient.invalidateQueries({ queryKey: key });
+      });
+      
+      toast({
+        title: 'Başarılı',
+        description: 'Üye başarıyla odaya eklendi.',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Hata',
+        description: error?.data?.message || 'Üye eklenirken bir hata oluştu',
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
 export function useJoinRoom() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -116,7 +148,7 @@ export function useUpdateMemberRole() {
       roomId: string; 
       role: 'admin' | 'lr' | 'member' 
     }) => 
-      post(`${API_ENDPOINTS.members}/${data.memberId}/role`, {
+      put(`${API_ENDPOINTS.members}/${data.memberId}/role`, {
         role: data.role,
       }),
     onSuccess: (data, variables) => {
