@@ -27,20 +27,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Check if user has access to this room
-    const { data: membership, error: memberError } = await supabase
-      .from('mbdf_member')
-      .select('role')
-      .eq('room_id', roomId)
-      .eq('user_id', user.id)
-      .single();
-
-    if (memberError) {
-      return NextResponse.json(
-        { error: 'Access denied', success: false },
-        { status: 403 }
-      );
-    }
+    // Allow all authenticated users to view packages
+    // No membership check needed for viewing
 
     // Get packages for this room
     const { data: packages, error } = await supabase

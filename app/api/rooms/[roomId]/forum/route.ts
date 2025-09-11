@@ -22,24 +22,18 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Check if user is member of the room
-    const { data: membership } = await supabase
-      .from("mbdf_member")
-      .select("id")
-      .eq("room_id", params.roomId)
-      .eq("user_id", user.id)
-      .single();
+    // Use admin client to bypass RLS for viewing messages
+    const adminSupabase = createAdminSupabase();
 
-    if (!membership) {
-      return NextResponse.json({ error: "Access denied", code: "ACCESS_DENIED" }, { status: 403 });
-    }
+    // Allow all authenticated users to view forum messages
+    // No membership check needed for viewing
 
     // Get topic from query parameters
     const { searchParams } = new URL(request.url);
     const topic = searchParams.get('topic') || 'Genel';
 
-    // Get forum messages for the room and topic
-    const { data: messages, error } = await supabase
+    // Get forum messages for the room and topic using admin client
+    const { data: messages, error } = await adminSupabase
       .from("message")
       .select(`
         id,
@@ -55,6 +49,19 @@ export async function GET(
       .eq("topic", topic)
       .order("created_at", { ascending: false });
 
+    // Also check ALL messages in this room (for debugging)
+    const { data: allMessages, error: allError } = await adminSupabase
+      .from("message")
+      .select(`
+        id,
+        content,
+        message_type,
+        topic,
+        created_at,
+        sender_id
+      `)
+      .eq("room_id", params.roomId)
+      .eq("message_type", "forum");
     if (error) {
       console.error("Error fetching forum messages:", error);
       return NextResponse.json({ error: "Failed to fetch messages" }, { status: 500 });
@@ -117,7 +124,7 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Check if user is member of the room
+    // Check if user is member of the room for posting messages
     const { data: membership } = await supabase
       .from("mbdf_member")
       .select("id")
@@ -126,7 +133,10 @@ export async function POST(
       .single();
 
     if (!membership) {
-      return NextResponse.json({ error: "Access denied", code: "ACCESS_DENIED" }, { status: 403 });
+      return NextResponse.json({ 
+        error: "Bu odaya üye olmadığınız için mesaj yazamazsınız. Mesaj yazmak için odaya üye olmanız gerekmektedir.", 
+        code: "MEMBERSHIP_REQUIRED" 
+      }, { status: 403 });
     }
 
     const body = await request.json();

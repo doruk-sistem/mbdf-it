@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Send, MessageCircle, User, Plus, Search, X, Trash2, AlertTriangle } from "lucide-react";
+import { useMembers } from "@/hooks/use-members";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -50,6 +51,9 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Get members data to check if current user is a member
+  const { data: membersData } = useMembers(roomId);
+
   // Get current user ID
   useEffect(() => {
     const getUser = async () => {
@@ -66,10 +70,16 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
     getUser();
   }, []);
 
+  // Check if current user is a member
+  const isMember = currentUserId && membersData?.items?.some(member => 
+    member.id === currentUserId || 
+    member.user_id === currentUserId ||
+    member.profiles?.id === currentUserId
+  );
   // Fetch forum topics
-  const { data: topics } = useQuery({
+  const { data: topics } = useQuery<string[]>({
     queryKey: ["forum-topics", roomId],
-    queryFn: async () => {
+    queryFn: async (): Promise<string[]> => {
       const response = await fetch(`/api/rooms/${roomId}/forum/topics`);
       if (!response.ok) {
         if (response.status === 403) {
@@ -77,8 +87,8 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
         }
         throw new Error("Failed to fetch forum topics");
       }
-      const data = await response.json();
-      return data.topics as string[];
+      const data = await response.json() as { topics: string[] };
+      return data.topics;
     },
     retry: (failureCount, error) => {
       if (error.message === "ACCESS_DENIED") {
@@ -89,33 +99,22 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
   });
 
   // Fetch forum messages
-  const { data: messages, isLoading, error } = useQuery({
+  const { data: messages, isLoading, error } = useQuery<ForumMessage[]>({
     queryKey: ["forum-messages", roomId, selectedTopic],
-    queryFn: async () => {
+    queryFn: async (): Promise<ForumMessage[]> => {
       const response = await fetch(`/api/rooms/${roomId}/forum?topic=${encodeURIComponent(selectedTopic)}`);
       if (!response.ok) {
-        if (response.status === 403) {
-          throw new Error("ACCESS_DENIED");
-        }
         throw new Error("Failed to fetch forum messages");
       }
-      const data = await response.json();
+      const data = await response.json() as { messages: ForumMessage[] };
       // Sort messages by created_at (oldest first, newest last)
-      const sortedMessages = (data.messages as ForumMessage[]).sort((a, b) => 
+      const sortedMessages = data.messages.sort((a, b) => 
         new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
       );
       return sortedMessages;
     },
-    refetchInterval: (query) => {
-      // Only refetch if we have data (user has access)
-      // Don't refetch if there's an error (access denied)
-      return query.state.data ? 5000 : false;
-    },
+    refetchInterval: 5000, // Refetch every 5 seconds
     retry: (failureCount, error) => {
-      // Don't retry if access is denied
-      if (error.message === "ACCESS_DENIED") {
-        return false;
-      }
       return failureCount < 3;
     },
   });
@@ -132,6 +131,10 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
       });
 
       if (!response.ok) {
+        const errorData = await response.json();
+        if (response.status === 403 && errorData.code === "MEMBERSHIP_REQUIRED") {
+          throw new Error("MEMBERSHIP_REQUIRED");
+        }
         throw new Error("Failed to send message");
       }
 
@@ -147,11 +150,19 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
       });
     },
     onError: (error) => {
-      toast({
-        title: "Hata",
-        description: "Mesaj gönderilirken bir hata oluştu.",
-        variant: "destructive",
-      });
+      if (error.message === "MEMBERSHIP_REQUIRED") {
+        toast({
+          title: "Üyelik Gerekli",
+          description: "Bu odaya üye olmadığınız için mesaj yazamazsınız. Mesaj yazmak için odaya üye olmanız gerekmektedir.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Hata",
+          description: "Mesaj gönderilirken bir hata oluştu.",
+          variant: "destructive",
+        });
+      }
     },
   });
 
@@ -262,12 +273,12 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
   };
 
   // Filter topics based on search term
-  const filteredTopics = topics?.filter(topic =>
+  const filteredTopics = (topics || []).filter(topic =>
     topic.toLowerCase().includes(topicSearchTerm.toLowerCase())
-  ) || [];
+  );
 
   // Show topics based on search state
-  const displayTopics = topicSearchTerm ? filteredTopics : topics || [];
+  const displayTopics = topicSearchTerm ? filteredTopics : (topics || []);
 
   // Auto-select first matching topic when searching
   useEffect(() => {
@@ -395,14 +406,16 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
                 </SelectContent>
               </Select>
               
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowNewTopicInput(!showNewTopicInput)}
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                Yeni Konu
-              </Button>
+              {isMember && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowNewTopicInput(!showNewTopicInput)}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Yeni Konu
+                </Button>
+              )}
             </div>
             
             {/* Search Results Info */}
@@ -417,7 +430,7 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
           </div>
 
           {/* New Topic Input */}
-          {showNewTopicInput && (
+          {showNewTopicInput && isMember && (
             <div className="flex gap-2 items-center">
               <Input
                 placeholder="Yeni konu adı..."
@@ -511,18 +524,29 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
               <div className="text-sm text-muted-foreground">
                 "{selectedTopic}" konusuna mesaj yazıyorsunuz
               </div>
+              
+              {/* Membership warning */}
+              {isMember === false && (
+                <div className="rounded-lg border bg-yellow-50 p-3 dark:bg-yellow-950">
+                  <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                    <strong>Not:</strong> Bu odaya üye olmadığınız için mesaj yazamazsınız. 
+                    Mesaj yazmak için odaya üye olmanız gerekmektedir.
+                  </p>
+                </div>
+              )}
+              
               <div className="flex gap-2">
                 <Textarea
-                  placeholder="Forum mesajınızı yazın..."
+                  placeholder={isMember === false ? "Üye olmadığınız için mesaj yazamazsınız..." : "Forum mesajınızı yazın..."}
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
                   onKeyPress={handleKeyPress}
                   className="min-h-[80px] resize-none"
-                  disabled={sendMessageMutation.isPending}
+                  disabled={sendMessageMutation.isPending || isMember === false}
                 />
                 <Button
                   onClick={handleSendMessage}
-                  disabled={!newMessage.trim() || sendMessageMutation.isPending}
+                  disabled={!newMessage.trim() || sendMessageMutation.isPending || isMember === false}
                   size="icon"
                   className="self-end"
                 >
