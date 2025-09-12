@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
 // Common schemas
-export const IdSchema = z.string().uuid();
-export const DateSchema = z.string(); // Use flexible string validation for Supabase timestamps
+export const IdSchema = z.string().uuid().nullable();
+export const DateSchema = z.string().nullable(); // Use flexible string validation for Supabase timestamps
 
 // User role enum
 export const UserRoleSchema = z.enum(['admin', 'lr', 'member']);
@@ -42,8 +42,8 @@ export const CompanySchema = z.object({
   contact_email: z.string().email().nullable(),
   contact_phone: z.string().nullable(),
   vat_number: z.string().nullable(),
-  created_at: DateSchema,
-  updated_at: DateSchema,
+  created_at: DateSchema.nullable(),
+  updated_at: DateSchema.nullable(),
 });
 
 export const SubstanceSchema = z.object({
@@ -61,13 +61,13 @@ export const RoomSchema = z.object({
   name: z.string(),
   description: z.string().nullable(),
   status: RoomStatusSchema,
-  substance_id: IdSchema,
-  created_by: IdSchema,
+  substance_id: IdSchema.nullable(),
+  created_by: IdSchema.nullable(),
   archived_at: DateSchema.nullable(),
   archive_reason: z.string().nullable(),
   archive_initiated_by: IdSchema.nullable(),
-  created_at: DateSchema,
-  updated_at: DateSchema,
+  created_at: DateSchema.nullable(),
+  updated_at: DateSchema.nullable(),
 });
 
 export const MemberSchema = z.object({

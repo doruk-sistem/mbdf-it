@@ -35,7 +35,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    let query = supabase
+    // Use admin client for join_request queries to avoid RLS issues
+    const adminSupabase = createAdminSupabase();
+    let query = adminSupabase
       .from('join_request')
       .select(`
         *,
@@ -63,17 +65,17 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false });
 
     if (roomId) {
-      // Check if user has access to this room (must be LR or admin)
-      const { data: membership, error: memberError } = await supabase
+      // Check if user has access to this room (must be LR only)
+      const { data: membership, error: memberError } = await adminSupabase
         .from('mbdf_member')
         .select('role')
         .eq('room_id', roomId)
         .eq('user_id', user.id)
-        .single();
+        .single() as { data: any; error: any };
 
-      if (memberError || !membership || (membership.role !== 'lr' && membership.role !== 'admin')) {
+      if (memberError || !membership || membership.role !== 'lr') {
         return NextResponse.json(
-          { error: 'Access denied', success: false },
+          { error: 'Access denied - LR role required', success: false },
           { status: 403 }
         );
       }

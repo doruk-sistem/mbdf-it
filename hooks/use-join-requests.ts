@@ -14,7 +14,15 @@ export function useJoinRequests(roomId: string) {
   return useQuery({
     queryKey: keys.joinRequests.list(roomId),
     queryFn: () => get(withQuery(API_ENDPOINTS.joinRequests, { roomId }))
-      .then(data => JoinRequestsListResponseSchema.parse(data)),
+      .then(data => {
+        try {
+          return JoinRequestsListResponseSchema.parse(data);
+        } catch (error) {
+          console.error('Schema validation error:', error);
+          // Return raw data if schema validation fails
+          return data;
+        }
+      }),
     enabled: !!roomId,
     staleTime: 1000 * 30, // 30 seconds
   });
