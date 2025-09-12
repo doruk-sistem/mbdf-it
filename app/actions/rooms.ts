@@ -547,7 +547,7 @@ export async function getRoomMembers(roomId: string) {
     const membership = await checkMembership(roomId, user.id);
 
     // Allow non-members to view members, but with limited role
-    const currentUserRole = membership?.role || 'member' as Database['public']['Enums']['user_role'];
+    const currentUserRole = membership?.role || null;
 
     // Get all members with profile and company data using admin client
     const { data: members, error } = await adminSupabase

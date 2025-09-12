@@ -17,6 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
 import { useCreateJoinRequest } from "@/hooks/use-join-requests";
+import { useRoomMemberRole } from "@/hooks/use-user";
 
 interface JoinRequestButtonProps {
   roomId: string;
@@ -24,12 +25,19 @@ interface JoinRequestButtonProps {
   isArchived?: boolean;
 }
 
-export function JoinRequestButton({ roomId, roomName, isArchived = false }: JoinRequestButtonProps) {
+export function JoinRequestButton({
+  roomId,
+  roomName,
+  isArchived = false,
+}: JoinRequestButtonProps) {
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [acceptTerms, setAcceptTerms] = useState(false);
   const { toast } = useToast();
   const createJoinRequestMutation = useCreateJoinRequest();
+  // Check if current user is a member of this room
+  const userRole = useRoomMemberRole(roomId);
+  const isMember = userRole !== null;
 
   const handleSubmit = async () => {
     if (!acceptTerms) {
@@ -57,11 +65,16 @@ export function JoinRequestButton({ roomId, roomName, isArchived = false }: Join
     );
   };
 
+  // Don't show button if user is already a member
+  if (isMember) {
+    return null;
+  }
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button 
-          variant="outline" 
+        <Button
+          variant="outline"
           size="sm"
           disabled={isArchived}
           className="gap-2"
@@ -77,10 +90,11 @@ export function JoinRequestButton({ roomId, roomName, isArchived = false }: Join
             Katılım Talebi
           </DialogTitle>
           <DialogDescription>
-            <strong>{roomName}</strong> odasına katılım talebi göndermek istediğinizi onaylıyor musunuz?
+            <strong>{roomName}</strong> odasına katılım talebi göndermek
+            istediğinizi onaylıyor musunuz?
           </DialogDescription>
         </DialogHeader>
-        
+
         <div className="space-y-4">
           <div>
             <Label htmlFor="message">Mesaj (İsteğe bağlı)</Label>
@@ -93,7 +107,7 @@ export function JoinRequestButton({ roomId, roomName, isArchived = false }: Join
               rows={3}
             />
           </div>
-          
+
           <div className="flex items-center space-x-2">
             <Switch
               id="terms"
@@ -104,7 +118,7 @@ export function JoinRequestButton({ roomId, roomName, isArchived = false }: Join
               MBDF oda kurallarını ve şartlarını kabul ediyorum
             </Label>
           </div>
-          
+
           <div className="flex space-x-2 pt-4">
             <Button
               variant="outline"
