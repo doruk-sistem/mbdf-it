@@ -194,7 +194,7 @@ export async function POST(request: NextRequest) {
     const { data: candidate, error: candidateError } = await adminSupabase
       .from('lr_candidate')
       .select('room_id, created_at')
-      .eq('id', validatedData.candidate_id)
+      .eq('id', validatedData.candidate_id!)
       .single() as { data: { room_id: string; created_at: string } | null; error: any };
 
     if (candidateError || !candidate) {
@@ -282,7 +282,7 @@ export async function POST(request: NextRequest) {
       .upsert([
         {
           room_id: candidate.room_id,
-          candidate_id: validatedData.candidate_id,
+          candidate_id: validatedData.candidate_id!,
           voter_id: user.id,
           technical_score: validatedData.technical_score,
           experience_score: validatedData.experience_score,

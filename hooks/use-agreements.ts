@@ -48,7 +48,7 @@ export function useCreateAgreement() {
     mutationFn: (data: CreateAgreementInput) => post(API_ENDPOINTS.agreements, data),
     onSuccess: (data, variables) => {
       // Invalidate agreements lists
-      invalidationHelpers.agreement(data.id, variables.room_id).forEach(key => {
+      invalidationHelpers.agreement(data.id!, variables.room_id!).forEach(key => {
         queryClient.invalidateQueries({ queryKey: key });
       });
       

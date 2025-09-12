@@ -2,45 +2,26 @@
 
 import { useState } from "react";
 import { Check, X, Clock, UserPlus, Building2, Calendar, MessageSquare } from "lucide-react";
-// import { format } from "date-fns";
-// import { tr } from "date-fns/locale";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { 
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger 
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Separator } from "@/components/ui/separator";
-import { 
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { 
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { MoreHorizontal } from "lucide-react";
-
+import { Separator } from "@/components/ui/separator";  
 import { useJoinRequests, useUpdateJoinRequest } from "@/hooks/use-join-requests";
 import { useMembers } from "@/hooks/use-members";
-import type { Database } from "@/types/supabase";
+
 
 interface JoinRequestsTabProps {
   roomId: string;

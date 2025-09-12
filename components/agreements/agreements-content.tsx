@@ -156,7 +156,8 @@ export function AgreementsContent() {
 
     const partyIds = agreement.agreement_party
       .filter(p => p.signature_status === 'pending')
-      .map(p => p.id);
+      .map(p => p.id)
+      .filter((id): id is string => id !== null);
 
     requestSignatureMutation.mutate({ agreementId, partyIds });
   };
@@ -314,7 +315,7 @@ export function AgreementsContent() {
                         </SelectTrigger>
                         <SelectContent>
                           {rooms.map((room) => (
-                            <SelectItem key={room.id} value={room.id}>
+                            <SelectItem key={room.id} value={room.id || ''}>
                               {room.name} - {room.substance?.name}
                             </SelectItem>
                           ))}
@@ -379,7 +380,7 @@ export function AgreementsContent() {
               
               {!isLoading && filteredAgreements.map((agreement, index) => (
                 <motion.div
-                  key={agreement.id}
+                  key={agreement.id || index}
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.2, delay: index * 0.1 }}
@@ -403,7 +404,7 @@ export function AgreementsContent() {
                             <span>•</span>
                             <span>Oluşturan: {agreement.created_by_profile?.full_name || "Bilinmiyor"}</span>
                             <span>•</span>
-                            <span>Tarih: {new Date(agreement.created_at).toLocaleDateString('tr-TR')}</span>
+                            <span>Tarih: {new Date(agreement.created_at || '').toLocaleDateString('tr-TR')}</span>
                           </div>
                           <div className="flex items-center space-x-4">
                             <div className="flex items-center space-x-2">
@@ -436,7 +437,7 @@ export function AgreementsContent() {
                         </div>
                         <div className="flex items-center space-x-2">
                           <Button variant="outline" size="sm" asChild>
-                            <Link href={`/agreements/${agreement.id}`}>
+                            <Link href={`/agreements/${agreement.id || ''}`}>
                               <Eye className="mr-2 h-4 w-4" />
                               Görüntüle
                             </Link>
@@ -461,14 +462,14 @@ export function AgreementsContent() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem 
-                                onClick={() => handleRequestPenTool(agreement.id)}
+                                onClick={() => handleRequestPenTool(agreement.id!)}
                                 disabled={requestSignatureMutation.isPending}
                               >
                                 <PenTool className="mr-2 h-4 w-4" />
                                 İmza Talep Et
                               </DropdownMenuItem>
                               <DropdownMenuItem 
-                                onClick={() => handleSendKEP(agreement.id)}
+                                onClick={() => handleSendKEP(agreement.id!)}
                                 disabled={sendKepMutation.isPending}
                               >
                                 <Send className="mr-2 h-4 w-4" />

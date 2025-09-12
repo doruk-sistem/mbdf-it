@@ -135,7 +135,7 @@ export function CreateRoomForm({ preselectedSubstanceId }: CreateRoomFormProps) 
                     </div>
                   ) : filteredSubstances.length > 0 ? (
                     filteredSubstances.map((substance) => (
-                      <SelectItem key={substance.id} value={substance.id}>
+                      <SelectItem key={substance.id} value={substance.id || ''}>
                         <div className="flex flex-col">
                           <span className="font-medium">{substance.name}</span>
                           <div className="text-xs text-muted-foreground space-y-0.5">

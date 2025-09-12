@@ -373,7 +373,7 @@ export function MembersTab({ roomId, isArchived = false }: MembersTabProps) {
                   </TableCell>
                   <TableCell>
                     <span className="text-sm text-muted-foreground">
-                      {new Date(member.joined_at).toLocaleDateString("tr-TR")}
+                      {new Date(member.joined_at || '').toLocaleDateString("tr-TR")}
                     </span>
                   </TableCell>
                   <TableCell>
@@ -396,7 +396,7 @@ export function MembersTab({ roomId, isArchived = false }: MembersTabProps) {
                             {currentUserRole === "admin" && (
                               <DropdownMenuItem
                                 onClick={() =>
-                                  handleUpdateRole(member.id, "member")
+                                  handleUpdateRole(member.id!, "member")
                                 }
                                 disabled={
                                   isArchived || updateRoleMutation.isPending
@@ -408,7 +408,7 @@ export function MembersTab({ roomId, isArchived = false }: MembersTabProps) {
                             {currentUserRole === "admin" && (
                               <DropdownMenuItem
                                 onClick={() =>
-                                  handleUpdateRole(member.id, "lr")
+                                  handleUpdateRole(member.id!, "lr")
                                 }
                                 disabled={
                                   isArchived || updateRoleMutation.isPending
@@ -420,7 +420,7 @@ export function MembersTab({ roomId, isArchived = false }: MembersTabProps) {
                             {currentUserRole === "admin" && (
                               <DropdownMenuItem
                                 onClick={() =>
-                                  handleUpdateRole(member.id, "admin")
+                                  handleUpdateRole(member.id!, "admin")
                                 }
                                 disabled={
                                   isArchived || updateRoleMutation.isPending
@@ -432,7 +432,7 @@ export function MembersTab({ roomId, isArchived = false }: MembersTabProps) {
                             {currentUserRole === "lr" && member.role !== "member" && (
                               <DropdownMenuItem
                                 onClick={() =>
-                                  handleUpdateRole(member.id, "member")
+                                  handleUpdateRole(member.id!, "member")
                                 }
                                 disabled={
                                   isArchived || updateRoleMutation.isPending
@@ -444,7 +444,7 @@ export function MembersTab({ roomId, isArchived = false }: MembersTabProps) {
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               className="text-destructive"
-                              onClick={() => handleRemoveMember(member.id)}
+                              onClick={() => handleRemoveMember(member.id!)}
                               disabled={
                                 isArchived || leaveRoomMutation.isPending
                               }
