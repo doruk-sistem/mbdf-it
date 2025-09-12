@@ -25,6 +25,7 @@ import { VotingTab } from "./tabs/voting-tab";
 import { ForumTab } from "./tabs/forum-tab";
 import { ArchiveDialog } from "./archive-dialog";
 import { ArchivedBanner } from "./archived-banner";
+import { JoinRequestButton } from "./join-request-button";
 import { isRoomArchived, getRoomStatusText, getRoomStatusVariant } from "@/lib/archive-utils";
 import { useCanArchiveRoom, useIsRoomAdmin } from "@/hooks/use-user";
 
@@ -127,6 +128,11 @@ export function RoomContent({ roomId }: RoomContentProps) {
         </div>
         
         <div className="flex items-center space-x-2">
+          <JoinRequestButton 
+            roomId={roomId} 
+            roomName={room.name}
+            isArchived={isRoomArchived(room)}
+          />
           <Button variant="outline">
             <Settings className="mr-2 h-4 w-4" />
             Ayarlar
