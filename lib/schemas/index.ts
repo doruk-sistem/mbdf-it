@@ -13,6 +13,9 @@ export const RoomStatusSchema = z.enum(['active', 'closed', 'archived']);
 // Request status enum
 export const RequestStatusSchema = z.enum(['pending', 'approved', 'rejected', 'revoked']);
 
+// Join request status enum
+export const JoinRequestStatusSchema = z.enum(['pending', 'approved', 'rejected', 'cancelled']);
+
 // Signature status enum
 export const SignatureStatusSchema = z.enum(['pending', 'signed', 'rejected']);
 
@@ -192,6 +195,20 @@ export const MessageSchema = z.object({
   updated_at: DateSchema,
 });
 
+export const JoinRequestSchema = z.object({
+  request_id: IdSchema,
+  mbdf_room_id: IdSchema.nullable(),
+  company_id: IdSchema.nullable(),
+  requested_by: IdSchema.nullable(),
+  message: z.string().nullable(),
+  accept_terms: z.boolean().nullable(),
+  status: JoinRequestStatusSchema.nullable(),
+  decision_by: IdSchema.nullable(),
+  decision_note: z.string().nullable(),
+  created_at: DateSchema.nullable(),
+  decided_at: DateSchema.nullable(),
+});
+
 // Extended schemas with joins - Base room schema must be defined first
 export const RoomWithDetailsSchema = RoomSchema.extend({
   substance: SubstanceSchema.nullable(),
@@ -216,6 +233,14 @@ export const AccessRequestWithDetailsSchema = AccessRequestSchema.extend({
 export const DocumentWithUploaderSchema = DocumentSchema.extend({
   profiles: ProfileSchema,
   download_url: z.string().url().nullable().optional(),
+});
+
+export const JoinRequestWithDetailsSchema = JoinRequestSchema.extend({
+  profiles: ProfileSchema.extend({
+    company: CompanySchema.nullable(),
+  }).nullable(),
+  decision_by_profile: ProfileSchema.nullable(),
+  mbdf_room: RoomSchema.nullable(),
 });
 
 // Now we can reference RoomWithDetailsSchema safely
@@ -296,6 +321,17 @@ export const CreateKksSubmissionSchema = z.object({
   submission_data: z.any(),
 });
 
+export const CreateJoinRequestSchema = z.object({
+  roomId: IdSchema,
+  message: z.string().optional(),
+  acceptTerms: z.boolean().default(false),
+});
+
+export const UpdateJoinRequestSchema = z.object({
+  status: JoinRequestStatusSchema,
+  decisionNote: z.string().optional(),
+});
+
 // API response schemas
 export const RoomsListResponseSchema = z.object({
   items: z.array(RoomWithDetailsSchema),
@@ -339,6 +375,11 @@ export const SubstancesListResponseSchema = z.object({
   total: z.number(),
 });
 
+export const JoinRequestsListResponseSchema = z.object({
+  requests: z.array(JoinRequestWithDetailsSchema),
+  success: z.boolean(),
+});
+
 export const MessageResponseSchema = z.object({
   message: z.string(),
   success: z.boolean(),
@@ -377,3 +418,9 @@ export type RejectAccessRequestInput = z.infer<typeof RejectAccessRequestSchema>
 export type SubmitVoteInput = z.infer<typeof SubmitVoteSchema>;
 export type CreateAgreementInput = z.infer<typeof CreateAgreementSchema>;
 export type CreateKksSubmissionInput = z.infer<typeof CreateKksSubmissionSchema>;
+export type CreateJoinRequestInput = z.infer<typeof CreateJoinRequestSchema>;
+export type UpdateJoinRequestInput = z.infer<typeof UpdateJoinRequestSchema>;
+
+export type JoinRequest = z.infer<typeof JoinRequestSchema>;
+export type JoinRequestWithDetails = z.infer<typeof JoinRequestWithDetailsSchema>;
+export type JoinRequestStatus = z.infer<typeof JoinRequestStatusSchema>;

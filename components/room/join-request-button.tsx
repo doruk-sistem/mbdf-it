@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
+import { useCreateJoinRequest } from "@/hooks/use-join-requests";
 
 interface JoinRequestButtonProps {
   roomId: string;
@@ -27,8 +28,8 @@ export function JoinRequestButton({ roomId, roomName, isArchived = false }: Join
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [acceptTerms, setAcceptTerms] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  const createJoinRequestMutation = useCreateJoinRequest();
 
   const handleSubmit = async () => {
     if (!acceptTerms) {
@@ -40,20 +41,20 @@ export function JoinRequestButton({ roomId, roomName, isArchived = false }: Join
       return;
     }
 
-    setIsSubmitting(true);
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    setIsSubmitting(false);
-    setOpen(false);
-    setMessage("");
-    setAcceptTerms(false);
-    
-    toast({
-      title: "Başarılı",
-      description: `${roomName} odasına katılım talebiniz gönderildi!`,
-    });
+    createJoinRequestMutation.mutate(
+      {
+        roomId,
+        message: message.trim() || undefined,
+        acceptTerms,
+      },
+      {
+        onSuccess: () => {
+          setOpen(false);
+          setMessage("");
+          setAcceptTerms(false);
+        },
+      }
+    );
   };
 
   return (
@@ -108,17 +109,17 @@ export function JoinRequestButton({ roomId, roomName, isArchived = false }: Join
             <Button
               variant="outline"
               onClick={() => setOpen(false)}
-              disabled={isSubmitting}
+              disabled={createJoinRequestMutation.isPending}
               className="flex-1"
             >
               İptal
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={isSubmitting || !acceptTerms}
+              disabled={createJoinRequestMutation.isPending || !acceptTerms}
               className="flex-1 gap-2"
             >
-              {isSubmitting ? (
+              {createJoinRequestMutation.isPending ? (
                 <>
                   <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
                   Gönderiliyor...

@@ -122,9 +122,13 @@ export const keys = {
     byUserId: (userId: string) => ['notifications', 'byUserId', userId] as const,
   },
 
-  // Join Requests (company-based)
-  join: {
-    list: (roomId: string) => ['join','list',roomId] as const,
+  // Join Requests
+  joinRequests: {
+    all: ['joinRequests'] as const,
+    list: (roomId: string) => ['joinRequests', 'list', roomId] as const,
+    byId: (id: string) => ['joinRequests', 'byId', id] as const,
+    byUserId: (userId: string) => ['joinRequests', 'byUserId', userId] as const,
+    pending: (roomId: string) => ['joinRequests', 'pending', roomId] as const,
   },
 } as const;
 

@@ -316,4 +316,8 @@ export const API_ENDPOINTS = {
   archiveCheck: (roomId: string) => `/api/rooms/${roomId}/archive/check`,
   archiveConfirm: (roomId: string) => `/api/rooms/${roomId}/archive/confirm`,
   unarchiveRoom: (roomId: string) => `/api/rooms/${roomId}/archive/unarchive`,
+
+  // Join Requests
+  joinRequests: '/api/join-requests',
+  joinRequest: (id: string) => `/api/join-requests/${id}`,
 } as const;
