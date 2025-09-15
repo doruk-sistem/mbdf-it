@@ -53,8 +53,14 @@ export function JoinRequestsTab({ roomId, isArchived = false }: JoinRequestsTabP
     request.profiles?.company?.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Check if current user can manage join requests (only lr)
-  const canManageRequests = currentUserRole === 'lr';
+  // Check if current user can manage join requests based on leadership status
+  const members = membersData?.items || [];
+  const hasLeader = members.some((member: any) => member.role === 'lr');
+  
+  // User can manage join requests if:
+  // 1. They are a member of the room AND
+  // 2. Either there's no leader (all members can manage) OR they are the leader
+  const canManageRequests = currentUserRole && (!hasLeader || currentUserRole === 'lr');
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -152,7 +158,7 @@ export function JoinRequestsTab({ roomId, isArchived = false }: JoinRequestsTabP
       {!canManageRequests ? (
         <div className="text-center py-8">
           <p className="text-sm text-muted-foreground">
-            Katılım taleplerini görüntülemek için LR (Lider) yetkisine sahip olmanız gerekiyor.
+            Katılım taleplerini görüntülemek için oda üyesi olmanız gerekiyor. Eğer odada bir lider varsa, sadece lider katılım taleplerini yönetebilir.
           </p>
         </div>
       ) : filteredRequests.length === 0 ? (
