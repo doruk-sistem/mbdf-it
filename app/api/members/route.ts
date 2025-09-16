@@ -114,21 +114,36 @@ export async function POST(request: NextRequest) {
       .eq("user_id", user.id)
       .single();
 
-    if (memberError || !member || (member.role !== "admin" && member.role !== "lr")) {
-      return NextResponse.json({ 
-        error: 'Insufficient permissions to add members' 
-      }, { status: 403 });
+
+    // Special case: If user is trying to join a room themselves (self-join)
+    const isSelfJoin = user.email === userEmail;
+    
+    if (isSelfJoin) {
+      // Allow self-join if user is not already a member
+      if (member) {
+        return NextResponse.json({ 
+          error: 'You are already a member of this room' 
+        }, { status: 400 });
+      }
+    } else {
+      // For adding other users, require admin or LR permissions
+      if (memberError || !member || (member.role !== "admin" && member.role !== "lr")) {
+        return NextResponse.json({ 
+          error: 'Insufficient permissions to add members' 
+        }, { status: 403 });
+      }
     }
 
-    // LR can only add members with "member" role
-    if (member.role === "lr" && role !== "member") {
+    // LR can only add members with "member" role (but not for self-join)
+    if (!isSelfJoin && member && member.role === "lr" && role !== "member") {
       return NextResponse.json({ 
         error: 'LR can only add members with "member" role' 
       }, { status: 403 });
     }
 
-    // Check if room is archived
-    const { data: room, error: roomError } = await supabase
+    // Check if room is archived - use admin client to bypass RLS
+    const adminSupabase = createAdminSupabase();
+    const { data: room, error: roomError } = await adminSupabase
       .from("mbdf_room")
       .select("status, name, description")
       .eq("id", roomId)
@@ -138,14 +153,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Room not found' }, { status: 404 });
     }
 
-    if (room.status === 'archived') {
+    if ((room as any).status === 'archived') {
       return NextResponse.json({ 
         error: 'Room is archived. Membership changes are disabled' 
       }, { status: 400 });
     }
 
-    // Use admin client to bypass RLS for profile lookup
-    const adminSupabase = createAdminSupabase();
+    // Use admin client to bypass RLS for profile lookup (already defined above)
     
     // Find user by email
     const { data: targetProfile, error: profileError } = await adminSupabase

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, User, Building, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
 import { completeOnboarding } from "@/app/actions/auth";
+import { SubstanceSelectionCard } from "./substance-selection-card";
 
 interface OnboardingCardProps {
   userEmail: string;
@@ -37,6 +38,7 @@ const countries = [
 
 export function OnboardingCard({ userEmail }: OnboardingCardProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const [currentStep, setCurrentStep] = useState<'profile' | 'substance'>('profile');
   const [formData, setFormData] = useState({
     fullName: "",
     companyName: "",
@@ -49,6 +51,42 @@ export function OnboardingCard({ userEmail }: OnboardingCardProps) {
   
   const { toast } = useToast();
   const router = useRouter();
+
+  // Load existing profile data
+  useEffect(() => {
+    const loadProfileData = async () => {
+      try {
+        const response = await fetch('/api/profile');
+        if (response.ok) {
+          const data = await response.json();          
+          if (data.profile) {
+            const profile = data.profile;
+            // Check if profile is already completed
+            if (profile.full_name && profile.company?.name) {
+              // Profile is complete, skip to substance selection
+              setCurrentStep('substance');
+              return;
+            }
+            
+            // Profile is incomplete, load existing data
+            setFormData({
+              fullName: profile.full_name || "",
+              companyName: profile.company?.name || "",
+              country: "", // Country is not stored in company table
+              vatNumber: profile.company?.vat_number || "",
+              address: profile.company?.address || "",
+              contactPhone: profile.company?.contact_phone || "",
+              tonnage: profile.tonnage?.toString() || "",
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error loading profile data:', error);
+      }
+    };
+
+    loadProfileData();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,10 +129,10 @@ export function OnboardingCard({ userEmail }: OnboardingCardProps) {
 
       if (result.success) {
         toast({
-          title: "Hoş Geldiniz!",
+          title: "Profil Tamamlandı!",
           description: "Profil bilgileriniz başarıyla kaydedildi.",
         });
-        router.push("/");
+        setCurrentStep('substance');
       } else {
         toast({
           title: "Hata",
@@ -112,6 +150,16 @@ export function OnboardingCard({ userEmail }: OnboardingCardProps) {
       setIsLoading(false);
     }
   };
+
+  const handleSubstanceComplete = () => {
+    // Redirect to dashboard after substance selection is completed
+    router.push("/");
+  };
+
+  // Show substance selection step
+  if (currentStep === 'substance') {
+    return <SubstanceSelectionCard userEmail={userEmail} onComplete={handleSubstanceComplete} />;
+  }
 
   return (
     <Card>

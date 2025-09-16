@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Building2, Users, FileText, Clock, ArrowRight, Plus } from "lucide-react";
+import { Building2, Users, FileText, Clock, ArrowRight, Plus, FlaskConical } from "lucide-react";
 import { useRooms } from "@/hooks/use-rooms";
 import { DashboardSkeleton } from "./dashboard-skeleton";
 
@@ -293,17 +293,28 @@ export function DashboardContent() {
               </div>
             ) : (
               <div className="text-center py-12">
-                <Building2 className="mx-auto h-12 w-12 text-muted-foreground" />
-                <h3 className="mt-4 text-lg font-semibold">Henüz oda yok</h3>
+                <FlaskConical className="mx-auto h-12 w-12 text-muted-foreground" />
+                <h3 className="mt-4 text-lg font-semibold">Madde Seçimi Gerekli</h3>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  İlk MBDF odanızı oluşturarak başlayın veya var olan bir odaya katılın.
+                  MBDF süreçlerine başlamak için önce hangi madde ile ilgilendiğinizi seçmeniz gerekiyor.
                 </p>
-                <Button asChild className="mt-4">
-                  <Link href="/create-room">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Oda Oluştur
-                  </Link>
-                </Button>
+                <div className="mt-6 space-y-3">
+                  <Button asChild className="w-full sm:w-auto">
+                    <Link href="/onboarding">
+                      <FlaskConical className="mr-2 h-4 w-4" />
+                      Madde Seçimi Yap
+                    </Link>
+                  </Button>
+                  <div className="text-xs text-muted-foreground">
+                    veya
+                  </div>
+                  <Button variant="outline" asChild className="w-full sm:w-auto">
+                    <Link href="/create-room">
+                      <Plus className="mr-2 h-4 w-4" />
+                      Doğrudan Oda Oluştur
+                    </Link>
+                  </Button>
+                </div>
               </div>
             )}
           </CardContent>
