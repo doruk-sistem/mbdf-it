@@ -20,7 +20,18 @@ export default async function OnboardingPage() {
     .single();
 
   if (profile?.full_name && profile?.company_id) {
-    redirect("/");
+    // Check if user has joined any rooms
+    const { data: userRooms } = await supabase
+      .from("mbdf_member")
+      .select("room_id")
+      .eq("user_id", authUser.id)
+      .limit(1);
+
+    // If user has completed onboarding and joined at least one room, redirect to dashboard
+    if (userRooms && userRooms.length > 0) {
+      redirect("/");
+    }
+    // If user completed onboarding but hasn't joined any rooms, stay on onboarding for substance selection
   }
 
   return (

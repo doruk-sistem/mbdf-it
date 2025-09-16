@@ -2,7 +2,11 @@ import { redirect } from "next/navigation";
 import { createServerSupabase } from "@/lib/supabase";
 import { CreateRoomForm } from "@/components/rooms/create-room-form";
 
-export default async function CreateRoomPage() {
+interface CreateRoomPageProps {
+  searchParams: { substance_id?: string };
+}
+
+export default async function CreateRoomPage({ searchParams }: CreateRoomPageProps) {
   const supabase = createServerSupabase();
   
   // Check if user is authenticated
@@ -36,7 +40,7 @@ export default async function CreateRoomPage() {
             </p>
           </div>
           
-          <CreateRoomForm />
+          <CreateRoomForm preselectedSubstanceId={searchParams.substance_id} />
         </div>
       </div>
     </div>

@@ -136,7 +136,8 @@ export function AgreementDetailContent({ agreementId }: AgreementDetailContentPr
   const handleRequestSignature = () => {
     const partyIds = agreement.agreement_party
       ?.filter(p => p.signature_status === 'pending')
-      .map(p => p.id) || [];
+      .map(p => p.id)
+      .filter((id): id is string => id !== null) || [];
 
     requestSignatureMutation.mutate({ agreementId, partyIds });
   };
@@ -200,7 +201,7 @@ export function AgreementDetailContent({ agreementId }: AgreementDetailContentPr
                   </div>
                   <div className="flex items-center space-x-1">
                     <Calendar className="h-4 w-4" />
-                    <span>{new Date(agreement.created_at).toLocaleDateString('tr-TR')}</span>
+                    <span>{new Date(agreement.created_at || '').toLocaleDateString('tr-TR')}</span>
                   </div>
                   <Badge variant="secondary">
                     {agreementTypeLabels[agreement.agreement_type as keyof typeof agreementTypeLabels]}

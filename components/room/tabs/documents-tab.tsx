@@ -326,7 +326,7 @@ export function DocumentsTab({ roomId, isArchived = false }: DocumentsTabProps) 
                     </TableCell>
                     <TableCell>
                       <span className="text-sm text-muted-foreground">
-                        {new Date(document.created_at).toLocaleDateString('tr-TR')}
+                        {new Date(document.created_at || '').toLocaleDateString('tr-TR')}
                       </span>
                     </TableCell>
                     <TableCell>

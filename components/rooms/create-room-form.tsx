@@ -19,11 +19,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useSubstances } from "@/hooks/use-substances";
 import { useCreateRoom } from "@/hooks/use-rooms";
 
-export function CreateRoomForm() {
+interface CreateRoomFormProps {
+  preselectedSubstanceId?: string;
+}
+
+export function CreateRoomForm({ preselectedSubstanceId }: CreateRoomFormProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [formData, setFormData] = useState({
     description: "",
-    substanceId: "",
+    substanceId: preselectedSubstanceId || "",
   });
   
   const router = useRouter();
@@ -131,7 +135,7 @@ export function CreateRoomForm() {
                     </div>
                   ) : filteredSubstances.length > 0 ? (
                     filteredSubstances.map((substance) => (
-                      <SelectItem key={substance.id} value={substance.id}>
+                      <SelectItem key={substance.id} value={substance.id || ''}>
                         <div className="flex flex-col">
                           <span className="font-medium">{substance.name}</span>
                           <div className="text-xs text-muted-foreground space-y-0.5">

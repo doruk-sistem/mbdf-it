@@ -56,7 +56,7 @@ export function useCreateKKSSubmission() {
     mutationFn: (data: CreateKksSubmissionInput) => post(API_ENDPOINTS.kks, data),
     onSuccess: (data, variables) => {
       // Invalidate KKS lists
-      invalidationHelpers.kks(data.id, variables.room_id).forEach(key => {
+      invalidationHelpers.kks(data.id!, variables.room_id!).forEach(key => {
         queryClient.invalidateQueries({ queryKey: key });
       });
       

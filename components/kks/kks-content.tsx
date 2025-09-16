@@ -252,7 +252,7 @@ export function KKSContent() {
                         </SelectTrigger>
                         <SelectContent>
                           {rooms.map((room) => (
-                            <SelectItem key={room.id} value={room.id}>
+                            <SelectItem key={room.id} value={room.id || ''}>
                               {room.name} - {room.substance?.name}
                             </SelectItem>
                           ))}
@@ -359,7 +359,7 @@ export function KKSContent() {
                             <span>Oluşturan: {submission.created_by_profile?.full_name || "Bilinmiyor"}</span>
                           </div>
                           <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                            <span>Oluşturulma: {new Date(submission.created_at).toLocaleDateString('tr-TR')}</span>
+                            <span>Oluşturulma: {new Date(submission.created_at || '').toLocaleDateString('tr-TR')}</span>
                             {submission.submitted_at && (
                               <>
                                 <span>•</span>
@@ -408,7 +408,7 @@ export function KKSContent() {
                               {submission.status === "draft" && (
                                 <>
                                   <DropdownMenuItem 
-                                    onClick={() => handleGenerateEvidence(submission.id)}
+                                    onClick={() => handleGenerateEvidence(submission.id!)}
                                     disabled={generateEvidenceMutation.isPending}
                                   >
                                     <Upload className="mr-2 h-4 w-4" />
@@ -420,7 +420,7 @@ export function KKSContent() {
                               {submission.status === "submitted" && (
                                 <>
                                   <DropdownMenuItem 
-                                    onClick={() => handleSendToKKS(submission.id)}
+                                    onClick={() => handleSendToKKS(submission.id!)}
                                     disabled={sendKKSMutation.isPending}
                                   >
                                     <Send className="mr-2 h-4 w-4" />
@@ -431,11 +431,11 @@ export function KKSContent() {
                               )}
                               {(submission.status === "submitted" || submission.status === "sent") && (
                                 <>
-                                  <DropdownMenuItem onClick={() => handleDownloadEvidence(submission.id, "csv")}>
+                                  <DropdownMenuItem onClick={() => handleDownloadEvidence(submission.id!, "csv")}>
                                     <Download className="mr-2 h-4 w-4" />
                                     CSV İndir
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleDownloadEvidence(submission.id, "pdf")}>
+                                  <DropdownMenuItem onClick={() => handleDownloadEvidence(submission.id!, "pdf")}>
                                     <Download className="mr-2 h-4 w-4" />
                                     PDF İndir
                                   </DropdownMenuItem>
