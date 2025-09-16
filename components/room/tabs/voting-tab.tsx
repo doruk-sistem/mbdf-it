@@ -74,7 +74,7 @@ export function VotingTab({ roomId }: VotingTabProps) {
   const isFinalized = (votingData?.is_finalized || false) && candidates.length > 0;
   
   // Check if current user is a candidate
-  const currentUser = members.find((member: any) => member.profiles?.email === user?.profile?.email);
+  const currentUser = members.find((member: any) => member.user_id === user?.profile?.id);
   const isCurrentUserCandidate = candidates.some((candidate: any) => candidate.user_id === currentUser?.user_id);
 
   // Calculate evaluated candidates from database instead of local state
@@ -293,14 +293,15 @@ export function VotingTab({ roomId }: VotingTabProps) {
 
   const handleNominateCandidate = () => {
     // Always use current user ID for self-nomination
-      const currentUser = members.find((member: any) => member.profiles?.email === user?.profile?.email);
-      if (!currentUser) {
-        toast({
-          title: "Hata",
-          description: "Kullanıcı bilgileri bulunamadı.",
-          variant: "destructive",
-        });
-        return;
+    // Find current user in members list by user ID instead of email
+    const currentUser = members.find((member: any) => member.user_id === user?.profile?.id);
+    if (!currentUser) {
+      toast({
+        title: "Hata",
+        description: "Kullanıcı bilgileri bulunamadı.",
+        variant: "destructive",
+      });
+      return;
     }
 
     nominateCandidateMutation.mutate({
