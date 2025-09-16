@@ -66,7 +66,7 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
         const response = await fetch('/api/profile');
         if (response.ok) {
           const userData = await response.json();
-          setCurrentUserId(userData.user?.id || null);
+          setCurrentUserId(userData.profile?.id || null);
         }
       } catch (error) {
         console.error('Error fetching user:', error);
