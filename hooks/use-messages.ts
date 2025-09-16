@@ -74,6 +74,8 @@ export function usePinMessage() {
     onSuccess: (data, variables) => {
       // Invalidate all messages queries as we don't know the roomId here
       queryClient.invalidateQueries({ queryKey: ['messages'] });
+      // Also invalidate forum topics queries to refresh the pin status
+      queryClient.invalidateQueries({ queryKey: ['forum-topics'] });
       toast({
         title: 'Başarılı',
         description: variables.isPinned ? 'Mesaj sabitleme kaldırıldı' : 'Mesaj sabitlendi',
