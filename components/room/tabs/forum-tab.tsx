@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Send, MessageCircle, User, Plus, Search, X, Trash2, AlertTriangle, ArrowLeft, Hash } from "lucide-react";
 import { useMembers } from "@/hooks/use-members";
+import { useForumUnread, useMarkForumAsRead } from "@/hooks/use-forum-unread";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -58,6 +59,10 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
 
   // Get members data to check if current user is a member
   const { data: membersData } = useMembers(roomId);
+  
+  // Get unread message counts
+  const { data: unreadData, isLoading: unreadLoading, error: unreadError } = useForumUnread(roomId);
+  const markAsReadMutation = useMarkForumAsRead();
 
   // Get current user ID
   useEffect(() => {
@@ -284,6 +289,9 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
     setSelectedTopic(topic);
     setViewMode('messages');
     setTopicSearchTerm("");
+    
+    // Mark forum as read when user enters a topic
+    markAsReadMutation.mutate(roomId);
   };
 
   const handleBackToTopics = () => {
@@ -379,6 +387,14 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
             <CardTitle className="flex items-center gap-2">
               <MessageCircle className="h-5 w-5" />
               Forum Konuları
+              {unreadData?.totalUnread && unreadData.totalUnread > 0 && (
+                <Badge variant="destructive" className="ml-2">
+                  {unreadData.totalUnread} okunmamış
+                </Badge>
+              )}
+              {/* Debug info */}
+              {unreadLoading && <span className="text-xs text-muted-foreground ml-2">(Yükleniyor...)</span>}
+              {unreadError && <span className="text-xs text-red-500 ml-2">(Hata: {unreadError.message})</span>}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -461,7 +477,14 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
                   >
                     <Hash className="h-4 w-4 text-muted-foreground" />
                     <div className="flex-1">
-                      <h3 className="font-medium">{topic}</h3>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-medium">{topic}</h3>
+                        {unreadData?.unreadCounts?.[topic] && unreadData.unreadCounts[topic] > 0 && (
+                          <Badge variant="destructive" className="text-xs">
+                            {unreadData.unreadCounts[topic]}
+                          </Badge>
+                        )}
+                      </div>
                       <p className="text-sm text-muted-foreground">
                         Konuya tıklayarak mesajları görüntüleyin
                       </p>
