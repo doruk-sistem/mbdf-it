@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabase } from '@/lib/supabase';
+import { createServerSupabase, createAdminSupabase } from '@/lib/supabase';
 import { z } from 'zod';
 
 // Validation schemas
@@ -33,8 +33,9 @@ export async function PUT(
     const body = await request.json();
     const validatedData = UpdateJoinRequestSchema.parse(body);
 
-    // Get the join request
-    const { data: joinRequest, error: requestError } = await supabase
+    // Get the join request using admin client to bypass RLS
+    const adminSupabase = createAdminSupabase();
+    const { data: joinRequest, error: requestError } = await (adminSupabase as any)
       .from('join_request')
       .select(`
         *,
@@ -72,7 +73,7 @@ export async function PUT(
         );
       }
     } else {
-      // Only LR or admin can approve/reject
+      // Check if user is a member of the room
       const { data: membership, error: memberError } = await supabase
         .from('mbdf_member')
         .select('role')
@@ -80,9 +81,26 @@ export async function PUT(
         .eq('user_id', user.id)
         .single();
 
-      if (memberError || !membership || (membership.role !== 'lr' && membership.role !== 'admin')) {
+      if (memberError || !membership) {
         return NextResponse.json(
-          { error: 'Access denied', success: false },
+          { error: 'Access denied - Room membership required', success: false },
+          { status: 403 }
+        );
+      }
+
+      // Check if there's a leader in the room
+      const { data: leaderExists } = await supabase
+        .from('mbdf_member')
+        .select('id')
+        .eq('room_id', joinRequest.mbdf_room_id)
+        .eq('role', 'lr')
+        .single();
+
+      // If there's a leader, only the leader can approve/reject
+      // If no leader, all members can approve/reject
+      if (leaderExists && membership.role !== 'lr') {
+        return NextResponse.json(
+          { error: 'Access denied - Only the leader can manage join requests when a leader exists', success: false },
           { status: 403 }
         );
       }
@@ -99,7 +117,7 @@ export async function PUT(
       updateData.decision_note = validatedData.decisionNote;
     }
 
-    const { data: updatedRequest, error: updateError } = await supabase
+    const { data: updatedRequest, error: updateError } = await (adminSupabase as any)
       .from('join_request')
       .update(updateData)
       .eq('request_id', params.id)
@@ -138,7 +156,7 @@ export async function PUT(
 
     // If approved, add the user to the room
     if (validatedData.status === 'approved') {
-      const { error: addMemberError } = await supabase
+      const { error: addMemberError } = await (adminSupabase as any)
         .from('mbdf_member')
         .insert({
           room_id: joinRequest.mbdf_room_id,

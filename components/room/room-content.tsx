@@ -29,6 +29,7 @@ import { ArchivedBanner } from "./archived-banner";
 import { JoinRequestButton } from "./join-request-button";
 import { isRoomArchived, getRoomStatusText, getRoomStatusVariant } from "@/lib/archive-utils";
 import { useCanArchiveRoom, useIsRoomAdmin, useRoomMemberRole } from "@/hooks/use-user";
+import { useMembers } from "@/hooks/use-members";
 
 interface RoomContentProps {
   roomId: string;
@@ -46,8 +47,18 @@ export function RoomContent({ roomId }: RoomContentProps) {
   const isRoomAdmin = useIsRoomAdmin(roomId);
   const userRole = useRoomMemberRole(roomId);
   
-  // Check if user is LR (Lider) - only LR can see join requests
-  const isLR = userRole === 'lr';
+  // Check if user can see join requests based on leadership status
+  const { data: membersData } = useMembers(roomId);
+  const members = membersData?.items || [];
+  const currentUserRole = membersData?.currentUserRole;
+  
+  // Check if there's a leader in the room
+  const hasLeader = members.some((member: any) => member.role === 'lr');
+  
+  // User can see join requests if:
+  // 1. They are a member of the room AND
+  // 2. Either there's no leader (all members can see) OR they are the leader
+  const canSeeJoinRequests = currentUserRole && (!hasLeader || currentUserRole === 'lr');
 
   if (isLoading) {
     return (
@@ -224,7 +235,7 @@ export function RoomContent({ roomId }: RoomContentProps) {
         transition={{ duration: 0.3, delay: 0.2 }}
       >
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className={`grid w-full ${isLR ? 'grid-cols-6' : 'grid-cols-5'}`}>
+          <TabsList className={`grid w-full ${canSeeJoinRequests ? 'grid-cols-6' : 'grid-cols-5'}`}>
             <TabsTrigger value="members">
               <Users className="mr-2 h-4 w-4" />
               Üyeler
@@ -241,7 +252,7 @@ export function RoomContent({ roomId }: RoomContentProps) {
               <Vote className="mr-2 h-4 w-4" />
               LR Oylaması
             </TabsTrigger>
-            {isLR && (
+            {canSeeJoinRequests && (
               <TabsTrigger value="join-requests">
                 <UserPlus className="mr-2 h-4 w-4" />
                 Katılım Talepleri
@@ -269,7 +280,7 @@ export function RoomContent({ roomId }: RoomContentProps) {
             <VotingTab roomId={roomId} />
           </TabsContent>
 
-          {isLR && (
+          {canSeeJoinRequests && (
             <TabsContent value="join-requests" className="space-y-4">
               <JoinRequestsTab roomId={roomId} isArchived={isRoomArchived(room)} />
             </TabsContent>
