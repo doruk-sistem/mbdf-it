@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Send, MessageCircle, User, Plus, Search, X, Trash2, AlertTriangle, ArrowLeft, Hash } from "lucide-react";
+import { Send, MessageCircle, User, Plus, Search, X, Trash2, AlertTriangle, ArrowLeft, Hash, Pin } from "lucide-react";
 import { useMembers } from "@/hooks/use-members";
 import { useForumUnread, useMarkForumAsRead } from "@/hooks/use-forum-unread";
+import { usePinMessage } from "@/hooks/use-messages";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -63,6 +64,7 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
   // Get unread message counts
   const { data: unreadData, isLoading: unreadLoading, error: unreadError } = useForumUnread(roomId);
   const markAsReadMutation = useMarkForumAsRead();
+  const pinMessageMutation = usePinMessage();
 
   // Get current user ID
   useEffect(() => {
@@ -87,9 +89,9 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
     member.profiles?.id === currentUserId
   );
   // Fetch forum topics
-  const { data: topics } = useQuery<string[]>({
+  const { data: topics } = useQuery<{ topic: string; isPinned: boolean }[]>({
     queryKey: ["forum-topics", roomId],
-    queryFn: async (): Promise<string[]> => {
+    queryFn: async (): Promise<{ topic: string; isPinned: boolean }[]> => {
       const response = await fetch(`/api/rooms/${roomId}/forum/topics`);
       if (!response.ok) {
         if (response.status === 403) {
@@ -97,7 +99,7 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
         }
         throw new Error("Failed to fetch forum topics");
       }
-      const data = await response.json() as { topics: string[] };
+      const data = await response.json() as { topics: { topic: string; isPinned: boolean }[] };
       return data.topics;
     },
     retry: (failureCount, error) => {
@@ -270,7 +272,7 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
   };
 
   const handleAddNewTopic = () => {
-    if (newTopic.trim() && topics && !topics.includes(newTopic.trim())) {
+    if (newTopic.trim() && topics && !topics.some(t => t.topic === newTopic.trim())) {
       const newTopicName = newTopic.trim();
       setSelectedTopic(newTopicName);
       setNewTopic("");
@@ -278,9 +280,9 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
       setViewMode('messages');
       
       // Optimistically update the topics list
-      queryClient.setQueryData(["forum-topics", roomId], (oldTopics: string[] | undefined) => {
-        if (!oldTopics) return [newTopicName];
-        return [...oldTopics, newTopicName].sort();
+      queryClient.setQueryData(["forum-topics", roomId], (oldTopics: { topic: string; isPinned: boolean }[] | undefined) => {
+        if (!oldTopics) return [{ topic: newTopicName, isPinned: false }];
+        return [...oldTopics, { topic: newTopicName, isPinned: false }].sort((a, b) => a.topic.localeCompare(b.topic));
       });
     }
   };
@@ -299,9 +301,27 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
     setSelectedTopic(null);
   };
 
+  const handlePinTopic = async (topic: string, isPinned: boolean) => {
+    // Get the first message of this topic to pin/unpin
+    const response = await fetch(`/api/rooms/${roomId}/forum?topic=${encodeURIComponent(topic)}`);
+    if (!response.ok) {
+      return;
+    }
+    
+    const data = await response.json() as { messages: ForumMessage[] };
+    const firstMessage = data.messages[0];
+    
+    if (firstMessage) {
+      pinMessageMutation.mutate({ 
+        messageId: firstMessage.id, 
+        isPinned: isPinned 
+      });
+    }
+  };
+
   // Filter topics based on search term
-  const filteredTopics = (topics || []).filter(topic =>
-    topic.toLowerCase().includes(topicSearchTerm.toLowerCase())
+  const filteredTopics = (topics || []).filter(topicObj =>
+    topicObj.topic.toLowerCase().includes(topicSearchTerm.toLowerCase())
   );
 
   // Show topics based on search state
@@ -387,14 +407,11 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
             <CardTitle className="flex items-center gap-2">
               <MessageCircle className="h-5 w-5" />
               Forum Konuları
-              {unreadData?.totalUnread && unreadData.totalUnread > 0 && (
+              {unreadData?.totalUnread && unreadData.totalUnread > 0 ? (
                 <Badge variant="destructive" className="ml-2">
                   {unreadData.totalUnread} okunmamış
                 </Badge>
-              )}
-              {/* Debug info */}
-              {unreadLoading && <span className="text-xs text-muted-foreground ml-2">(Yükleniyor...)</span>}
-              {unreadError && <span className="text-xs text-red-500 ml-2">(Hata: {unreadError.message})</span>}
+              ) : null}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -469,19 +486,30 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
             {/* Topics List */}
             <div className="space-y-2">
               {paginatedTopics.length > 0 ? (
-                paginatedTopics.map((topic) => (
+                paginatedTopics.map((topicObj) => (
                   <div
-                    key={topic}
-                    onClick={() => handleTopicSelect(topic)}
-                    className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors"
+                    key={topicObj.topic}
+                    onClick={() => handleTopicSelect(topicObj.topic)}
+                    className={`flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors ${
+                      topicObj.isPinned ? 'bg-blue-50 border-blue-200' : ''
+                    }`}
                   >
-                    <Hash className="h-4 w-4 text-muted-foreground" />
+                    {topicObj.isPinned ? (
+                      <Pin className="h-4 w-4 text-blue-600" />
+                    ) : (
+                      <Hash className="h-4 w-4 text-muted-foreground" />
+                    )}
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <h3 className="font-medium">{topic}</h3>
-                        {unreadData?.unreadCounts?.[topic] && unreadData.unreadCounts[topic] > 0 && (
+                        <h3 className="font-medium">{topicObj.topic}</h3>
+                        {topicObj.isPinned && (
+                          <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">
+                            Sabitlenen
+                          </Badge>
+                        )}
+                        {unreadData?.unreadCounts?.[topicObj.topic] && unreadData.unreadCounts[topicObj.topic] > 0 && (
                           <Badge variant="destructive" className="text-xs">
-                            {unreadData.unreadCounts[topic]}
+                            {unreadData.unreadCounts[topicObj.topic]}
                           </Badge>
                         )}
                       </div>
@@ -489,7 +517,22 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
                         Konuya tıklayarak mesajları görüntüleyin
                       </p>
                     </div>
-                    <MessageCircle className="h-4 w-4 text-muted-foreground" />
+                    <div className="flex items-center gap-2">
+                      {isMember && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handlePinTopic(topicObj.topic, topicObj.isPinned);
+                          }}
+                          className="h-8 w-8 p-0"
+                        >
+                          <Pin className={`h-4 w-4 ${topicObj.isPinned ? 'text-blue-600' : 'text-muted-foreground'}`} />
+                        </Button>
+                      )}
+                      <MessageCircle className="h-4 w-4 text-muted-foreground" />
+                    </div>
                   </div>
                 ))
               ) : (

@@ -63,11 +63,10 @@ export async function GET(
         .neq("sender_id", user.id) // Don't count own messages
         .gt("created_at", lastForumVisit.toISOString());
 
-      if (!unreadError && unreadMessages) {
-        unreadCounts[topic] = unreadMessages.length || 0;
-      } else {
-        unreadCounts[topic] = 0;
+      if (!unreadError && unreadMessages && unreadMessages.length > 0) {
+        unreadCounts[topic] = unreadMessages.length;
       }
+      // Don't add topics with 0 unread messages to the response
     }
 
     // Calculate total unread count
