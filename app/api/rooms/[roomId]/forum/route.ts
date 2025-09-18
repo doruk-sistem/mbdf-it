@@ -142,8 +142,11 @@ export async function POST(
     const body = await request.json();
     const { content, message_type, topic } = createMessageSchema.parse(body);
 
+    // Use admin client to bypass RLS for message creation
+    const adminSupabase = createAdminSupabase();
+    
     // Create new forum message
-    const { data: message, error } = await supabase
+    const { data: message, error } = await adminSupabase
       .from("message")
       .insert({
         room_id: params.roomId,
@@ -168,9 +171,7 @@ export async function POST(
       return NextResponse.json({ error: "Failed to create message" }, { status: 500 });
     }
 
-    // Get sender profile
-    // Use admin client to bypass RLS for profiles
-    const adminSupabase = createAdminSupabase();
+    // Get sender profile using the same admin client
     const { data: profile, error: profileError } = await adminSupabase
       .from("profiles")
       .select("id, full_name, avatar_url")

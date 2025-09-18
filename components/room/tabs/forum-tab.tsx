@@ -142,9 +142,7 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
 
       if (!response.ok) {
         const errorData = await response.json();
-        if (response.status === 403 && errorData.code === "MEMBERSHIP_REQUIRED") {
-          throw new Error("MEMBERSHIP_REQUIRED");
-        }
+        console.error("Forum message error:", errorData);
         throw new Error("Failed to send message");
       }
 
@@ -160,19 +158,12 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
       });
     },
     onError: (error) => {
-      if (error.message === "MEMBERSHIP_REQUIRED") {
-        toast({
-          title: "Üyelik Gerekli",
-          description: "Bu odaya üye olmadığınız için mesaj yazamazsınız. Mesaj yazmak için odaya üye olmanız gerekmektedir.",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Hata",
-          description: "Mesaj gönderilirken bir hata oluştu.",
-          variant: "destructive",
-        });
-      }
+      console.error("Forum message send error:", error);
+      toast({
+        title: "Hata",
+        description: "Mesaj gönderilirken bir hata oluştu.",
+        variant: "destructive",
+      });
     },
   });
 

@@ -47,10 +47,20 @@ export function RoomContent({ roomId }: RoomContentProps) {
   const isRoomAdmin = useIsRoomAdmin(roomId);
   const userRole = useRoomMemberRole(roomId);
   
-  // All authenticated users can see all tabs
-  const canSeeVoting = true;
+  // Check if there's a leader in the room
+  const { data: membersData } = useMembers(roomId);
+  const members = membersData?.items || [];
+  const hasLeader = members.some((member: any) => member.role === 'lr');
 
-  // No need to redirect tabs based on leadership status
+  // LR Oylaması sekmesi sadece odada LR yokken görünür
+  const canSeeVoting = !hasLeader;
+
+  // LR seçildiğinde (hasLeader true olduğunda) Üyeler sekmesine yönlendir
+  useEffect(() => {
+    if (hasLeader && activeTab === "voting") {
+      setActiveTab("members");
+    }
+  }, [hasLeader, activeTab]);
 
   if (isLoading) {
     return (
@@ -223,7 +233,9 @@ export function RoomContent({ roomId }: RoomContentProps) {
         transition={{ duration: 0.3, delay: 0.2 }}
       >
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className={`grid w-full ${
+            canSeeVoting ? 'grid-cols-5' : 'grid-cols-4'
+          }`}>
             <TabsTrigger value="members">
               <Users className="mr-2 h-4 w-4" />
               Üyeler
@@ -236,10 +248,12 @@ export function RoomContent({ roomId }: RoomContentProps) {
               <Package className="mr-2 h-4 w-4" />
               Paketler
             </TabsTrigger>
-            <TabsTrigger value="voting">
-              <Vote className="mr-2 h-4 w-4" />
-              LR Oylaması
-            </TabsTrigger>
+            {canSeeVoting && (
+              <TabsTrigger value="voting">
+                <Vote className="mr-2 h-4 w-4" />
+                LR Oylaması
+              </TabsTrigger>
+            )}
             <TabsTrigger value="forum">
               <MessageCircle className="mr-2 h-4 w-4" />
               Forum

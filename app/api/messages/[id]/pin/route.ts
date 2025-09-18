@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createMiddlewareSupabaseClient } from "@/lib/supabase";
+import { createMiddlewareSupabaseClient, createAdminSupabase } from "@/lib/supabase";
 
 export async function POST(
   request: NextRequest,
@@ -18,9 +18,12 @@ export async function POST(
     const body = await request.json();
     const { is_pinned } = body;
 
+    // Use admin client to bypass RLS for message pinning
+    const adminSupabase = createAdminSupabase();
+    
     // Update message pin status
-    const { data: message, error } = await supabase
-      .from("message")
+    const { data: message, error } = await (adminSupabase
+      .from("message") as any)
       .update({ is_pinned: is_pinned })
       .eq("id", params.id)
       .select()
