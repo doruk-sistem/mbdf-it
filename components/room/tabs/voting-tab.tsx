@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Vote, Crown, Star, Users, CheckCircle, Plus } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -219,6 +219,7 @@ export function VotingTab({ roomId }: VotingTabProps) {
   const firstCandidate = candidates.length > 0 ? candidates.sort((a: any, b: any) => 
     new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
   )[0] : null;
+
   
   const votingStartTime = firstCandidate ? new Date(new Date(firstCandidate.created_at).getTime() + (60 * 1000)) : null; // +1 minute for testing
   const votingEndTime = votingStartTime ? new Date(votingStartTime.getTime() + (60 * 1000)) : null; // +1 minute for testing
