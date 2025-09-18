@@ -78,12 +78,14 @@ export function MembersTab({ roomId, isArchived = false }: MembersTabProps) {
   // Extract data from query response
   const members = (membersData as MembersListResponse | undefined)?.items || [];
   const currentUserRole =
-    (membersData as MembersListResponse | undefined)?.currentUserRole ||
-    ("member" as Database["public"]["Enums"]["user_role"]);
+    (membersData as MembersListResponse | undefined)?.currentUserRole;
+  const currentUserIdFromData = (membersData as MembersListResponse | undefined)?.currentUserId;
 
-  // Find current user from members data (fallback method)
-  const currentUserFromMembers = members.find(member => member.role === currentUserRole);
-  const currentUserId = currentUserFromMembers?.user_id || currentUser?.id;
+  // Find current user from members data by matching user_id
+  const currentUserFromMembers = members.find(member => member.user_id === currentUser?.id);
+  
+  // Get current user ID - prioritize from auth context, fallback to data
+  const currentUserId = currentUser?.id || currentUserIdFromData;
 
 
   const filteredMembers = members.filter(
@@ -356,7 +358,8 @@ export function MembersTab({ roomId, isArchived = false }: MembersTabProps) {
                         3. Admin: can remove others (except other admins) but not themselves */}
                     {((currentUserRole === "admin" && member.role !== "admin") ||
                       (currentUserRole === "lr" && member.role !== "admin" && member.role !== "lr") ||
-                      (currentUserRole === "member" && currentUserId === member.user_id)) && (
+                      (currentUserRole === "member" && currentUserId === member.user_id) ||
+                      (currentUserId === member.user_id)) && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button

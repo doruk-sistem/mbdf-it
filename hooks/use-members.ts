@@ -13,7 +13,8 @@ import type { Database } from '@/types/supabase';
 export interface MembersListResponse {
   items: MemberWithProfile[];
   total: number;
-  currentUserRole: Database['public']['Enums']['user_role'];
+  currentUserRole: Database['public']['Enums']['user_role'] | null;
+  currentUserId?: string;
 }
 
 // Query hooks
@@ -25,7 +26,8 @@ export function useMembers(roomId: string) {
       return {
         items: data.members,
         total: data.members.length,
-        currentUserRole: data.currentUserRole
+        currentUserRole: data.currentUserRole,
+        currentUserId: data.currentUserId
       };
     },
     enabled: !!roomId,
@@ -86,9 +88,21 @@ export function useJoinRoom() {
         role: data.role || 'member',
       }),
     onSuccess: (data, variables) => {
-      // Invalidate member-related queries
-      invalidationHelpers.member(variables.roomId).forEach(key => {
-        queryClient.invalidateQueries({ queryKey: key });
+    // Force refetch all member queries
+      queryClient.invalidateQueries({ 
+        queryKey: ['members'],
+        exact: false 
+      });
+      
+      // Also invalidate specific room members
+      queryClient.invalidateQueries({ 
+        queryKey: ['members', 'list', variables.roomId],
+        exact: false 
+      });
+      
+      // Force refetch to ensure UI updates
+      queryClient.refetchQueries({ 
+        queryKey: ['members', 'list', variables.roomId] 
       });
       
       toast({
@@ -119,9 +133,21 @@ export function useLeaveRoom() {
       return del(withQuery(endpoint, { roomId: data.roomId }));
     },
     onSuccess: (data, variables) => {
-      // Invalidate member-related queries
-      invalidationHelpers.member(variables.roomId, variables.userId).forEach(key => {
-        queryClient.invalidateQueries({ queryKey: key });
+      // Force refetch all member queries
+      queryClient.invalidateQueries({ 
+        queryKey: ['members'],
+        exact: false 
+      });
+      
+      // Also invalidate specific room members
+      queryClient.invalidateQueries({ 
+        queryKey: ['members', 'list', variables.roomId],
+        exact: false 
+      });
+      
+      // Force refetch to ensure UI updates
+      queryClient.refetchQueries({ 
+        queryKey: ['members', 'list', variables.roomId] 
       });
       
       toast({

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { UserPlus, CheckCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
-import { useMembers, useJoinRoom } from "@/hooks/use-members";
+import { useMembers, useJoinRoom, type MembersListResponse } from "@/hooks/use-members";
 import { useQueryClient } from "@tanstack/react-query";
 
 interface JoinRoomButtonProps {
@@ -23,9 +23,8 @@ export function JoinRoomButton({
   const joinRoomMutation = useJoinRoom();
   
   // Check if current user is already a member
-  const currentUserId = membersData?.currentUserRole ? 
-    Object.keys(membersData).find(key => key !== 'currentUserRole') : null;
-  const isMember = membersData?.currentUserRole !== null;
+  const isMember = (membersData as MembersListResponse | undefined)?.currentUserRole !== null && 
+                   (membersData as MembersListResponse | undefined)?.currentUserRole !== undefined;
 
   const handleJoinRoom = async () => {
     if (isMember) {
