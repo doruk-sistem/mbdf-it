@@ -6,10 +6,10 @@ import {
   useMembers,
   useJoinRoom,
   useLeaveRoom,
-  useUpdateMemberRole,
   useAddMember,
   type MembersListResponse,
 } from "@/hooks/use-members";
+import { useAuth } from "@/components/auth/auth-wrapper";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -67,21 +67,24 @@ export function MembersTab({ roomId, isArchived = false }: MembersTabProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [addMemberDialogOpen, setAddMemberDialogOpen] = useState(false);
   const [newMemberEmail, setNewMemberEmail] = useState("");
-  const [newMemberRole, setNewMemberRole] =
-    useState<Database["public"]["Enums"]["user_role"]>("member");
 
   // Query hooks
   const { data: membersData, isLoading, error } = useMembers(roomId);
+  const { user: currentUser } = useAuth();
   const addMemberMutation = useAddMember();
   const joinRoomMutation = useJoinRoom();
   const leaveRoomMutation = useLeaveRoom();
-  const updateRoleMutation = useUpdateMemberRole();
 
   // Extract data from query response
   const members = (membersData as MembersListResponse | undefined)?.items || [];
   const currentUserRole =
     (membersData as MembersListResponse | undefined)?.currentUserRole ||
     ("member" as Database["public"]["Enums"]["user_role"]);
+
+  // Find current user from members data (fallback method)
+  const currentUserFromMembers = members.find(member => member.role === currentUserRole);
+  const currentUserId = currentUserFromMembers?.user_id || currentUser?.id;
+
 
   const filteredMembers = members.filter(
     (member: MemberWithProfile) =>
@@ -139,12 +142,11 @@ export function MembersTab({ roomId, isArchived = false }: MembersTabProps) {
       {
         roomId,
         userEmail: newMemberEmail.trim(),
-        role: newMemberRole as "member" | "lr" | "admin",
+        role: "member", // Always add as member - LR is selected through voting
       },
       {
         onSuccess: () => {
           setNewMemberEmail("");
-          setNewMemberRole("member");
           setAddMemberDialogOpen(false);
         },
       }
@@ -156,13 +158,6 @@ export function MembersTab({ roomId, isArchived = false }: MembersTabProps) {
     leaveRoomMutation.mutate({ roomId, userId: memberId });
   };
 
-  // Handle role update
-  const handleUpdateRole = (
-    memberId: string,
-    newRole: Database["public"]["Enums"]["user_role"]
-  ) => {
-    updateRoleMutation.mutate({ memberId, roomId, role: newRole });
-  };
 
   if (isLoading) {
     return (
@@ -213,27 +208,29 @@ export function MembersTab({ roomId, isArchived = false }: MembersTabProps) {
               Bu odadaki tüm üyeleri görüntüleyin ve yönetin
             </CardDescription>
           </div>
-          <Dialog
-              open={addMemberDialogOpen}
-              onOpenChange={setAddMemberDialogOpen}
-            >
-              <DialogTrigger asChild>
-                <Button
-                  disabled={isArchived}
-                  title={
-                    isArchived ? "Arşivli odada işlem yapılamaz" : undefined
-                  }
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Üye Ekle
-                </Button>
-              </DialogTrigger>
+          {/* Only show Add Member button for admin and LR roles */}
+          {(currentUserRole === "admin" || currentUserRole === "lr") && (
+            <Dialog
+                open={addMemberDialogOpen}
+                onOpenChange={setAddMemberDialogOpen}
+              >
+                <DialogTrigger asChild>
+                  <Button
+                    disabled={isArchived}
+                    title={
+                      isArchived ? "Arşivli odada işlem yapılamaz" : undefined
+                    }
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Üye Ekle
+                  </Button>
+                </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Yeni Üye Ekle</DialogTitle>
                   <DialogDescription>
-                    Odaya yeni üye eklemek için e-posta adresini ve rolünü
-                    seçin.
+                    Odaya yeni üye eklemek için e-posta adresini girin. 
+                    Tüm yeni üyeler "Üye" rolünde eklenir. LR seçimi oylama ile yapılır.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
@@ -247,25 +244,6 @@ export function MembersTab({ roomId, isArchived = false }: MembersTabProps) {
                       onChange={(e) => setNewMemberEmail(e.target.value)}
                       disabled={addMemberMutation.isPending || isArchived}
                     />
-                  </div>
-                  <div>
-                    <Label htmlFor="role">Rol</Label>
-                    <Select
-                      value={newMemberRole}
-                      onValueChange={(
-                        value: Database["public"]["Enums"]["user_role"]
-                      ) => setNewMemberRole(value)}
-                      disabled={addMemberMutation.isPending || isArchived}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="member">Üye</SelectItem>
-                        <SelectItem value="lr">LR</SelectItem>
-                        <SelectItem value="admin">Yönetici</SelectItem>
-                      </SelectContent>
-                    </Select>
                   </div>
                   <div className="flex space-x-2">
                     <Button
@@ -291,6 +269,7 @@ export function MembersTab({ roomId, isArchived = false }: MembersTabProps) {
                 </div>
               </DialogContent>
             </Dialog>
+          )}
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -371,14 +350,19 @@ export function MembersTab({ roomId, isArchived = false }: MembersTabProps) {
                     </span>
                   </TableCell>
                   <TableCell>
-                    {member.role !== "admin" && (
+                    {/* Show remove option based on permissions:
+                        1. Normal members: can only remove themselves
+                        2. LR: can remove others (except admins) but not themselves
+                        3. Admin: can remove others (except other admins) but not themselves */}
+                    {((currentUserRole === "admin" && member.role !== "admin") ||
+                      (currentUserRole === "lr" && member.role !== "admin" && member.role !== "lr") ||
+                      (currentUserRole === "member" && currentUserId === member.user_id)) && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button
                               variant="ghost"
                               size="icon"
                               disabled={
-                                updateRoleMutation.isPending ||
                                 leaveRoomMutation.isPending
                               }
                             >
@@ -387,37 +371,6 @@ export function MembersTab({ roomId, isArchived = false }: MembersTabProps) {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem
-                              onClick={() =>
-                                handleUpdateRole(member.id!, "member")
-                              }
-                              disabled={
-                                isArchived || updateRoleMutation.isPending
-                              }
-                            >
-                              Üye Yap
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() =>
-                                handleUpdateRole(member.id!, "lr")
-                              }
-                              disabled={
-                                isArchived || updateRoleMutation.isPending
-                              }
-                            >
-                              LR Yap
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() =>
-                                handleUpdateRole(member.id!, "admin")
-                              }
-                              disabled={
-                                isArchived || updateRoleMutation.isPending
-                              }
-                            >
-                              Yönetici Yap
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
                               className="text-destructive"
                               onClick={() => handleRemoveMember(member.id!)}
                               disabled={
@@ -425,11 +378,11 @@ export function MembersTab({ roomId, isArchived = false }: MembersTabProps) {
                               }
                             >
                               <UserX className="mr-2 h-4 w-4" />
-                              Odadan Çıkar
+                              {currentUserId === member.user_id ? "Odadan Ayrıl" : "Odadan Çıkar"}
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
-                      )}
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

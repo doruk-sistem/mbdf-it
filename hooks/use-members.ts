@@ -82,7 +82,7 @@ export function useJoinRoom() {
   return useMutation({
     mutationFn: (data: { roomId: string; role?: 'member' | 'lr' | 'admin' }) => 
       post(API_ENDPOINTS.members, {
-        room_id: data.roomId,
+        roomId: data.roomId,
         role: data.role || 'member',
       }),
     onSuccess: (data, variables) => {
@@ -92,14 +92,14 @@ export function useJoinRoom() {
       });
       
       toast({
-        title: 'Success',
-        description: 'Joined room successfully',
+        title: 'Başarılı',
+        description: 'Odaya başarıyla katıldınız.',
       });
     },
     onError: (error: any) => {
       toast({
-        title: 'Error',
-        description: error?.data?.message || 'Failed to join room',
+        title: 'Hata',
+        description: error?.data?.message || 'Odaya katılırken bir hata oluştu',
         variant: 'destructive',
       });
     },
@@ -115,6 +115,7 @@ export function useLeaveRoom() {
       const endpoint = data.userId 
         ? `${API_ENDPOINTS.members}/${data.userId}`
         : API_ENDPOINTS.members;
+      
       return del(withQuery(endpoint, { roomId: data.roomId }));
     },
     onSuccess: (data, variables) => {
@@ -124,48 +125,14 @@ export function useLeaveRoom() {
       });
       
       toast({
-        title: 'Success',
-        description: 'Left room successfully',
+        title: 'Başarılı',
+        description: 'Odadan başarıyla ayrıldınız.',
       });
     },
     onError: (error: any) => {
       toast({
-        title: 'Error',
-        description: error?.data?.message || 'Failed to leave room',
-        variant: 'destructive',
-      });
-    },
-  });
-}
-
-export function useUpdateMemberRole() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: (data: { 
-      memberId: string; 
-      roomId: string; 
-      role: 'admin' | 'lr' | 'member' 
-    }) => 
-      put(`${API_ENDPOINTS.members}/${data.memberId}/role`, {
-        role: data.role,
-      }),
-    onSuccess: (data, variables) => {
-      // Invalidate member-related queries
-      invalidationHelpers.member(variables.roomId).forEach(key => {
-        queryClient.invalidateQueries({ queryKey: key });
-      });
-      
-      toast({
-        title: 'Success',
-        description: 'Member role updated successfully',
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: 'Error',
-        description: error?.data?.message || 'Failed to update member role',
+        title: 'Hata',
+        description: error?.data?.message || 'Odadan ayrılırken bir hata oluştu',
         variant: 'destructive',
       });
     },

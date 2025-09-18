@@ -7,6 +7,7 @@ import {
   DocumentWithUploaderSchema 
 } from '@/lib/schemas';
 import { useToast } from '@/components/ui/use-toast';
+import { deleteDocument } from '@/app/actions/documents';
 
 // Query hooks
 export function useDocuments(roomId: string) {
@@ -76,24 +77,21 @@ export function useDeleteDocument(documentId: string, roomId: string) {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: () => {
-      // Note: Delete endpoint would need to be implemented
-      throw new Error('Delete document endpoint not implemented yet');
-    },
+    mutationFn: () => deleteDocument(documentId),
     onSuccess: () => {
       // Invalidate documents list
       invalidationHelpers.document(roomId).forEach(key => {
         queryClient.invalidateQueries({ queryKey: key });
       });
       toast({
-        title: 'Success',
-        description: 'Document deleted successfully',
+        title: 'Başarılı',
+        description: 'Doküman başarıyla silindi.',
       });
     },
     onError: (error: any) => {
       toast({
-        title: 'Error',
-        description: error?.message || 'Failed to delete document',
+        title: 'Hata',
+        description: error?.message || 'Doküman silinirken bir hata oluştu',
         variant: 'destructive',
       });
     },

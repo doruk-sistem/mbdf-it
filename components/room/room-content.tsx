@@ -27,7 +27,7 @@ import { ForumTab } from "./tabs/forum-tab";
 // JoinRequestsTab is no longer needed - no join requests functionality
 import { ArchiveDialog } from "./archive-dialog";
 import { ArchivedBanner } from "./archived-banner";
-// JoinRequestButton is no longer needed - all users have access to all rooms
+import { JoinRoomButton } from "./join-room-button";
 import { isRoomArchived, getRoomStatusText, getRoomStatusVariant } from "@/lib/archive-utils";
 import { useCanArchiveRoom, useIsRoomAdmin, useRoomMemberRole } from "@/hooks/use-user";
 
@@ -146,7 +146,11 @@ export function RoomContent({ roomId }: RoomContentProps) {
         </div>
         
         <div className="flex items-center space-x-2">
-          {/* Join request button removed - all users have access to all rooms */}
+          <JoinRoomButton 
+            roomId={roomId} 
+            roomName={room.name}
+            isArchived={isRoomArchived(room)}
+          />
           <Button variant="outline">
             <Settings className="mr-2 h-4 w-4" />
             Ayarlar

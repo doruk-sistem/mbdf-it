@@ -92,25 +92,31 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { roomId, userEmail, role } = body;
+    const { roomId, room_id, userEmail, role } = body;
 
-    if (!roomId || !userEmail || !role) {
+    // Handle both roomId and room_id field names for backward compatibility
+    const actualRoomId = roomId || room_id;
+
+    if (!actualRoomId || !role) {
       return NextResponse.json({ 
-        error: 'Missing required fields: roomId, userEmail, role' 
+        error: 'Missing required fields: roomId, role' 
       }, { status: 400 });
     }
+
+    // For self-join, userEmail is not required - use current user's email
+    const actualUserEmail = userEmail || user.email;
 
     // Check if current user has permission to add members
     const { data: member, error: memberError } = await supabase
       .from("mbdf_member")
       .select("role")
-      .eq("room_id", roomId)
+      .eq("room_id", actualRoomId)
       .eq("user_id", user.id)
       .single();
 
 
     // Special case: If user is trying to join a room themselves (self-join)
-    const isSelfJoin = user.email === userEmail;
+    const isSelfJoin = user.email === actualUserEmail;
     
     if (isSelfJoin) {
       // Allow self-join if user is not already a member
@@ -140,7 +146,7 @@ export async function POST(request: NextRequest) {
     const { data: room, error: roomError } = await adminSupabase
       .from("mbdf_room")
       .select("status, name, description")
-      .eq("id", roomId)
+      .eq("id", actualRoomId)
       .single();
 
     if (roomError || !room) {
@@ -159,7 +165,7 @@ export async function POST(request: NextRequest) {
     const { data: targetProfile, error: profileError } = await adminSupabase
       .from("profiles")
       .select("id, full_name")
-      .eq("email", userEmail)
+      .eq("email", actualUserEmail)
       .single();
 
     if (profileError || !targetProfile) {
@@ -175,7 +181,7 @@ export async function POST(request: NextRequest) {
     const { data: existingMember, error: existingError } = await supabase
       .from("mbdf_member")
       .select("id")
-      .eq("room_id", roomId)
+      .eq("room_id", actualRoomId)
       .eq("user_id", profile.id)
       .single();
 
@@ -189,7 +195,7 @@ export async function POST(request: NextRequest) {
     const { error: insertError } = await supabase
       .from("mbdf_member")
       .insert({
-        room_id: roomId,
+        room_id: actualRoomId,
         user_id: profile.id,
         role: role
       });
@@ -212,12 +218,12 @@ export async function POST(request: NextRequest) {
     await supabase
       .from("audit_log")
       .insert({
-        room_id: roomId,
+        room_id: actualRoomId,
         user_id: user.id,
         action: "member_added",
         resource_type: "mbdf_member",
         new_values: { 
-          room_id: roomId, 
+          room_id: actualRoomId, 
           user_id: profile.id, 
           role, 
           added_by: user.id 

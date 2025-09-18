@@ -6,50 +6,63 @@ import { Upload, Download, FileText, Trash2, Eye, Loader2 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { 
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger 
+  DialogTrigger,
 } from "@/components/ui/dialog";
-import { 
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuTrigger 
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue 
+  SelectValue,
 } from "@/components/ui/select";
-import { 
+import {
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
-  TableRow 
+  TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { useDocuments, useUploadDocument } from "@/hooks/use-documents";
+import { deleteDocument } from "@/app/actions/documents";
+import { useMembers } from "@/hooks/use-members";
+import { useAuth } from "@/components/auth/auth-wrapper";
+import { useQueryClient } from "@tanstack/react-query";
+import { keys, invalidationHelpers } from "@/lib/query-keys";
 
 interface DocumentsTabProps {
   roomId: string;
   isArchived?: boolean;
 }
 
-
-export function DocumentsTab({ roomId, isArchived = false }: DocumentsTabProps) {
+export function DocumentsTab({
+  roomId,
+  isArchived = false,
+}: DocumentsTabProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
@@ -60,26 +73,36 @@ export function DocumentsTab({ roomId, isArchived = false }: DocumentsTabProps) 
 
   // API hooks
   const { data: documentsData, isLoading, refetch } = useDocuments(roomId);
+  const { data: membersData } = useMembers(roomId);
+  const { user: currentUser } = useAuth();
   const uploadMutation = useUploadDocument();
-
+  const queryClient = useQueryClient();
   const documents = documentsData?.items || [];
-  const isMember = true; // All authenticated users can access documents
+  const currentUserRole = membersData?.currentUserRole;
+  const isMember = currentUserRole !== null;
 
-  const filteredDocuments = documents.filter(doc => {
-    const matchesSearch = doc.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         doc.description?.toLowerCase().includes(searchTerm.toLowerCase());
-    
+  // Find current user from members data (fallback method)
+  const currentUserFromMembers = membersData?.items?.find(
+    (member) => member.role === currentUserRole
+  );
+  const currentUserId = currentUserFromMembers?.user_id || currentUser?.id;
+
+  const filteredDocuments = documents.filter((doc) => {
+    const matchesSearch =
+      doc.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      doc.description?.toLowerCase().includes(searchTerm.toLowerCase());
+
     if (filterType === "all") return matchesSearch;
-    
+
     const fileType = doc.mime_type?.split("/")[1] || "";
     return matchesSearch && fileType.includes(filterType);
   });
 
   const formatFileSize = (bytes: number) => {
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    if (bytes === 0) return '0 Bytes';
+    const sizes = ["Bytes", "KB", "MB", "GB"];
+    if (bytes === 0) return "0 Bytes";
     const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+    return Math.round((bytes / Math.pow(1024, i)) * 100) / 100 + " " + sizes[i];
   };
 
   const getFileIcon = (mimeType: string) => {
@@ -94,15 +117,16 @@ export function DocumentsTab({ roomId, isArchived = false }: DocumentsTabProps) 
 
   const handleView = (document: any) => {
     // Check if file type can be viewed inline
-    const mimeType = document.mime_type || '';
-    const canViewInline = mimeType.includes('pdf') || 
-                         mimeType.includes('image/') || 
-                         mimeType.includes('text/');
-    
+    const mimeType = document.mime_type || "";
+    const canViewInline =
+      mimeType.includes("pdf") ||
+      mimeType.includes("image/") ||
+      mimeType.includes("text/");
+
     if (canViewInline) {
       // Use view endpoint for inline viewing
       const viewUrl = `/api/documents/${document.id}/view`;
-      window.open(viewUrl, '_blank');
+      window.open(viewUrl, "_blank");
     } else {
       // For files that can't be viewed inline, show info message
       toast({
@@ -116,15 +140,29 @@ export function DocumentsTab({ roomId, isArchived = false }: DocumentsTabProps) 
   const handleDownload = (document: any) => {
     // Use download endpoint for file download
     const downloadUrl = `/api/documents/${document.id}/download`;
-    window.open(downloadUrl, '_blank');
+    window.open(downloadUrl, "_blank");
   };
 
-  const handleDelete = (document: any) => {
-    toast({
-      title: "Doküman silindi",
-      description: `${document.name} başarıyla silindi.`,
-      variant: "destructive",
-    });
+  const handleDelete = async (document: any) => {
+    try {
+      await deleteDocument(document.id);
+
+      // Invalidate documents cache to update UI immediately
+      invalidationHelpers.document(roomId).forEach((key) => {
+        queryClient.invalidateQueries({ queryKey: key });
+      });
+
+      toast({
+        title: "Başarılı",
+        description: "Doküman başarıyla silindi.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Hata",
+        description: error?.message || "Doküman silinirken bir hata oluştu",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleUpload = async () => {
@@ -144,7 +182,7 @@ export function DocumentsTab({ roomId, isArchived = false }: DocumentsTabProps) 
         title: title.trim(),
         description: description.trim() || undefined,
       });
-      
+
       // Reset form
       setSelectedFile(null);
       setTitle("");
@@ -166,71 +204,90 @@ export function DocumentsTab({ roomId, isArchived = false }: DocumentsTabProps) 
             </CardDescription>
           </div>
           {isMember && (
-            <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
+            <Dialog
+              open={isUploadDialogOpen}
+              onOpenChange={setIsUploadDialogOpen}
+            >
               <DialogTrigger asChild>
-                <Button disabled={isArchived} title={isArchived ? "Arşivli odada işlem yapılamaz" : undefined}>
+                <Button
+                  disabled={isArchived}
+                  title={
+                    isArchived ? "Arşivli odada işlem yapılamaz" : undefined
+                  }
+                >
                   <Upload className="mr-2 h-4 w-4" />
                   Yükle
                 </Button>
               </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
-              <DialogHeader>
-                <DialogTitle>Doküman Yükle</DialogTitle>
-                <DialogDescription>
-                  Yeni bir doküman yükleyin.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="title">Başlık *</Label>
-                  <Input
-                    id="title"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="Doküman başlığı..."
-                    disabled={isArchived}
-                  />
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>Doküman Yükle</DialogTitle>
+                  <DialogDescription>
+                    Yeni bir doküman yükleyin.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="title">Başlık *</Label>
+                    <Input
+                      id="title"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      placeholder="Doküman başlığı..."
+                      disabled={isArchived}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="file">Dosya *</Label>
+                    <Input
+                      id="file"
+                      type="file"
+                      onChange={(e) =>
+                        setSelectedFile(e.target.files?.[0] || null)
+                      }
+                      disabled={isArchived}
+                    />
+                    {selectedFile && (
+                      <p className="text-sm text-muted-foreground">
+                        Seçilen: {selectedFile.name} (
+                        {(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+                      </p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="description">Açıklama</Label>
+                    <Textarea
+                      id="description"
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="Doküman açıklaması..."
+                      className="resize-none"
+                      disabled={isArchived}
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="file">Dosya *</Label>
-                  <Input
-                    id="file"
-                    type="file"
-                    onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                    disabled={isArchived}
-                  />
-                  {selectedFile && (
-                    <p className="text-sm text-muted-foreground">
-                      Seçilen: {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
-                    </p>
-                  )}
+                <div className="flex justify-end space-x-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsUploadDialogOpen(false)}
+                  >
+                    İptal
+                  </Button>
+                  <Button
+                    onClick={handleUpload}
+                    disabled={
+                      uploadMutation.isPending ||
+                      !selectedFile ||
+                      !title.trim() ||
+                      isArchived
+                    }
+                  >
+                    {uploadMutation.isPending && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    Yükle
+                  </Button>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="description">Açıklama</Label>
-                  <Textarea
-                    id="description"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Doküman açıklaması..."
-                    className="resize-none"
-                    disabled={isArchived}
-                  />
-                </div>
-              </div>
-              <div className="flex justify-end space-x-2">
-                <Button variant="outline" onClick={() => setIsUploadDialogOpen(false)}>
-                  İptal
-                </Button>
-                <Button 
-                  onClick={handleUpload}
-                  disabled={uploadMutation.isPending || !selectedFile || !title.trim() || isArchived}
-                >
-                  {uploadMutation.isPending && (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  )}
-                  Yükle
-                </Button>
-              </div>
               </DialogContent>
             </Dialog>
           )}
@@ -240,8 +297,9 @@ export function DocumentsTab({ roomId, isArchived = false }: DocumentsTabProps) 
         {!isMember && !isLoading && (
           <div className="rounded-lg border bg-muted/50 p-4">
             <p className="text-sm text-muted-foreground">
-              <strong>Not:</strong> Bu odaya üye olmadığınız için sadece dokümanları görüntüleyebilirsiniz. 
-              Doküman yüklemek veya silmek için odaya üye olmanız gerekmektedir.
+              <strong>Not:</strong> Bu odaya üye olmadığınız için sadece
+              dokümanları görüntüleyebilirsiniz. Doküman yüklemek veya silmek
+              için odaya üye olmanız gerekmektedir.
             </p>
           </div>
         )}
@@ -293,32 +351,42 @@ export function DocumentsTab({ roomId, isArchived = false }: DocumentsTabProps) 
                         <div>
                           <p className="font-medium">{document.name}</p>
                           {document.description && (
-                            <p className="text-sm text-muted-foreground">{document.description}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {document.description}
+                            </p>
                           )}
                         </div>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <span className="text-sm">{formatFileSize(document.file_size || 0)}</span>
+                      <span className="text-sm">
+                        {formatFileSize(document.file_size || 0)}
+                      </span>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center space-x-2">
                         <Avatar className="h-6 w-6">
-                          <AvatarImage src={document.profiles?.avatar_url || ""} />
+                          <AvatarImage
+                            src={document.profiles?.avatar_url || ""}
+                          />
                           <AvatarFallback className="text-xs">
                             {document.profiles?.full_name
                               ?.split(" ")
-                              .map(n => n[0])
+                              .map((n) => n[0])
                               .join("")
                               .toUpperCase() || "U"}
                           </AvatarFallback>
                         </Avatar>
-                        <span className="text-sm">{document.profiles?.full_name || "Bilinmiyor"}</span>
+                        <span className="text-sm">
+                          {document.profiles?.full_name || "Bilinmiyor"}
+                        </span>
                       </div>
                     </TableCell>
                     <TableCell>
                       <span className="text-sm text-muted-foreground">
-                        {new Date(document.created_at || '').toLocaleDateString('tr-TR')}
+                        {new Date(document.created_at || "").toLocaleDateString(
+                          "tr-TR"
+                        )}
                       </span>
                     </TableCell>
                     <TableCell>
@@ -341,19 +409,24 @@ export function DocumentsTab({ roomId, isArchived = false }: DocumentsTabProps) 
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleDownload(document)}>
+                          <DropdownMenuItem
+                            onClick={() => handleDownload(document)}
+                          >
                             <Download className="mr-2 h-4 w-4" />
                             İndir
                           </DropdownMenuItem>
                           {(() => {
-                            const mimeType = document.mime_type || '';
-                            const canViewInline = mimeType.includes('pdf') || 
-                                                 mimeType.includes('image/') || 
-                                                 mimeType.includes('text/');
-                            
+                            const mimeType = document.mime_type || "";
+                            const canViewInline =
+                              mimeType.includes("pdf") ||
+                              mimeType.includes("image/") ||
+                              mimeType.includes("text/");
+
                             if (canViewInline) {
                               return (
-                                <DropdownMenuItem onClick={() => handleView(document)}>
+                                <DropdownMenuItem
+                                  onClick={() => handleView(document)}
+                                >
                                   <Eye className="mr-2 h-4 w-4" />
                                   Görüntüle
                                 </DropdownMenuItem>
@@ -363,18 +436,32 @@ export function DocumentsTab({ roomId, isArchived = false }: DocumentsTabProps) 
                               return null;
                             }
                           })()}
-                          {isMember && (
-                            <>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem 
-                                className="text-destructive"
-                                onClick={() => handleDelete(document)}
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Sil
-                              </DropdownMenuItem>
-                            </>
-                          )}
+                          {(() => {
+                            // Only show delete option for:
+                            // 1. Document uploader
+                            // 2. Admin
+                            // 3. LR
+                            const canDelete =
+                              document.uploaded_by === currentUserId ||
+                              currentUserRole === "admin" ||
+                              currentUserRole === "lr";
+
+                            if (canDelete) {
+                              return (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    className="text-destructive"
+                                    onClick={() => handleDelete(document)}
+                                  >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Sil
+                                  </DropdownMenuItem>
+                                </>
+                              );
+                            }
+                            return null;
+                          })()}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -390,7 +477,9 @@ export function DocumentsTab({ roomId, isArchived = false }: DocumentsTabProps) 
             <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
             <h3 className="mt-4 text-lg font-semibold">Doküman bulunamadı</h3>
             <p className="mt-2 text-sm text-muted-foreground">
-              {searchTerm ? "Arama kriterlerinize uygun doküman bulunamadı." : "Henüz doküman yüklenmemiş."}
+              {searchTerm
+                ? "Arama kriterlerinize uygun doküman bulunamadı."
+                : "Henüz doküman yüklenmemiş."}
             </p>
             {!isMember && (
               <p className="mt-2 text-sm text-muted-foreground">
