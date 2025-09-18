@@ -38,9 +38,6 @@ export async function GET(request: NextRequest) {
     const userRole = 'member'; // Default role for access
 
     // Get documents with uploader profile using admin client to bypass RLS
-    console.log('=== DOCUMENTS API DEBUG START ===');
-    console.log('Room ID:', roomId);
-    
     const { data: documents, error } = await adminSupabase
       .from('document')
       .select(`
@@ -49,18 +46,6 @@ export async function GET(request: NextRequest) {
       `)
       .eq('room_id', roomId)
       .order('created_at', { ascending: false });
-
-    console.log('Documents fetch result:', {
-      documentsCount: documents?.length || 0,
-      documents: documents?.map((doc: any) => ({
-        id: doc.id,
-        name: doc.name,
-        file_path: doc.file_path,
-        original_name: doc.original_name,
-        mime_type: doc.mime_type
-      })),
-      error
-    });
 
     if (error) {
       console.error('Error fetching documents:', error);
