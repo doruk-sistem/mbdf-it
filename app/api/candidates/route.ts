@@ -108,46 +108,8 @@ export async function POST(request: NextRequest) {
     // Use admin client to bypass RLS
     const adminSupabase = createAdminSupabase();
 
-    // Check if user is a member of the room
-    const { data: membership, error: memberError } = await adminSupabase
-      .from('mbdf_member')
-      .select('role')
-      .eq('room_id', validatedData.room_id)
-      .eq('user_id', user.id)
-      .single() as { data: { role: string } | null; error: any };
-
-    if (memberError || !membership) {
-      return NextResponse.json(
-        { error: 'Access denied: You must be a member of this room', success: false },
-        { status: 403 }
-      );
-    }
-
-    // Check if user is trying to nominate themselves or if they have admin/lr role
-    const isSelfNomination = user.id === validatedData.user_id;
-    const hasAdminRole = ['admin', 'lr'].includes(membership.role);
-
-    if (!isSelfNomination && !hasAdminRole) {
-      return NextResponse.json(
-        { error: 'Access denied: You can only nominate yourself or need admin/LR role to nominate others', success: false },
-        { status: 403 }
-      );
-    }
-
-    // Check if the user to be nominated is a member of the room
-    const { data: targetMember, error: targetMemberError } = await adminSupabase
-      .from('mbdf_member')
-      .select('id')
-      .eq('room_id', validatedData.room_id)
-      .eq('user_id', validatedData.user_id)
-      .single();
-
-    if (targetMemberError || !targetMember) {
-      return NextResponse.json(
-        { error: 'User is not a member of this room', success: false },
-        { status: 400 }
-      );
-    }
+    // Allow all authenticated users to nominate candidates
+    // No membership check needed - all users can nominate candidates
 
     // Check if candidate already exists
     const { data: existingCandidate, error: existingError } = await adminSupabase

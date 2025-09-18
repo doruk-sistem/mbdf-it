@@ -136,20 +136,8 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Check if user is member of the room for posting messages
-    const { data: membership } = await supabase
-      .from("mbdf_member")
-      .select("id")
-      .eq("room_id", params.roomId)
-      .eq("user_id", user.id)
-      .single();
-
-    if (!membership) {
-      return NextResponse.json({ 
-        error: "Bu odaya üye olmadığınız için mesaj yazamazsınız. Mesaj yazmak için odaya üye olmanız gerekmektedir.", 
-        code: "MEMBERSHIP_REQUIRED" 
-      }, { status: 403 });
-    }
+      // Allow all authenticated users to post messages
+    // No membership check needed - all users can participate in forum
 
     const body = await request.json();
     const { content, message_type, topic } = createMessageSchema.parse(body);

@@ -24,20 +24,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Check if user is a member of the room
-    const { data: membership, error: memberError } = await supabase
+    // Allow all authenticated users to view members
+    // No membership check needed - all users can see room members
+    const { data: membership } = await supabase
       .from("mbdf_member")
       .select("role")
       .eq("room_id", roomId)
       .eq("user_id", user.id)
       .single();
-
-    if (memberError || !membership) {
-      return NextResponse.json(
-        { error: 'Access denied: You must be a member of this room' },
-        { status: 403 }
-      );
-    }
 
     // Use admin client to bypass RLS for reading members
     const adminSupabase = createAdminSupabase();
@@ -73,7 +67,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       items: members || [],
       total: members?.length || 0,
-      currentUserRole: membership.role
+      currentUserRole: membership?.role || 'member' // Default to member if not found
     });
 
   } catch (error) {

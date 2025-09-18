@@ -63,7 +63,7 @@ export function DocumentsTab({ roomId, isArchived = false }: DocumentsTabProps) 
   const uploadMutation = useUploadDocument();
 
   const documents = documentsData?.items || [];
-  const isMember = documentsData?.isMember ?? false;
+  const isMember = true; // All authenticated users can access documents
 
   const filteredDocuments = documents.filter(doc => {
     const matchesSearch = doc.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -93,38 +93,30 @@ export function DocumentsTab({ roomId, isArchived = false }: DocumentsTabProps) 
   };
 
   const handleView = (document: any) => {
-    if (document.download_url) {
-      window.open(document.download_url, '_blank');
-      return;
+    // Check if file type can be viewed inline
+    const mimeType = document.mime_type || '';
+    const canViewInline = mimeType.includes('pdf') || 
+                         mimeType.includes('image/') || 
+                         mimeType.includes('text/');
+    
+    if (canViewInline) {
+      // Use view endpoint for inline viewing
+      const viewUrl = `/api/documents/${document.id}/view`;
+      window.open(viewUrl, '_blank');
+    } else {
+      // For files that can't be viewed inline, show info message
+      toast({
+        title: "Görüntüleme Desteklenmiyor",
+        description: `${document.name} dosyası tarayıcıda görüntülenemez. İndir butonunu kullanın.`,
+        variant: "default",
+      });
     }
-    
-    // Check if user is member, show appropriate message
-    const errorMessage = isMember 
-      ? "Görüntüleme linki oluşturulamadı."
-      : "Bu odaya üye olmadığınız için dokümanı görüntüleyemezsiniz. Görüntülemek için odaya üye olmanız gerekmektedir.";
-    
-    toast({
-      title: "Erişim Engellendi",
-      description: errorMessage,
-      variant: "destructive",
-    });
   };
 
   const handleDownload = (document: any) => {
-    if (document.download_url) {
-      window.open(document.download_url, '_blank');
-    } else {
-      // Check if user is member, show appropriate message
-      const errorMessage = isMember 
-        ? "İndirme linki oluşturulamadı."
-        : "Bu odaya üye olmadığınız için dokümanı indiremezsiniz. İndirmek için odaya üye olmanız gerekmektedir.";
-      
-      toast({
-        title: "Erişim Engellendi",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    }
+    // Use download endpoint for file download
+    const downloadUrl = `/api/documents/${document.id}/download`;
+    window.open(downloadUrl, '_blank');
   };
 
   const handleDelete = (document: any) => {
@@ -353,10 +345,24 @@ export function DocumentsTab({ roomId, isArchived = false }: DocumentsTabProps) 
                             <Download className="mr-2 h-4 w-4" />
                             İndir
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleView(document)}>
-                            <Eye className="mr-2 h-4 w-4" />
-                            Görüntüle
-                          </DropdownMenuItem>
+                          {(() => {
+                            const mimeType = document.mime_type || '';
+                            const canViewInline = mimeType.includes('pdf') || 
+                                                 mimeType.includes('image/') || 
+                                                 mimeType.includes('text/');
+                            
+                            if (canViewInline) {
+                              return (
+                                <DropdownMenuItem onClick={() => handleView(document)}>
+                                  <Eye className="mr-2 h-4 w-4" />
+                                  Görüntüle
+                                </DropdownMenuItem>
+                              );
+                            } else {
+                              // Don't show "Görüntüle" option for unsupported file types
+                              return null;
+                            }
+                          })()}
                           {isMember && (
                             <>
                               <DropdownMenuSeparator />

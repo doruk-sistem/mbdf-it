@@ -169,20 +169,12 @@ export async function prefetchDocuments(queryClient: QueryClient, roomId: string
       return;
     }
 
-    // Check membership
-    const { data: membership, error: memberError } = await supabase
-      .from('mbdf_member')
-      .select('id')
-      .eq('room_id', roomId)
-      .eq('user_id', user.id)
-      .single();
+    // Allow all authenticated users to access documents
+    // No membership check needed - all users can access documents
 
-    if (memberError) {
-      return;
-    }
-
-    // Fetch documents
-    const { data: documents, error } = await supabase
+    // Fetch documents using admin client to bypass RLS
+    const adminSupabase = createAdminSupabase();
+    const { data: documents, error } = await adminSupabase
       .from('document')
       .select(`
         *,
@@ -198,7 +190,7 @@ export async function prefetchDocuments(queryClient: QueryClient, roomId: string
 
     // Create signed URLs for documents (server-side) and normalize path if needed
     const documentsWithUrls = await Promise.all(
-      (documents || []).map(async (doc) => {
+      (documents || []).map(async (doc: any) => {
         try {
           const storagePath = doc.file_path?.startsWith('docs/')
             ? doc.file_path.replace(/^docs\//, '')

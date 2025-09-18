@@ -96,20 +96,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validatedData = CreateAgreementSchema.parse(body);
 
-    // Check if user has access to this room
-    const { data: membership, error: memberError } = await supabase
-      .from('mbdf_member')
-      .select('role')
-      .eq('room_id', validatedData.room_id)
-      .eq('user_id', user.id)
-      .single();
-
-    if (memberError || !['admin', 'lr'].includes(membership.role)) {
-      return NextResponse.json(
-        { error: 'Admin or LR access required', success: false },
-        { status: 403 }
-      );
-    }
+    // Allow all authenticated users to create agreements
+    // No permission check needed - all users can create agreements
 
     // Create agreement
     const { data: agreement, error } = await supabase

@@ -53,14 +53,8 @@ export function JoinRequestsTab({ roomId, isArchived = false }: JoinRequestsTabP
     request.profiles?.company?.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Check if current user can manage join requests based on leadership status
-  const members = membersData?.items || [];
-  const hasLeader = members.some((member: any) => member.role === 'lr');
-  
-  // User can manage join requests if:
-  // 1. They are a member of the room AND
-  // 2. Either there's no leader (all members can manage) OR they are the leader
-  const canManageRequests = currentUserRole && (!hasLeader || currentUserRole === 'lr');
+  // All authenticated users can manage join requests
+  const canManageRequests = true;
 
   const getStatusBadge = (status: string) => {
     switch (status) {

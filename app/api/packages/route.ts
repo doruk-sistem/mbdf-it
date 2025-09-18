@@ -83,20 +83,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if user is admin of this room
-    const { data: membership, error: memberError } = await supabase
-      .from('mbdf_member')
-      .select('role')
-      .eq('room_id', room_id)
-      .eq('user_id', user.id)
-      .single();
-
-    if (memberError || !['admin', 'lr'].includes(membership.role)) {
-      return NextResponse.json(
-        { error: 'Admin or LR access required', success: false },
-        { status: 403 }
-      );
-    }
+    // Allow all authenticated users to create packages
+    // No permission check needed - all users can create packages
 
     // Create package
     const { data: package_data_result, error } = await supabase

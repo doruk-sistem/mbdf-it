@@ -44,26 +44,8 @@ export async function PUT(
       return NextResponse.json({ error: 'Member not found' }, { status: 404 });
     }
 
-    // Check if current user has permission to update this member's role
-    const { data: currentMember, error: currentMemberError } = await supabase
-      .from("mbdf_member")
-      .select("role")
-      .eq("room_id", member.room_id)
-      .eq("user_id", user.id)
-      .single();
-
-    if (currentMemberError || !currentMember) {
-      return NextResponse.json({ 
-        error: 'You are not a member of this room' 
-      }, { status: 403 });
-    }
-
-    // Only admins can update roles
-    if (currentMember.role !== "admin") {
-      return NextResponse.json({ 
-        error: 'Insufficient permissions. Only admins can update member roles' 
-      }, { status: 403 });
-    }
+    // Allow all authenticated users to update member roles
+    // No permission check needed - all users can manage roles
 
     // Check if room is archived
     const { data: room, error: roomError } = await supabase

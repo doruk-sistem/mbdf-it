@@ -29,22 +29,8 @@ export async function GET(
     // Use admin client to bypass RLS
     const adminSupabase = createAdminSupabase();
 
-    // First check if user has access to this room using admin client
-    // We will NOT block non-members from seeing basic room details; feature tabs enforce permissions.
-    const { data: membership, error: memberError } = await adminSupabase
-      .from('mbdf_member')
-      .select('id')
-      .eq('room_id', roomId)
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    if (memberError && memberError.code !== 'PGRST116') {
-      console.error('Error checking membership:', memberError);
-      return NextResponse.json(
-        { error: 'Failed to verify access', success: false },
-        { status: 500 }
-      );
-    }
+    // Allow all authenticated users to view room details
+    // No membership check needed - all users can access room information
 
     // Get room basic data using admin client
     const { data: room, error: roomError } = await adminSupabase

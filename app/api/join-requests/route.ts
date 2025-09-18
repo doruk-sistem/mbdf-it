@@ -65,38 +65,8 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false });
 
     if (roomId) {
-      // Check if user has access to this room (must be a member)
-      const { data: membership, error: memberError } = await adminSupabase
-        .from('mbdf_member')
-        .select('role')
-        .eq('room_id', roomId)
-        .eq('user_id', user.id)
-        .single() as { data: any; error: any };
-
-      if (memberError || !membership) {
-        return NextResponse.json(
-          { error: 'Access denied - Room membership required', success: false },
-          { status: 403 }
-        );
-      }
-
-      // Check if there's a leader in the room
-      const { data: leaderExists } = await adminSupabase
-        .from('mbdf_member')
-        .select('id')
-        .eq('room_id', roomId)
-        .eq('role', 'lr')
-        .single();
-
-      // If there's a leader, only the leader can see join requests
-      // If no leader, all members can see join requests
-      if (leaderExists && membership.role !== 'lr') {
-        return NextResponse.json(
-          { error: 'Access denied - Only the leader can view join requests when a leader exists', success: false },
-          { status: 403 }
-        );
-      }
-
+      // Allow all authenticated users to view join requests
+      // No membership check needed - all users can see join requests
       query = query.eq('mbdf_room_id', roomId);
     }
 

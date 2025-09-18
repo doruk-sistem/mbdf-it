@@ -213,8 +213,7 @@ export function MembersTab({ roomId, isArchived = false }: MembersTabProps) {
               Bu odadaki tüm üyeleri görüntüleyin ve yönetin
             </CardDescription>
           </div>
-          {(currentUserRole === "admin" || currentUserRole === "lr") && (
-            <Dialog
+          <Dialog
               open={addMemberDialogOpen}
               onOpenChange={setAddMemberDialogOpen}
             >
@@ -263,12 +262,8 @@ export function MembersTab({ roomId, isArchived = false }: MembersTabProps) {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="member">Üye</SelectItem>
-                        {currentUserRole === "admin" && (
-                          <SelectItem value="lr">LR</SelectItem>
-                        )}
-                        {currentUserRole === "admin" && (
-                          <SelectItem value="admin">Yönetici</SelectItem>
-                        )}
+                        <SelectItem value="lr">LR</SelectItem>
+                        <SelectItem value="admin">Yönetici</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -296,7 +291,6 @@ export function MembersTab({ roomId, isArchived = false }: MembersTabProps) {
                 </div>
               </DialogContent>
             </Dialog>
-          )}
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -377,8 +371,7 @@ export function MembersTab({ roomId, isArchived = false }: MembersTabProps) {
                     </span>
                   </TableCell>
                   <TableCell>
-                    {(currentUserRole === "admin" || currentUserRole === "lr") &&
-                      member.role !== "admin" && (
+                    {member.role !== "admin" && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button
@@ -393,54 +386,36 @@ export function MembersTab({ roomId, isArchived = false }: MembersTabProps) {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            {currentUserRole === "admin" && (
-                              <DropdownMenuItem
-                                onClick={() =>
-                                  handleUpdateRole(member.id!, "member")
-                                }
-                                disabled={
-                                  isArchived || updateRoleMutation.isPending
-                                }
-                              >
-                                Üye Yap
-                              </DropdownMenuItem>
-                            )}
-                            {currentUserRole === "admin" && (
-                              <DropdownMenuItem
-                                onClick={() =>
-                                  handleUpdateRole(member.id!, "lr")
-                                }
-                                disabled={
-                                  isArchived || updateRoleMutation.isPending
-                                }
-                              >
-                                LR Yap
-                              </DropdownMenuItem>
-                            )}
-                            {currentUserRole === "admin" && (
-                              <DropdownMenuItem
-                                onClick={() =>
-                                  handleUpdateRole(member.id!, "admin")
-                                }
-                                disabled={
-                                  isArchived || updateRoleMutation.isPending
-                                }
-                              >
-                                Yönetici Yap
-                              </DropdownMenuItem>
-                            )}
-                            {currentUserRole === "lr" && member.role !== "member" && (
-                              <DropdownMenuItem
-                                onClick={() =>
-                                  handleUpdateRole(member.id!, "member")
-                                }
-                                disabled={
-                                  isArchived || updateRoleMutation.isPending
-                                }
-                              >
-                                Üye Yap
-                              </DropdownMenuItem>
-                            )}
+                            <DropdownMenuItem
+                              onClick={() =>
+                                handleUpdateRole(member.id!, "member")
+                              }
+                              disabled={
+                                isArchived || updateRoleMutation.isPending
+                              }
+                            >
+                              Üye Yap
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() =>
+                                handleUpdateRole(member.id!, "lr")
+                              }
+                              disabled={
+                                isArchived || updateRoleMutation.isPending
+                              }
+                            >
+                              LR Yap
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() =>
+                                handleUpdateRole(member.id!, "admin")
+                              }
+                              disabled={
+                                isArchived || updateRoleMutation.isPending
+                              }
+                            >
+                              Yönetici Yap
+                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               className="text-destructive"

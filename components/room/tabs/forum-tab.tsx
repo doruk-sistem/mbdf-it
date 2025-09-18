@@ -82,12 +82,8 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
     getUser();
   }, []);
 
-  // Check if current user is a member
-  const isMember = currentUserId && membersData?.items?.some(member => 
-    member.id === currentUserId || 
-    member.user_id === currentUserId ||
-    member.profiles?.id === currentUserId
-  );
+  // All authenticated users are considered members for forum access
+  const isMember = true;
   // Fetch forum topics
   const { data: topics } = useQuery<{ topic: string; isPinned: boolean }[]>({
     queryKey: ["forum-topics", roomId],
@@ -373,8 +369,6 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
   }
 
   if (error) {
-    const isAccessDenied = error.message === "ACCESS_DENIED";
-    
     return (
       <Card>
         <CardHeader>
@@ -384,15 +378,7 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {isAccessDenied ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <MessageCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p className="font-medium">Bu odaya erişim yetkiniz yok</p>
-              <p className="text-sm">Forum mesajlarını görüntülemek için oda üyesi olmanız gerekiyor.</p>
-            </div>
-          ) : (
-            <p className="text-destructive">Forum mesajları yüklenirken bir hata oluştu.</p>
-          )}
+          <p className="text-destructive">Forum mesajları yüklenirken bir hata oluştu.</p>
         </CardContent>
       </Card>
     );
@@ -683,28 +669,20 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
                 "{selectedTopic}" konusuna mesaj yazıyorsunuz
               </div>
               
-              {/* Membership warning */}
-              {isMember === false && (
-                <div className="rounded-lg border bg-yellow-50 p-3 dark:bg-yellow-950">
-                  <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                    <strong>Not:</strong> Bu odaya üye olmadığınız için mesaj yazamazsınız. 
-                    Mesaj yazmak için odaya üye olmanız gerekmektedir.
-                  </p>
-                </div>
-              )}
+              {/* All authenticated users can now participate in forum */}
               
               <div className="space-y-3">
                 <RichTextEditor
                   content={newMessage}
                   onChange={setNewMessage}
-                  placeholder={isMember === false ? "Üye olmadığınız için mesaj yazamazsınız..." : "Forum mesajınızı yazın..."}
-                  disabled={sendMessageMutation.isPending || isMember === false}
+                  placeholder="Forum mesajınızı yazın..."
+                  disabled={sendMessageMutation.isPending}
                   className="min-h-[120px]"
                 />
                 <div className="flex justify-end">
                   <Button
                     onClick={handleSendMessage}
-                    disabled={!newMessage.trim() || sendMessageMutation.isPending || isMember === false}
+                    disabled={!newMessage.trim() || sendMessageMutation.isPending}
                     size="sm"
                     className="flex items-center gap-2"
                   >
