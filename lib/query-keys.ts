@@ -24,6 +24,7 @@ export const keys = {
     list: (roomId: string) => ['documents', 'list', roomId] as const,
     byId: (id: string) => ['documents', 'byId', id] as const,
     byRoomId: (roomId: string) => ['documents', 'byRoomId', roomId] as const,
+    byUserId: (userId: string) => ['documents', 'byUserId', userId] as const,
   },
 
   // Packages and Access Requests

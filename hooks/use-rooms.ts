@@ -62,7 +62,16 @@ type UnarchiveResponse = z.infer<typeof UnarchiveResponseSchema>;
 export function useRooms() {
   return useQuery({
     queryKey: keys.rooms.list(),
-    queryFn: () => get(API_ENDPOINTS.rooms).then(data => RoomsListResponseSchema.parse(data)),
+    queryFn: async () => {
+      try {
+        const data = await get(API_ENDPOINTS.rooms);
+        const parsed = RoomsListResponseSchema.parse(data);
+        return parsed;
+      } catch (error) {
+        console.error('❌ useRooms: Error:', error);
+        throw error;
+      }
+    },
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }

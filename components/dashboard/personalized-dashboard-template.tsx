@@ -27,7 +27,7 @@ import { motion } from "framer-motion";
 import { useCurrentUser } from "@/hooks/use-user";
 import { useRooms } from "@/hooks/use-rooms";
 import { useMyKKSSubmissions } from "@/hooks/use-kks";
-import { useDocuments } from "@/hooks/use-documents";
+import { useUserDocuments } from "@/hooks/use-documents";
 
 // Mock data for template
 const mockCompanyData = {
@@ -115,19 +115,23 @@ export function PersonalizedDashboardTemplate() {
   const { data: userData, isLoading: userLoading } = useCurrentUser();
   const { data: roomsData, isLoading: roomsLoading } = useRooms();
   const { data: kksData, isLoading: kksLoading } = useMyKKSSubmissions(userData?.profile?.id || '');
+  const { data: documentsData, isLoading: documentsLoading } = useUserDocuments(userData?.profile?.id || '');
 
   // Extract company information
   const company = userData?.profile?.company;
   
-  // Calculate statistics
-  const totalRooms = roomsData?.items?.length || 0;
-  const activeRooms = roomsData?.items?.filter((room: any) => room.status === 'active').length || 0;
-  const userRooms = roomsData?.items?.filter((room: any) => room.is_member) || [];
-  const lrRooms = roomsData?.items?.filter((room: any) => room.user_role === 'lr') || [];
+  // Calculate statistics with proper type guards
+  const rooms = roomsData?.items || [];
+  const totalRooms = rooms.length;
+  const activeRooms = rooms.filter((room: any) => room.status === 'active').length;
+  const userRooms = rooms.filter((room: any) => room.is_member);
+  const lrRooms = rooms.filter((room: any) => room.user_role === 'lr');
   const totalKks = kksData?.items?.length || 0;
+  const totalDocuments = documentsData?.items?.length || 0;
+
 
   // Loading state
-  const isLoading = userLoading || roomsLoading;
+  const isLoading = userLoading || roomsLoading || documentsLoading;
 
   return (
     <div className="space-y-8">
@@ -279,7 +283,7 @@ export function PersonalizedDashboardTemplate() {
                 animate={{ scale: 1 }}
                 transition={{ delay: 0.3, type: "spring", stiffness: 200 }}
               >
-                {isLoading ? "..." : "0"}
+                {isLoading ? "..." : totalDocuments}
               </motion.div>
               <p className="text-xs text-muted-foreground">
                 Toplam yüklediğim belge
@@ -476,7 +480,7 @@ export function PersonalizedDashboardTemplate() {
 
               {/* MBDF Results */}
               <div className="space-y-4">
-                {roomsData?.items?.filter((room: any) => {
+                {rooms.filter((room: any) => {
                   if (selectedStatus === 'all') return true;
                   return room.status === selectedStatus;
                 }).filter((room: any) => {

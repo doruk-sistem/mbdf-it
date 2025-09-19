@@ -216,6 +216,8 @@ export const RoomWithDetailsSchema = RoomSchema.extend({
   member_count: z.number().optional(),
   document_count: z.number().optional(),
   package_count: z.number().optional(),
+  is_member: z.boolean().optional(),
+  user_role: z.string().nullable().optional(),
 });
 
 export const MemberWithProfileSchema = MemberSchema.extend({
@@ -231,8 +233,17 @@ export const AccessRequestWithDetailsSchema = AccessRequestSchema.extend({
 });
 
 export const DocumentWithUploaderSchema = DocumentSchema.extend({
-  profiles: ProfileSchema,
+  profiles: ProfileSchema.optional(),
   download_url: z.string().url().nullable().optional(),
+  mbdf_room: z.object({
+    id: z.string().uuid(),
+    name: z.string(),
+    substance: z.object({
+      name: z.string(),
+      cas_number: z.string().nullable(),
+      ec_number: z.string().nullable(),
+    }).nullable(),
+  }).nullable().optional(),
 });
 
 export const JoinRequestWithDetailsSchema = JoinRequestSchema.extend({
@@ -341,6 +352,7 @@ export const RoomsListResponseSchema = z.object({
 export const DocumentsListResponseSchema = z.object({
   items: z.array(DocumentWithUploaderSchema),
   total: z.number(),
+  success: z.boolean().optional(),
   isMember: z.boolean().optional(),
 });
 

@@ -30,6 +30,24 @@ export function useDocument(documentId: string) {
   });
 }
 
+export function useUserDocuments(userId: string) {
+  return useQuery({
+    queryKey: keys.documents.byUserId(userId),
+    queryFn: async () => {
+      try {
+        const data = await get(API_ENDPOINTS.userDocuments);
+        const parsed = DocumentsListResponseSchema.parse(data);
+        return parsed;
+      } catch (error) {
+        console.error('❌ useUserDocuments: Parse error:', error);
+        throw error;
+      }
+    },
+    enabled: !!userId,
+    staleTime: 1000 * 60 * 2, // 2 minutes
+  });
+}
+
 // Mutation hooks
 export function useUploadDocument() {
   const queryClient = useQueryClient();
