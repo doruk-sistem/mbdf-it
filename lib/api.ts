@@ -270,6 +270,9 @@ export const API_ENDPOINTS = {
   documentUpload: '/api/documents/upload',
   userDocuments: '/api/documents/user',
 
+  // Activities
+  activities: '/api/activities',
+
   // Members
   members: '/api/members',
   member: (id: string) => `/api/members/${id}`,

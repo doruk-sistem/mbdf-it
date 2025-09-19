@@ -28,6 +28,7 @@ import { useCurrentUser } from "@/hooks/use-user";
 import { useRooms } from "@/hooks/use-rooms";
 import { useMyKKSSubmissions } from "@/hooks/use-kks";
 import { useUserDocuments } from "@/hooks/use-documents";
+import { useRecentActivities } from "@/hooks/use-activities";
 
 // Mock data for template
 const mockCompanyData = {
@@ -71,40 +72,6 @@ const mockMBDFData = [
   }
 ];
 
-const mockRecentActivities = [
-  {
-    id: "1",
-    action: "Yeni MBDF odası oluşturdunuz",
-    user: "Sen",
-    room: "Chlorobenzene",
-    time: "2 saat önce",
-    type: "Oluşturma"
-  },
-  {
-    id: "2",
-    action: "Belge yüklediniz",
-    user: "Sen",
-    room: "Acetone",
-    time: "4 saat önce", 
-    type: "Belge"
-  },
-  {
-    id: "3",
-    action: "Oylamaya katıldınız",
-    user: "Sen",
-    room: "Phenol",
-    time: "1 gün önce",
-    type: "Oylama"
-  },
-  {
-    id: "4",
-    action: "KKS gönderdiniz",
-    user: "Sen",
-    room: "Toluene",
-    time: "2 gün önce",
-    type: "KKS"
-  }
-];
 
 export function PersonalizedDashboardTemplate() {   
   const [searchTerm, setSearchTerm] = useState("");
@@ -116,6 +83,7 @@ export function PersonalizedDashboardTemplate() {
   const { data: roomsData, isLoading: roomsLoading } = useRooms();
   const { data: kksData, isLoading: kksLoading } = useMyKKSSubmissions(userData?.profile?.id || '');
   const { data: documentsData, isLoading: documentsLoading } = useUserDocuments(userData?.profile?.id || '');
+  const { data: activitiesData, isLoading: activitiesLoading } = useRecentActivities();
 
   // Extract company information
   const company = userData?.profile?.company;
@@ -131,7 +99,7 @@ export function PersonalizedDashboardTemplate() {
 
 
   // Loading state
-  const isLoading = userLoading || roomsLoading || documentsLoading;
+  const isLoading = userLoading || roomsLoading || documentsLoading || activitiesLoading;
 
   return (
     <div className="space-y-8">
@@ -362,7 +330,7 @@ export function PersonalizedDashboardTemplate() {
                   <CardTitle>Son Aktiviteler</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {mockRecentActivities.map((activity, index) => (
+                  {(activitiesData?.items || []).map((activity, index) => (
                     <motion.div
                       key={activity.id}
                       initial={{ opacity: 0, y: 10 }}

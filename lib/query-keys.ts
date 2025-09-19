@@ -27,6 +27,12 @@ export const keys = {
     byUserId: (userId: string) => ['documents', 'byUserId', userId] as const,
   },
 
+  // Activities
+  activities: {
+    all: ['activities'] as const,
+    recent: () => ['activities', 'recent'] as const,
+  },
+
   // Packages and Access Requests
   packages: {
     all: ['packages'] as const,
