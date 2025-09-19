@@ -1,0 +1,551 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { 
+  Building2, 
+  Users, 
+  FileText, 
+  Clock, 
+  Plus, 
+  Search,
+  Database,
+  Filter,
+  Eye,
+  Edit,
+  Calendar
+} from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { motion } from "framer-motion";
+
+// Mock data for template
+const mockCompanyData = {
+  name: "Örnek Kimya A.Ş.",
+  vatNumber: "1234567890",
+  address: "İstanbul, Türkiye",
+  contactEmail: "info@ornekkimya.com",
+  contactPhone: "+90 212 123 45 67",
+  memberCount: 25,
+  activeProjects: 8,
+  totalRevenue: "₺2.5M"
+};
+
+const mockMBDFData = [
+  {
+    id: "1",
+    substance: "Chlorobenzene",
+    casNumber: "108-90-7",
+    ecNumber: "203-628-5",
+    status: "active",
+    members: 12,
+    lastActivity: "2 saat önce"
+  },
+  {
+    id: "2", 
+    substance: "Acetone",
+    casNumber: "67-64-1",
+    ecNumber: "200-662-2",
+    status: "closed",
+    members: 8,
+    lastActivity: "1 gün önce"
+  },
+  {
+    id: "3",
+    substance: "Phenol",
+    casNumber: "108-95-2", 
+    ecNumber: "203-632-7",
+    status: "archived",
+    members: 15,
+    lastActivity: "3 gün önce"
+  }
+];
+
+const mockRecentActivities = [
+  {
+    id: "1",
+    action: "Yeni MBDF odası oluşturdunuz",
+    user: "Sen",
+    room: "Chlorobenzene",
+    time: "2 saat önce",
+    type: "Oluşturma"
+  },
+  {
+    id: "2",
+    action: "Belge yüklediniz",
+    user: "Sen",
+    room: "Acetone",
+    time: "4 saat önce", 
+    type: "Belge"
+  },
+  {
+    id: "3",
+    action: "Oylamaya katıldınız",
+    user: "Sen",
+    room: "Phenol",
+    time: "1 gün önce",
+    type: "Oylama"
+  },
+  {
+    id: "4",
+    action: "KKS gönderdiniz",
+    user: "Sen",
+    room: "Toluene",
+    time: "2 gün önce",
+    type: "KKS"
+  }
+];
+
+export function PersonalizedDashboardTemplate() {   
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState("all");
+  const [activeTab, setActiveTab] = useState("overview");
+
+  return (
+    <div className="space-y-8">
+      {/* Header Section */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="bg-gradient-to-r from-slate-50 to-blue-50 p-6 rounded-lg border border-slate-200"
+      >
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-800">Dashboard</h1>
+          <p className="text-slate-600 mt-1">
+            MBDF süreçlerinizi yönetin ve takip edin
+          </p>
+        </div>
+      </motion.div>
+
+      {/* Company Information Section */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.1 }}
+      >
+        <Card className="border-l-4 border-l-blue-500">
+          <CardHeader className="bg-blue-50/50">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Building2 className="h-5 w-5 text-blue-600" />
+                <CardTitle className="text-blue-800">Firma Bilgileri</CardTitle>
+              </div>
+              <Button variant="outline" size="sm" className="border-blue-200 text-blue-700 hover:bg-blue-50">
+                <Edit className="mr-2 h-4 w-4" />
+                Düzenle
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium text-muted-foreground">Firma Adı</h4>
+                <p className="text-sm">{mockCompanyData.name}</p>
+              </div>
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium text-muted-foreground">Vergi No</h4>
+                <p className="text-sm">{mockCompanyData.vatNumber}</p>
+              </div>
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium text-muted-foreground">İletişim</h4>
+                <p className="text-sm">{mockCompanyData.contactEmail}</p>
+              </div>
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium text-muted-foreground">Şirketin Aktif Odaları</h4>
+                <p className="text-sm font-semibold">{mockCompanyData.activeProjects}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* Stats Overview */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.2 }}
+        className="grid gap-4 md:grid-cols-2 lg:grid-cols-4"
+      >
+        <motion.div
+          whileHover={{ scale: 1.02, y: -2 }}
+          transition={{ type: "spring", stiffness: 300, damping: 20 }}
+        >
+          <Card className="border-l-4 border-l-blue-500 hover:shadow-md transition-shadow">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-blue-700">Katıldığım Odalar</CardTitle>
+              <Database className="h-4 w-4 text-blue-500" />
+            </CardHeader>
+            <CardContent>
+              <motion.div 
+                className="text-2xl font-bold text-blue-600"
+                initial={{ scale: 0.8 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: 0.1, type: "spring", stiffness: 200 }}
+              >
+                {mockMBDFData.length}
+              </motion.div>
+              <p className="text-xs text-muted-foreground">
+                Üye olduğum odalar
+              </p>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        <motion.div
+          whileHover={{ scale: 1.02, y: -2 }}
+          transition={{ type: "spring", stiffness: 300, damping: 20 }}
+        >
+          <Card className="border-l-4 border-l-green-500 hover:shadow-md transition-shadow bg-green-50/30">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-green-50/50">
+              <CardTitle className="text-sm font-medium text-green-800">LR olduğum Odalar</CardTitle>
+              <Users className="h-4 w-4 text-green-600" />
+            </CardHeader>
+            <CardContent>
+              <motion.div 
+                className="text-2xl font-bold text-green-700"
+                initial={{ scale: 0.8 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+              >
+                1
+              </motion.div>
+              <p className="text-xs text-green-600">
+                LR rolünde olduğum odalar
+              </p>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        <motion.div
+          whileHover={{ scale: 1.02, y: -2 }}
+          transition={{ type: "spring", stiffness: 300, damping: 20 }}
+        >
+          <Card className="border-l-4 border-l-purple-500 hover:shadow-md transition-shadow">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-purple-700">Yüklediğim Belgeler</CardTitle>
+              <FileText className="h-4 w-4 text-purple-500" />
+            </CardHeader>
+            <CardContent>
+              <motion.div 
+                className="text-2xl font-bold text-purple-600"
+                initial={{ scale: 0.8 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: 0.3, type: "spring", stiffness: 200 }}
+              >
+                8
+              </motion.div>
+              <p className="text-xs text-muted-foreground">
+                Toplam yüklediğim belge
+              </p>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        <motion.div
+          whileHover={{ scale: 1.02, y: -2 }}
+          transition={{ type: "spring", stiffness: 300, damping: 20 }}
+        >
+          <Card className="border-l-4 border-l-orange-500 hover:shadow-md transition-shadow">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-orange-700">KKS Gönderimlerim</CardTitle>
+              <Users className="h-4 w-4 text-orange-500" />
+            </CardHeader>
+            <CardContent>
+              <motion.div 
+                className="text-2xl font-bold text-orange-600"
+                initial={{ scale: 0.8 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
+              >
+                5
+              </motion.div>
+              <p className="text-xs text-muted-foreground">
+                Gönderdiğim KKS sayısı
+              </p>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </motion.div>
+
+      {/* Main Content Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <TabsList className="bg-slate-100">
+          <TabsTrigger 
+            value="overview" 
+            className="data-[state=active]:bg-white data-[state=active]:text-blue-600 transition-all duration-200 hover:scale-105"
+          >
+            Genel Bakış
+          </TabsTrigger>
+          <TabsTrigger 
+            value="mbdf" 
+            className="data-[state=active]:bg-white data-[state=active]:text-green-600 transition-all duration-200 hover:scale-105"
+          >
+            MBDF Sorgulama
+          </TabsTrigger>
+          <TabsTrigger 
+            value="activities" 
+            className="data-[state=active]:bg-white data-[state=active]:text-purple-600 transition-all duration-200 hover:scale-105"
+          >
+            Aktiviteler
+          </TabsTrigger>
+          <TabsTrigger 
+            value="reports" 
+            className="data-[state=active]:bg-white data-[state=active]:text-orange-600 transition-all duration-200 hover:scale-105"
+          >
+            Belge Yönetimi
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Overview Tab */}
+        <TabsContent value="overview" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+            {/* Recent Activities */}
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3, delay: 0.3 }}
+              className="col-span-4"
+            >
+              <Card>
+                <CardHeader>
+                  <CardTitle>Son Aktiviteler</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {mockRecentActivities.map((activity, index) => (
+                    <motion.div
+                      key={activity.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.2, delay: index * 0.1 }}
+                      className="flex items-center space-x-4"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium leading-none">
+                          {activity.action}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {activity.user} • {activity.room}
+                        </p>
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {activity.time}
+                      </div>
+                      <Badge variant="secondary" className="text-xs">
+                        {activity.type}
+                      </Badge>
+                    </motion.div>
+                  ))}
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            {/* Quick Actions */}
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3, delay: 0.4 }}
+              className="col-span-3"
+            >
+              <Card>
+                <CardHeader>
+                  <CardTitle>Hızlı Erişim</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Button asChild className="w-full justify-start">
+                    <Link href="/create-room">
+                      <Plus className="mr-2 h-4 w-4" />
+                      Yeni MBDF Oluştur
+                    </Link>
+                  </Button>
+                  
+                  <Button variant="outline" asChild className="w-full justify-start">
+                    <Link href="/agreements">
+                      <FileText className="mr-2 h-4 w-4" />
+                      Sözleşmeler
+                    </Link>
+                  </Button>
+                  
+                  <Button variant="outline" asChild className="w-full justify-start">
+                    <Link href="/kks">
+                      <Users className="mr-2 h-4 w-4" />
+                      KKS Gönderimler
+                    </Link>
+                  </Button>
+
+                  <Separator />
+                  
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium">Sistem Durumu</h4>
+                    <div className="flex items-center space-x-2">
+                      <div className="h-2 w-2 rounded-full bg-green-500" />
+                      <span className="text-sm text-muted-foreground">Tüm servisler çalışıyor</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </div>
+        </TabsContent>
+
+        {/* MBDF Search Tab */}
+        <TabsContent value="mbdf" className="space-y-4">
+          <Card className="border-l-4 border-l-green-500 bg-green-50/20">
+            <CardHeader className="bg-green-100/60">
+              <CardTitle className="text-green-900">MBDF Sorgulama ve Yönetim</CardTitle>
+              <CardDescription className="text-green-700">
+                MBDF süreçlerinizi arayın, filtreleyin ve yönetin
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Search and Filter Controls */}
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex-1">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Madde adı, CAS numarası veya EC numarası ile ara..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+                <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                  <SelectTrigger className="w-full sm:w-48">
+                    <SelectValue placeholder="Durum seçin" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tümü</SelectItem>
+                    <SelectItem value="active">Aktif</SelectItem>
+                    <SelectItem value="closed">Kapalı</SelectItem>
+                    <SelectItem value="archived">Arşivlendi</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button variant="outline">
+                  <Filter className="mr-2 h-4 w-4" />
+                  Filtrele
+                </Button>
+              </div>
+
+              {/* MBDF Results */}
+              <div className="space-y-4">
+                {mockMBDFData.map((mbdf, index) => (
+                  <motion.div
+                    key={mbdf.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: index * 0.1 }}
+                    whileHover={{ scale: 1.01, y: -1 }}
+                  >
+                    <Card className="hover:shadow-md transition-all duration-200 border-l-4 border-l-green-200">
+                      <CardContent className="p-6">
+                        <div className="flex items-center justify-between">
+                          <div className="space-y-2">
+                            <div className="flex items-center space-x-2">
+                              <h3 className="text-lg font-semibold text-slate-800">{mbdf.substance}</h3>
+                              <Badge 
+                                className={
+                                  mbdf.status === 'active' ? 'bg-green-100 text-green-800 border-green-200' : 
+                                  mbdf.status === 'closed' ? 'bg-red-100 text-red-800 border-red-200' : 
+                                  'bg-gray-100 text-gray-800 border-gray-200'
+                                }
+                              >
+                                {mbdf.status === 'active' ? 'Aktif' : 
+                                 mbdf.status === 'closed' ? 'Kapalı' : 'Arşivlendi'}
+                              </Badge>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 text-sm text-muted-foreground">
+                              <div>
+                                <span className="font-medium">CAS:</span> {mbdf.casNumber}
+                              </div>
+                              <div>
+                                <span className="font-medium">EC:</span> {mbdf.ecNumber}
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+                              <div className="flex items-center space-x-1">
+                                <Users className="h-4 w-4" />
+                                <span>{mbdf.members} üye</span>
+                              </div>
+                              <div className="flex items-center space-x-1">
+                                <Clock className="h-4 w-4" />
+                                <span>{mbdf.lastActivity}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <div className="text-right">
+                              <div className="text-sm font-medium">Üye Sayısı</div>
+                              <div className="text-2xl font-bold">{mbdf.members}</div>
+                            </div>
+                            <div className="flex flex-col space-y-1">
+                              <Button size="sm" variant="outline">
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button size="sm" variant="outline">
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Activities Tab */}
+        <TabsContent value="activities" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Detaylı Aktivite Geçmişi</CardTitle>
+              <CardDescription>
+                Tüm sistem aktivitelerinizi görüntüleyin
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8">
+                <Calendar className="mx-auto h-12 w-12 text-muted-foreground" />
+                <h3 className="mt-4 text-lg font-semibold">Aktivite Geçmişi</h3>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Detaylı aktivite geçmişi burada görüntülenecek
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Document Management Tab */}
+        <TabsContent value="reports" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Belge Yönetimi</CardTitle>
+              <CardDescription>
+                Yüklediğiniz belgeleri yönetin ve takip edin
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8">
+                <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
+                <h3 className="mt-4 text-lg font-semibold">Belge Yönetimi</h3>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Yüklediğiniz belgeler burada görüntülenecek
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
