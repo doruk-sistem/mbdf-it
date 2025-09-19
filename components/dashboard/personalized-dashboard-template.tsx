@@ -24,6 +24,10 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion } from "framer-motion";
+import { useCurrentUser } from "@/hooks/use-user";
+import { useRooms } from "@/hooks/use-rooms";
+import { useMyKKSSubmissions } from "@/hooks/use-kks";
+import { useDocuments } from "@/hooks/use-documents";
 
 // Mock data for template
 const mockCompanyData = {
@@ -107,6 +111,24 @@ export function PersonalizedDashboardTemplate() {
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [activeTab, setActiveTab] = useState("overview");
 
+  // Fetch real data
+  const { data: userData, isLoading: userLoading } = useCurrentUser();
+  const { data: roomsData, isLoading: roomsLoading } = useRooms();
+  const { data: kksData, isLoading: kksLoading } = useMyKKSSubmissions(userData?.profile?.id || '');
+
+  // Extract company information
+  const company = userData?.profile?.company;
+  
+  // Calculate statistics
+  const totalRooms = roomsData?.items?.length || 0;
+  const activeRooms = roomsData?.items?.filter((room: any) => room.status === 'active').length || 0;
+  const userRooms = roomsData?.items?.filter((room: any) => room.is_member) || [];
+  const lrRooms = roomsData?.items?.filter((room: any) => room.user_role === 'lr') || [];
+  const totalKks = kksData?.items?.length || 0;
+
+  // Loading state
+  const isLoading = userLoading || roomsLoading;
+
   return (
     <div className="space-y-8">
       {/* Header Section */}
@@ -137,9 +159,11 @@ export function PersonalizedDashboardTemplate() {
                 <Building2 className="h-5 w-5 text-blue-600" />
                 <CardTitle className="text-blue-800">Firma Bilgileri</CardTitle>
               </div>
-              <Button variant="outline" size="sm" className="border-blue-200 text-blue-700 hover:bg-blue-50">
-                <Edit className="mr-2 h-4 w-4" />
-                Düzenle
+              <Button variant="outline" size="sm" className="border-blue-200 text-blue-700 hover:bg-blue-50" asChild>
+                <Link href="/settings">
+                  <Edit className="mr-2 h-4 w-4" />
+                  Düzenle
+                </Link>
               </Button>
             </div>
           </CardHeader>
@@ -147,19 +171,35 @@ export function PersonalizedDashboardTemplate() {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <div className="space-y-2">
                 <h4 className="text-sm font-medium text-muted-foreground">Firma Adı</h4>
-                <p className="text-sm">{mockCompanyData.name}</p>
+                <p className="text-sm">{isLoading ? "Yükleniyor..." : company?.name || "Bilgi bulunamadı"}</p>
               </div>
               <div className="space-y-2">
                 <h4 className="text-sm font-medium text-muted-foreground">Vergi No</h4>
-                <p className="text-sm">{mockCompanyData.vatNumber}</p>
+                <p className="text-sm">{isLoading ? "Yükleniyor..." : company?.vat_number || "Belirtilmemiş"}</p>
               </div>
               <div className="space-y-2">
                 <h4 className="text-sm font-medium text-muted-foreground">İletişim</h4>
-                <p className="text-sm">{mockCompanyData.contactEmail}</p>
+                <div className="text-sm space-y-1">
+                  {isLoading ? (
+                    "Yükleniyor..."
+                  ) : (
+                    <>
+                      {company?.contact_email && (
+                        <div className="text-blue-600">{company.contact_email}</div>
+                      )}
+                      {company?.contact_phone && (
+                        <div className="text-slate-600">{company.contact_phone}</div>
+                      )}
+                      {!company?.contact_email && !company?.contact_phone && (
+                        <div className="text-slate-500">Belirtilmemiş</div>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
               <div className="space-y-2">
-                <h4 className="text-sm font-medium text-muted-foreground">Şirketin Aktif Odaları</h4>
-                <p className="text-sm font-semibold">{mockCompanyData.activeProjects}</p>
+                <h4 className="text-sm font-medium text-muted-foreground">Adres</h4>
+                <p className="text-sm">{isLoading ? "Yükleniyor..." : company?.address || "Belirtilmemiş"}</p>
               </div>
             </div>
           </CardContent>
@@ -189,7 +229,7 @@ export function PersonalizedDashboardTemplate() {
                 animate={{ scale: 1 }}
                 transition={{ delay: 0.1, type: "spring", stiffness: 200 }}
               >
-                {mockMBDFData.length}
+                {isLoading ? "..." : userRooms.length}
               </motion.div>
               <p className="text-xs text-muted-foreground">
                 Üye olduğum odalar
@@ -214,7 +254,7 @@ export function PersonalizedDashboardTemplate() {
                 animate={{ scale: 1 }}
                 transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
               >
-                1
+                {isLoading ? "..." : lrRooms.length}
               </motion.div>
               <p className="text-xs text-green-600">
                 LR rolünde olduğum odalar
@@ -239,7 +279,7 @@ export function PersonalizedDashboardTemplate() {
                 animate={{ scale: 1 }}
                 transition={{ delay: 0.3, type: "spring", stiffness: 200 }}
               >
-                8
+                {isLoading ? "..." : "0"}
               </motion.div>
               <p className="text-xs text-muted-foreground">
                 Toplam yüklediğim belge
@@ -264,7 +304,7 @@ export function PersonalizedDashboardTemplate() {
                 animate={{ scale: 1 }}
                 transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
               >
-                5
+                {isLoading ? "..." : totalKks}
               </motion.div>
               <p className="text-xs text-muted-foreground">
                 Gönderdiğim KKS sayısı
@@ -436,9 +476,17 @@ export function PersonalizedDashboardTemplate() {
 
               {/* MBDF Results */}
               <div className="space-y-4">
-                {mockMBDFData.map((mbdf, index) => (
+                {roomsData?.items?.filter((room: any) => {
+                  if (selectedStatus === 'all') return true;
+                  return room.status === selectedStatus;
+                }).filter((room: any) => {
+                  if (!searchTerm) return true;
+                  return room.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         room.substance?.cas_number?.includes(searchTerm) ||
+                         room.substance?.ec_number?.includes(searchTerm);
+                }).map((room: any, index: number) => (
                   <motion.div
-                    key={mbdf.id}
+                    key={room.id}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3, delay: index * 0.1 }}
@@ -449,49 +497,53 @@ export function PersonalizedDashboardTemplate() {
                         <div className="flex items-center justify-between">
                           <div className="space-y-2">
                             <div className="flex items-center space-x-2">
-                              <h3 className="text-lg font-semibold text-slate-800">{mbdf.substance}</h3>
+                              <h3 className="text-lg font-semibold text-slate-800">{room.name}</h3>
                               <Badge 
                                 className={
-                                  mbdf.status === 'active' ? 'bg-green-100 text-green-800 border-green-200' : 
-                                  mbdf.status === 'closed' ? 'bg-red-100 text-red-800 border-red-200' : 
+                                  room.status === 'active' ? 'bg-green-100 text-green-800 border-green-200' : 
+                                  room.status === 'closed' ? 'bg-red-100 text-red-800 border-red-200' : 
                                   'bg-gray-100 text-gray-800 border-gray-200'
                                 }
                               >
-                                {mbdf.status === 'active' ? 'Aktif' : 
-                                 mbdf.status === 'closed' ? 'Kapalı' : 'Arşivlendi'}
+                                {room.status === 'active' ? 'Aktif' : 
+                                 room.status === 'closed' ? 'Kapalı' : 'Arşivlendi'}
                               </Badge>
                             </div>
                             <div className="grid grid-cols-2 gap-4 text-sm text-muted-foreground">
                               <div>
-                                <span className="font-medium">CAS:</span> {mbdf.casNumber}
+                                <span className="font-medium">CAS:</span> {room.substance?.cas_number || 'N/A'}
                               </div>
                               <div>
-                                <span className="font-medium">EC:</span> {mbdf.ecNumber}
+                                <span className="font-medium">EC:</span> {room.substance?.ec_number || 'N/A'}
                               </div>
                             </div>
                             <div className="flex items-center space-x-4 text-sm text-muted-foreground">
                               <div className="flex items-center space-x-1">
                                 <Users className="h-4 w-4" />
-                                <span>{mbdf.members} üye</span>
+                                <span>{room.member_count || 0} üye</span>
                               </div>
                               <div className="flex items-center space-x-1">
                                 <Clock className="h-4 w-4" />
-                                <span>{mbdf.lastActivity}</span>
+                                <span>{room.updated_at ? new Date(room.updated_at).toLocaleDateString('tr-TR') : 'N/A'}</span>
                               </div>
                             </div>
                           </div>
                           <div className="flex items-center space-x-2">
                             <div className="text-right">
                               <div className="text-sm font-medium">Üye Sayısı</div>
-                              <div className="text-2xl font-bold">{mbdf.members}</div>
+                              <div className="text-2xl font-bold">{room.member_count || 0}</div>
                             </div>
                             <div className="flex flex-col space-y-1">
-                              <Button size="sm" variant="outline">
-                                <Eye className="h-4 w-4" />
+                              <Button size="sm" variant="outline" asChild>
+                                <Link href={`/mbdf/${room.id}`}>
+                                  <Eye className="h-4 w-4" />
+                                </Link>
                               </Button>
-                              <Button size="sm" variant="outline">
-                                <Edit className="h-4 w-4" />
-                              </Button>
+                              {room.user_role === 'admin' && (
+                                <Button size="sm" variant="outline">
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                              )}
                             </div>
                           </div>
                         </div>
