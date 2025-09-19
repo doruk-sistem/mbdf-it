@@ -590,10 +590,10 @@ export async function prefetchUserKKS(queryClient: QueryClient, userId: string) 
     const adminSupabase = createAdminSupabase();
     
     const { data: kks, error } = await adminSupabase
-      .from('kks')
+      .from('kks_submission')
       .select(`
         id,
-        tracking_number,
+        title,
         created_at,
         mbdf_room:room_id (
           id,
@@ -601,7 +601,7 @@ export async function prefetchUserKKS(queryClient: QueryClient, userId: string) 
           substance:substance_id (name)
         )
       `)
-      .eq('submitted_by', userId)
+      .eq('created_by', userId)
       .order('created_at', { ascending: false });
 
     if (error) {

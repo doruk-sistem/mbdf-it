@@ -170,7 +170,6 @@ export const KksSubmissionSchema = z.object({
   created_by: IdSchema,
   submitted_at: DateSchema.nullable(),
   sent_at: DateSchema.nullable(),
-  tracking_number: z.string().nullable(),
   created_at: DateSchema,
   updated_at: DateSchema,
 });
@@ -256,8 +255,8 @@ export const JoinRequestWithDetailsSchema = JoinRequestSchema.extend({
 
 // Now we can reference RoomWithDetailsSchema safely
 export const KksSubmissionWithDetailsSchema = KksSubmissionSchema.extend({
-  created_by_profile: ProfileSchema,
-  room: RoomWithDetailsSchema,
+  created_by_profile: ProfileSchema.nullable(),
+  room: RoomWithDetailsSchema.nullable(),
 });
 
 export const AgreementWithDetailsSchema = AgreementSchema.extend({
