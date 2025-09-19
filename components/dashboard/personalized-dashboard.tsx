@@ -42,7 +42,7 @@ import { useDeleteDocument } from "@/hooks/use-documents";
 
 export function PersonalizedDashboard() {   
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedStatus, setSelectedStatus] = useState("all");
+  const [selectedMembership, setSelectedMembership] = useState("all");
   const [activeTab, setActiveTab] = useState("overview");
   const [activityFilter, setActivityFilter] = useState("all");
   const [activityPage, setActivityPage] = useState(0);
@@ -416,18 +416,18 @@ export function PersonalizedDashboard() {
                     />
                   </div>
                 </div>
-                <Select value={selectedStatus} onValueChange={(value) => {
-                  setSelectedStatus(value);
+                <Select value={selectedMembership} onValueChange={(value) => {
+                  setSelectedMembership(value);
                   setRoomPage(0); // Reset pagination when filtering
                 }}>
                   <SelectTrigger className="w-full sm:w-48">
-                    <SelectValue placeholder="Durum seçin" />
+                    <SelectValue placeholder="Üyelik durumu" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Tümü</SelectItem>
-                    <SelectItem value="active">Aktif</SelectItem>
-                    <SelectItem value="closed">Kapalı</SelectItem>
-                    <SelectItem value="archived">Arşivlendi</SelectItem>
+                    <SelectItem value="member">Üye Olduğum Odalar</SelectItem>
+                    <SelectItem value="leader">Lider Olduğum Odalar</SelectItem>
+                    <SelectItem value="not_member">Üye Olmadığım Odalar</SelectItem>
                   </SelectContent>
                 </Select>
                 <Button variant="outline">
@@ -440,13 +440,17 @@ export function PersonalizedDashboard() {
               <div className="space-y-4">
                 {(() => {
                   const filteredRooms = rooms.filter((room: any) => {
-                    if (selectedStatus === 'all') return true;
-                    return room.status === selectedStatus;
-                  }).filter((room: any) => {
-                    if (!searchTerm) return true;
-                    return room.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           room.substance?.cas_number?.includes(searchTerm) ||
-                           room.substance?.ec_number?.includes(searchTerm);
+                    // Membership filter
+                    if (selectedMembership === 'member' && (!room.user_role || room.user_role === 'none')) return false;
+                    if (selectedMembership === 'leader' && room.user_role !== 'lr') return false;
+                    if (selectedMembership === 'not_member' && room.user_role && room.user_role !== 'none') return false;
+                    
+                    // Search filter
+                    if (searchTerm && !room.name?.toLowerCase().includes(searchTerm.toLowerCase()) &&
+                        !room.substance?.cas_number?.includes(searchTerm) &&
+                        !room.substance?.ec_number?.includes(searchTerm)) return false;
+                    
+                    return true;
                   });
                   
                   const totalPages = Math.ceil(filteredRooms.length / roomsPerPage);
@@ -482,8 +486,15 @@ export function PersonalizedDashboard() {
                               </Badge>
                               {/* Member indicator - only show if user is a member */}
                               {room.user_role && room.user_role !== 'none' && (
-                                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs">
-                                  Bu odaya üyesiniz
+                                <Badge 
+                                  variant="outline" 
+                                  className={
+                                    room.user_role === 'lr'
+                                      ? "bg-blue-50 text-blue-700 border-blue-200 text-xs"
+                                      : "bg-green-50 text-green-700 border-green-200 text-xs"
+                                  }
+                                >
+                                  {room.user_role === 'lr' ? 'Bu odada lidersiniz' : 'Bu odaya üyesiniz'}
                                 </Badge>
                               )}
                             </div>
