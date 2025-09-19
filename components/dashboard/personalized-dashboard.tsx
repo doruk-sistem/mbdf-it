@@ -36,50 +36,9 @@ import { useUserDocuments } from "@/hooks/use-documents";
 import { useRecentActivities, useDetailedActivities } from "@/hooks/use-activities";
 import { useDeleteDocument } from "@/hooks/use-documents";
 
-// Mock data for template
-const mockCompanyData = {
-  name: "Örnek Kimya A.Ş.",
-  vatNumber: "1234567890",
-  address: "İstanbul, Türkiye",
-  contactEmail: "info@ornekkimya.com",
-  contactPhone: "+90 212 123 45 67",
-  memberCount: 25,
-  activeProjects: 8,
-  totalRevenue: "₺2.5M"
-};
-
-const mockMBDFData = [
-  {
-    id: "1",
-    substance: "Chlorobenzene",
-    casNumber: "108-90-7",
-    ecNumber: "203-628-5",
-    status: "active",
-    members: 12,
-    lastActivity: "2 saat önce"
-  },
-  {
-    id: "2", 
-    substance: "Acetone",
-    casNumber: "67-64-1",
-    ecNumber: "200-662-2",
-    status: "closed",
-    members: 8,
-    lastActivity: "1 gün önce"
-  },
-  {
-    id: "3",
-    substance: "Phenol",
-    casNumber: "108-95-2", 
-    ecNumber: "203-632-7",
-    status: "archived",
-    members: 15,
-    lastActivity: "3 gün önce"
-  }
-];
 
 
-export function PersonalizedDashboardTemplate() {   
+export function PersonalizedDashboard() {   
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [activeTab, setActiveTab] = useState("overview");
@@ -140,20 +99,6 @@ export function PersonalizedDashboardTemplate() {
 
   return (
     <div className="space-y-8">
-      {/* Header Section */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="bg-gradient-to-r from-slate-50 to-blue-50 p-6 rounded-lg border border-slate-200"
-      >
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-800">Dashboard</h1>
-          <p className="text-slate-600 mt-1">
-            MBDF süreçlerinizi yönetin ve takip edin
-          </p>
-        </div>
-      </motion.div>
 
       {/* Company Information Section */}
       <motion.div
