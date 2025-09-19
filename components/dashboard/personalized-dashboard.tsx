@@ -15,13 +15,15 @@ import {
   Edit,
   Calendar,
   Trash2,
-  AlertTriangle
+  AlertTriangle,
+  CheckCircle
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -478,6 +480,12 @@ export function PersonalizedDashboard() {
                                 {room.status === 'active' ? 'Aktif' : 
                                  room.status === 'closed' ? 'Kapalı' : 'Arşivlendi'}
                               </Badge>
+                              {/* Member indicator - only show if user is a member */}
+                              {room.user_role && room.user_role !== 'none' && (
+                                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs">
+                                  Bu odaya üyesiniz
+                                </Badge>
+                              )}
                             </div>
                             <div className="grid grid-cols-2 gap-4 text-sm text-muted-foreground">
                               <div>

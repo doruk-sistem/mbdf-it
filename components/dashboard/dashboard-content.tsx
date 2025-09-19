@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Building2, Users, FileText, Clock, ArrowRight, Plus, FlaskConical } from "lucide-react";
+import { Building2, Users, FileText, Clock, ArrowRight, Plus, FlaskConical, CheckCircle } from "lucide-react";
 import { useRooms } from "@/hooks/use-rooms";
 import { DashboardSkeleton } from "./dashboard-skeleton";
 
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { motion } from "framer-motion";
 
 interface DashboardStats {
@@ -250,7 +251,15 @@ export function DashboardContent() {
                       <Link href={`/mbdf/${room.id}`}>
                         <CardHeader className="pb-3">
                           <div className="flex items-center justify-between">
-                            <CardTitle className="text-lg">{room.name}</CardTitle>
+                            <div className="flex items-center space-x-2">
+                              <CardTitle className="text-lg">{room.name}</CardTitle>
+                              {/* Member indicator - only show if user is a member */}
+                              {room.user_role && room.user_role !== 'none' && (
+                                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs">
+                                  Bu odaya üyesiniz
+                                </Badge>
+                              )}
+                            </div>
                             <Badge 
                               variant={room.status === "active" ? "default" : "secondary"}
                             >
