@@ -87,6 +87,8 @@ export function PersonalizedDashboardTemplate() {
   const [activityPage, setActivityPage] = useState(0);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [documentToDelete, setDocumentToDelete] = useState<string | null>(null);
+  const [roomPage, setRoomPage] = useState(0);
+  const [roomsPerPage] = useState(6);
 
   // Fetch real data
   const { data: userData, isLoading: userLoading } = useCurrentUser();
@@ -459,12 +461,18 @@ export function PersonalizedDashboardTemplate() {
                     <Input
                       placeholder="Madde adı, CAS numarası veya EC numarası ile ara..."
                       value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
+                      onChange={(e) => {
+                        setSearchTerm(e.target.value);
+                        setRoomPage(0); // Reset pagination when searching
+                      }}
                       className="pl-10"
                     />
                   </div>
                 </div>
-                <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                <Select value={selectedStatus} onValueChange={(value) => {
+                  setSelectedStatus(value);
+                  setRoomPage(0); // Reset pagination when filtering
+                }}>
                   <SelectTrigger className="w-full sm:w-48">
                     <SelectValue placeholder="Durum seçin" />
                   </SelectTrigger>
@@ -483,15 +491,25 @@ export function PersonalizedDashboardTemplate() {
 
               {/* MBDF Results */}
               <div className="space-y-4">
-                {rooms.filter((room: any) => {
-                  if (selectedStatus === 'all') return true;
-                  return room.status === selectedStatus;
-                }).filter((room: any) => {
-                  if (!searchTerm) return true;
-                  return room.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         room.substance?.cas_number?.includes(searchTerm) ||
-                         room.substance?.ec_number?.includes(searchTerm);
-                }).map((room: any, index: number) => (
+                {(() => {
+                  const filteredRooms = rooms.filter((room: any) => {
+                    if (selectedStatus === 'all') return true;
+                    return room.status === selectedStatus;
+                  }).filter((room: any) => {
+                    if (!searchTerm) return true;
+                    return room.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           room.substance?.cas_number?.includes(searchTerm) ||
+                           room.substance?.ec_number?.includes(searchTerm);
+                  });
+                  
+                  const totalPages = Math.ceil(filteredRooms.length / roomsPerPage);
+                  const startIndex = roomPage * roomsPerPage;
+                  const endIndex = startIndex + roomsPerPage;
+                  const paginatedRooms = filteredRooms.slice(startIndex, endIndex);
+                  
+                  return (
+                    <>
+                      {paginatedRooms.map((room: any, index: number) => (
                   <motion.div
                     key={room.id}
                     initial={{ opacity: 0, y: 10 }}
@@ -536,19 +554,17 @@ export function PersonalizedDashboardTemplate() {
                             </div>
                           </div>
                           <div className="flex items-center space-x-2">
-                            <div className="text-right">
-                              <div className="text-sm font-medium">Üye Sayısı</div>
-                              <div className="text-2xl font-bold">{room.member_count || 0}</div>
-                            </div>
-                            <div className="flex flex-col space-y-1">
-                              <Button size="sm" variant="outline" asChild>
+                            <div className="flex flex-col space-y-2">
+                              <Button size="sm" variant="outline" asChild className="text-sm">
                                 <Link href={`/mbdf/${room.id}`}>
-                                  <Eye className="h-4 w-4" />
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  Odayı Görüntüle
                                 </Link>
                               </Button>
                               {room.user_role === 'admin' && (
-                                <Button size="sm" variant="outline">
-                                  <Edit className="h-4 w-4" />
+                                <Button size="sm" variant="outline" className="text-sm">
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Düzenle
                                 </Button>
                               )}
                             </div>
@@ -557,7 +573,42 @@ export function PersonalizedDashboardTemplate() {
                       </CardContent>
                     </Card>
                   </motion.div>
-                ))}
+                      ))}
+                      
+                      {/* Pagination */}
+                      {totalPages > 1 && (
+                        <div className="flex justify-center items-center space-x-4 pt-6">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setRoomPage(Math.max(0, roomPage - 1))}
+                            disabled={roomPage === 0}
+                          >
+                            Önceki
+                          </Button>
+                          
+                          <div className="flex items-center space-x-2">
+                            <span className="text-sm text-muted-foreground">
+                              Sayfa {roomPage + 1} / {totalPages}
+                            </span>
+                            <span className="text-sm text-muted-foreground">
+                              ({filteredRooms.length} toplam oda)
+                            </span>
+                          </div>
+                          
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setRoomPage(Math.min(totalPages - 1, roomPage + 1))}
+                            disabled={roomPage >= totalPages - 1}
+                          >
+                            Sonraki
+                          </Button>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             </CardContent>
           </Card>
