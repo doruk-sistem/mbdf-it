@@ -13,7 +13,9 @@ import {
   Filter,
   Eye,
   Edit,
-  Calendar
+  Calendar,
+  Trash2,
+  AlertTriangle
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -23,12 +25,16 @@ import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
 import { motion } from "framer-motion";
 import { useCurrentUser } from "@/hooks/use-user";
 import { useRooms } from "@/hooks/use-rooms";
 import { useMyKKSSubmissions } from "@/hooks/use-kks";
 import { useUserDocuments } from "@/hooks/use-documents";
-import { useRecentActivities } from "@/hooks/use-activities";
+import { useRecentActivities, useDetailedActivities } from "@/hooks/use-activities";
+import { useDeleteDocument } from "@/hooks/use-documents";
 
 // Mock data for template
 const mockCompanyData = {
@@ -77,6 +83,10 @@ export function PersonalizedDashboardTemplate() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [activeTab, setActiveTab] = useState("overview");
+  const [activityFilter, setActivityFilter] = useState("all");
+  const [activityPage, setActivityPage] = useState(0);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [documentToDelete, setDocumentToDelete] = useState<string | null>(null);
 
   // Fetch real data
   const { data: userData, isLoading: userLoading } = useCurrentUser();
@@ -84,6 +94,31 @@ export function PersonalizedDashboardTemplate() {
   const { data: kksData, isLoading: kksLoading } = useMyKKSSubmissions(userData?.profile?.id || '');
   const { data: documentsData, isLoading: documentsLoading } = useUserDocuments(userData?.profile?.id || '');
   const { data: activitiesData, isLoading: activitiesLoading } = useRecentActivities();
+  const { data: detailedActivitiesData, isLoading: detailedActivitiesLoading } = useDetailedActivities({
+    limit: 20,
+    offset: activityPage * 20,
+    type: activityFilter === "all" ? undefined : activityFilter,
+  });
+  const deleteDocumentMutation = useDeleteDocument();
+
+  // Delete document handlers
+  const handleDeleteClick = (documentId: string) => {
+    setDocumentToDelete(documentId);
+    setDeleteDialogOpen(true);
+  };
+
+  const cancelDelete = () => {
+    setDeleteDialogOpen(false);
+    setDocumentToDelete(null);
+  };
+
+  const confirmDelete = () => {
+    if (documentToDelete) {
+      deleteDocumentMutation.mutate(documentToDelete);
+      setDeleteDialogOpen(false);
+      setDocumentToDelete(null);
+    }
+  };
 
   // Extract company information
   const company = userData?.profile?.company;
@@ -537,14 +572,93 @@ export function PersonalizedDashboardTemplate() {
                 Tüm sistem aktivitelerinizi görüntüleyin
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="text-center py-8">
-                <Calendar className="mx-auto h-12 w-12 text-muted-foreground" />
-                <h3 className="mt-4 text-lg font-semibold">Aktivite Geçmişi</h3>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Detaylı aktivite geçmişi burada görüntülenecek
-                </p>
+            <CardContent className="space-y-4">
+              {/* Filter Controls */}
+              <div className="flex items-center space-x-4">
+                <Select value={activityFilter} onValueChange={setActivityFilter}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue placeholder="Aktivite türü seçin" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tüm Aktiviteler</SelectItem>
+                    <SelectItem value="Oluşturma">MBDF Oluşturma</SelectItem>
+                    <SelectItem value="Belge">Belge Yükleme</SelectItem>
+                    <SelectItem value="Oylama">Oylama</SelectItem>
+                    <SelectItem value="KKS">KKS Gönderme</SelectItem>
+                    <SelectItem value="Erişim">Erişim Talepleri</SelectItem>
+                    <SelectItem value="Sözleşme">Sözleşmeler</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
+
+              {/* Activities List */}
+              {detailedActivitiesLoading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                  <p className="mt-2 text-sm text-muted-foreground">Aktiviteler yükleniyor...</p>
+                </div>
+              ) : (detailedActivitiesData?.items || []).length > 0 ? (
+                <div className="space-y-4">
+                  {(detailedActivitiesData?.items || []).map((activity, index) => (
+                    <motion.div
+                      key={activity.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.2, delay: index * 0.05 }}
+                      className="flex items-center space-x-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium leading-none">
+                          {activity.action}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {activity.user} • {activity.room}
+                        </p>
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {activity.time}
+                      </div>
+                      <Badge variant="secondary" className="text-xs">
+                        {activity.type}
+                      </Badge>
+                    </motion.div>
+                  ))}
+                  
+                  {/* Pagination */}
+                  <div className="flex justify-center space-x-2 pt-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setActivityPage(Math.max(0, activityPage - 1))}
+                      disabled={activityPage === 0}
+                    >
+                      Önceki
+                    </Button>
+                    <span className="text-sm text-muted-foreground px-2">
+                      Sayfa {activityPage + 1}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setActivityPage(activityPage + 1)}
+                      disabled={(detailedActivitiesData?.items || []).length < 20}
+                    >
+                      Sonraki
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Calendar className="mx-auto h-12 w-12 text-muted-foreground" />
+                  <h3 className="mt-4 text-lg font-semibold">Aktivite Bulunamadı</h3>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {activityFilter === "all" 
+                      ? "Henüz hiç aktivite bulunmuyor"
+                      : `${activityFilter} türünde aktivite bulunmuyor`
+                    }
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -559,17 +673,119 @@ export function PersonalizedDashboardTemplate() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-8">
-                <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
-                <h3 className="mt-4 text-lg font-semibold">Belge Yönetimi</h3>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Yüklediğiniz belgeler burada görüntülenecek
-                </p>
-              </div>
+              {documentsLoading ? (
+                <div className="space-y-4">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="flex items-center space-x-4 p-4 border rounded-lg">
+                      <Skeleton className="h-10 w-10 rounded" />
+                      <div className="space-y-2 flex-1">
+                        <Skeleton className="h-4 w-3/4" />
+                        <Skeleton className="h-3 w-1/2" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : documentsData?.items && documentsData.items.length > 0 ? (
+                <div className="space-y-4">
+                  {documentsData.items.map((document: any, index: number) => (
+                    <motion.div
+                      key={document.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3, delay: index * 0.1 }}
+                      className="flex items-center space-x-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex-shrink-0">
+                        <div className="h-10 w-10 rounded bg-blue-100 flex items-center justify-center">
+                          <FileText className="h-5 w-5 text-blue-600" />
+                        </div>
+                      </div>
+                      
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium leading-none truncate">
+                              {document.name}
+                            </p>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              {document.mbdf_room?.substance?.name || document.mbdf_room?.name || 'Bilinmeyen Oda'} • {new Date(document.created_at).toLocaleDateString('tr-TR')}
+                            </p>
+                          </div>
+                          
+                          <div className="flex items-center space-x-2 ml-4">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                if (document.mbdf_room?.id) {
+                                  const url = `/mbdf/${document.mbdf_room.id}?documentId=${document.id}&tab=documents`;
+                                  window.location.href = url;
+                                }
+                              }}
+                              className="text-blue-600 hover:text-blue-700"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteClick(document.id)}
+                              className="text-destructive hover:text-destructive/80"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
+                  <h3 className="mt-4 text-lg font-semibold">Henüz belge yüklenmemiş</h3>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    İlk belgenizi yüklemek için bir MBDF odasına katılın
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Belgeyi Sil</DialogTitle>
+            <DialogDescription>
+              Bu işlem geri alınamaz. Belgeyi silmek istediğinizden emin misiniz?
+            </DialogDescription>
+          </DialogHeader>
+          
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              <strong>Uyarı:</strong> Bu belge kalıcı olarak silinecektir ve geri alınamaz.
+            </AlertDescription>
+          </Alert>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={cancelDelete}>
+              İptal
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={confirmDelete}
+              disabled={deleteDocumentMutation.isPending}
+            >
+              {deleteDocumentMutation.isPending ? "Siliniyor..." : "Sil"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

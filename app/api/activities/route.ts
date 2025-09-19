@@ -16,6 +16,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Get query parameters
+    const { searchParams } = new URL(request.url);
+    const limit = parseInt(searchParams.get('limit') || '50');
+    const offset = parseInt(searchParams.get('offset') || '0');
+    const type = searchParams.get('type'); // Filter by activity type
+
     const adminSupabase = createAdminSupabase();
     const activities: any[] = [];
 
@@ -30,7 +36,7 @@ export async function GET(request: NextRequest) {
       `)
       .eq('created_by', user.id)
       .order('created_at', { ascending: false })
-      .limit(5);
+      .limit(limit);
 
     if (createdRooms) {
       createdRooms.forEach((room: any) => {
@@ -39,6 +45,7 @@ export async function GET(request: NextRequest) {
           action: 'Yeni MBDF odası oluşturdunuz',
           user: 'Sen',
           room: room.substance?.name || room.name,
+          roomId: room.id,
           time: getTimeAgo(room.created_at),
           type: 'Oluşturma',
           timestamp: new Date(room.created_at).getTime()
@@ -53,14 +60,18 @@ export async function GET(request: NextRequest) {
         id,
         name,
         created_at,
-        mbdf_room:room_id (
+        room_id,
+        mbdf_room!inner (
+          id,
           name,
-          substance:substance_id (name)
+          substance!inner (
+            name
+          )
         )
       `)
       .eq('uploaded_by', user.id)
       .order('created_at', { ascending: false })
-      .limit(5);
+      .limit(limit);
 
     if (uploadedDocs) {
       uploadedDocs.forEach((doc: any) => {
@@ -69,6 +80,8 @@ export async function GET(request: NextRequest) {
           action: 'Belge yüklediniz',
           user: 'Sen',
           room: doc.mbdf_room?.substance?.name || doc.mbdf_room?.name || 'Bilinmeyen',
+          roomId: doc.room_id, // Use room_id directly
+          documentId: doc.id,
           time: getTimeAgo(doc.created_at),
           type: 'Belge',
           timestamp: new Date(doc.created_at).getTime()
@@ -89,7 +102,7 @@ export async function GET(request: NextRequest) {
       `)
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
-      .limit(5);
+      .limit(limit);
 
     if (userVotes) {
       userVotes.forEach((vote: any) => {
@@ -98,6 +111,7 @@ export async function GET(request: NextRequest) {
           action: 'Oylamaya katıldınız',
           user: 'Sen',
           room: vote.mbdf_room?.substance?.name || vote.mbdf_room?.name || 'Bilinmeyen',
+          roomId: vote.mbdf_room?.id,
           time: getTimeAgo(vote.created_at),
           type: 'Oylama',
           timestamp: new Date(vote.created_at).getTime()
@@ -118,7 +132,7 @@ export async function GET(request: NextRequest) {
       `)
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
-      .limit(5);
+      .limit(limit);
 
     if (kksSubmissions) {
       kksSubmissions.forEach((kks: any) => {
@@ -127,6 +141,7 @@ export async function GET(request: NextRequest) {
           action: 'KKS gönderdiniz',
           user: 'Sen',
           room: kks.mbdf_room?.substance?.name || kks.mbdf_room?.name || 'Bilinmeyen',
+          roomId: kks.mbdf_room?.id,
           time: getTimeAgo(kks.created_at),
           type: 'KKS',
           timestamp: new Date(kks.created_at).getTime()
@@ -134,10 +149,81 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Sort by timestamp (most recent first) and limit to 10
-    const sortedActivities = activities
+    // 5. Get access requests by user
+    const { data: accessRequests } = await adminSupabase
+      .from('access_request')
+      .select(`
+        id,
+        created_at,
+        status,
+        mbdf_room:room_id (
+          name,
+          substance:substance_id (name)
+        )
+      `)
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (accessRequests) {
+      accessRequests.forEach((request: any) => {
+        const statusText = request.status === 'approved' ? 'onaylandı' : 
+                          request.status === 'rejected' ? 'reddedildi' : 'beklemede';
+        activities.push({
+          id: `request-${request.id}`,
+          action: `Erişim talebi ${statusText}`,
+          user: 'Sen',
+          room: request.mbdf_room?.substance?.name || request.mbdf_room?.name || 'Bilinmeyen',
+          roomId: request.mbdf_room?.id,
+          time: getTimeAgo(request.created_at),
+          type: 'Erişim',
+          timestamp: new Date(request.created_at).getTime()
+        });
+      });
+    }
+
+    // 6. Get agreements signed by user
+    const { data: agreements } = await adminSupabase
+      .from('agreement')
+      .select(`
+        id,
+        created_at,
+        status,
+        mbdf_room:room_id (
+          name,
+          substance:substance_id (name)
+        )
+      `)
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (agreements) {
+      agreements.forEach((agreement: any) => {
+        const statusText = agreement.status === 'signed' ? 'imzaladınız' : 'görüntülediniz';
+        activities.push({
+          id: `agreement-${agreement.id}`,
+          action: `Sözleşme ${statusText}`,
+          user: 'Sen',
+          room: agreement.mbdf_room?.substance?.name || agreement.mbdf_room?.name || 'Bilinmeyen',
+          roomId: agreement.mbdf_room?.id,
+          time: getTimeAgo(agreement.created_at),
+          type: 'Sözleşme',
+          timestamp: new Date(agreement.created_at).getTime()
+        });
+      });
+    }
+
+    // Filter by type if specified
+    let filteredActivities = activities;
+    if (type) {
+      filteredActivities = activities.filter(activity => activity.type === type);
+    }
+
+    // Sort by timestamp (most recent first) and apply pagination
+    const sortedActivities = filteredActivities
       .sort((a, b) => b.timestamp - a.timestamp)
-      .slice(0, 10);
+      .slice(offset, offset + limit);
 
     return NextResponse.json({
       items: sortedActivities,

@@ -57,11 +57,13 @@ import { keys, invalidationHelpers } from "@/lib/query-keys";
 interface DocumentsTabProps {
   roomId: string;
   isArchived?: boolean;
+  highlightDocumentId?: string | null;
 }
 
 export function DocumentsTab({
   roomId,
   isArchived = false,
+  highlightDocumentId,
 }: DocumentsTabProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState("all");
@@ -344,7 +346,10 @@ export function DocumentsTab({
               </TableHeader>
               <TableBody>
                 {filteredDocuments.map((document) => (
-                  <TableRow key={document.id}>
+                  <TableRow 
+                    key={document.id}
+                    className={document.id === highlightDocumentId ? "bg-yellow-50 border-yellow-200 animate-pulse" : ""}
+                  >
                     <TableCell>
                       <div className="flex items-center space-x-3">
                         {getFileIcon(document.mime_type || "")}

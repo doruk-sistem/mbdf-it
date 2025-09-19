@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { keys, invalidationHelpers } from '@/lib/query-keys';
-import { get, uploadFile, API_ENDPOINTS, withQuery } from '@/lib/api';
+import { get, uploadFile, del, API_ENDPOINTS, withQuery } from '@/lib/api';
 import { 
   DocumentWithUploader,
   DocumentsListResponseSchema,
@@ -48,6 +48,72 @@ export function useUserDocuments(userId: string) {
   });
 }
 
+export function useDeleteDocument() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (documentId: string) => deleteDocument(documentId),
+    onMutate: async (documentId: string) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: keys.activities.all });
+      await queryClient.cancelQueries({ queryKey: keys.documents.all });
+      
+      // Snapshot the previous values
+      const previousActivities = queryClient.getQueriesData({ queryKey: keys.activities.all });
+      const previousDocuments = queryClient.getQueriesData({ queryKey: keys.documents.all });
+      
+      // Optimistically update the activities list
+      queryClient.setQueriesData({ queryKey: keys.activities.all }, (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          items: old.items?.filter((activity: any) => activity.documentId !== documentId) || []
+        };
+      });
+      
+      // Optimistically update the documents list
+      queryClient.setQueriesData({ queryKey: keys.documents.all }, (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          items: old.items?.filter((doc: any) => doc.id !== documentId) || []
+        };
+      });
+      
+      return { previousActivities, previousDocuments };
+    },
+    onSuccess: () => {
+      // Invalidate documents queries
+      queryClient.invalidateQueries({ queryKey: keys.documents.all });
+      // Invalidate activities queries to update the activity list
+      queryClient.invalidateQueries({ queryKey: keys.activities.all });
+      toast({
+        title: 'Success',
+        description: 'Document deleted successfully',
+      });
+    },
+    onError: (error: any, documentId: string, context: any) => {
+      // Rollback optimistic update on error
+      if (context?.previousActivities) {
+        context.previousActivities.forEach(([queryKey, data]: any) => {
+          queryClient.setQueryData(queryKey, data);
+        });
+      }
+      if (context?.previousDocuments) {
+        context.previousDocuments.forEach(([queryKey, data]: any) => {
+          queryClient.setQueryData(queryKey, data);
+        });
+      }
+      toast({
+        title: 'Error',
+        description: error?.message || 'Failed to delete document',
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
 // Mutation hooks
 export function useUploadDocument() {
   const queryClient = useQueryClient();
@@ -75,6 +141,8 @@ export function useUploadDocument() {
       invalidationHelpers.document(variables.roomId).forEach(key => {
         queryClient.invalidateQueries({ queryKey: key });
       });
+      // Invalidate activities to show new document upload activity
+      queryClient.invalidateQueries({ queryKey: keys.activities.all });
       toast({
         title: 'Success',
         description: 'Document uploaded successfully',
@@ -84,32 +152,6 @@ export function useUploadDocument() {
       toast({
         title: 'Error',
         description: error?.data?.message || 'Failed to upload document',
-        variant: 'destructive',
-      });
-    },
-  });
-}
-
-export function useDeleteDocument(documentId: string, roomId: string) {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: () => deleteDocument(documentId),
-    onSuccess: () => {
-      // Invalidate documents list
-      invalidationHelpers.document(roomId).forEach(key => {
-        queryClient.invalidateQueries({ queryKey: key });
-      });
-      toast({
-        title: 'Başarılı',
-        description: 'Doküman başarıyla silindi.',
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: 'Hata',
-        description: error?.message || 'Doküman silinirken bir hata oluştu',
         variant: 'destructive',
       });
     },

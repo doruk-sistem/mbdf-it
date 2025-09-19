@@ -31,6 +31,8 @@ export const keys = {
   activities: {
     all: ['activities'] as const,
     recent: () => ['activities', 'recent'] as const,
+    detailed: (limit: number, offset: number, type?: string) => 
+      ['activities', 'detailed', limit, offset, type] as const,
   },
 
   // Packages and Access Requests
