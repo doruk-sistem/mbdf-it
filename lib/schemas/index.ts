@@ -76,6 +76,7 @@ export const MemberSchema = z.object({
   user_id: IdSchema,
   role: UserRoleSchema,
   joined_at: DateSchema,
+   tonnage_range: z.string().nullable(),
 });
 
 export const DocumentSchema = z.object({

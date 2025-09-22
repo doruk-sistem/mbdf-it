@@ -484,6 +484,7 @@ export async function getRoomMembers(roomId: string) {
         user_id,
         role,
         joined_at,
+        tonnage_range,
         profiles:user_id (
           id,
           full_name,

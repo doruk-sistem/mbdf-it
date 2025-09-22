@@ -40,9 +40,11 @@ export async function GET(request: NextRequest) {
     const { data: members, error } = await adminSupabase
       .from('mbdf_member')
       .select(`
+        id,
         user_id,
         role,
         joined_at,
+        tonnage_range,
         profiles:user_id (
           id,
           full_name,
@@ -234,6 +236,72 @@ export async function POST(request: NextRequest) {
       success: true, 
       message: 'Member added successfully',
       memberId: profile.id
+    });
+
+  } catch (error) {
+    return NextResponse.json({ 
+      error: 'Internal server error' 
+    }, { status: 500 });
+  }
+}
+
+// PUT /api/members - Update member tonnage
+export async function PUT(request: NextRequest) {
+  try {
+    const supabase = createServerSupabase();
+    
+    // Get current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { memberId, tonnageRange } = body;
+
+    if (!memberId) {
+      return NextResponse.json({ 
+        error: 'Missing required field: memberId' 
+      }, { status: 400 });
+    }
+
+    // Use admin client to bypass RLS
+    const adminSupabase = createAdminSupabase();
+    
+    // Get the member record to verify ownership
+    const { data: member, error: memberError } = await (adminSupabase as any)
+      .from("mbdf_member")
+      .select("room_id, user_id")
+      .eq("id", memberId)
+      .single();
+
+    if (memberError || !member) {
+      return NextResponse.json({ error: 'Member not found' }, { status: 404 });
+    }
+
+    // Allow only if user is updating their own tonnage
+    if (member.user_id !== user.id) {
+      return NextResponse.json({ 
+        error: 'You can only update your own tonnage' 
+      }, { status: 403 });
+    }
+
+    // Update member tonnage using admin client
+    const { error: updateError } = await (adminSupabase as any)
+      .from("mbdf_member")
+      .update({ tonnage_range: tonnageRange || null })
+      .eq("id", memberId);
+
+    if (updateError) {
+      return NextResponse.json({ 
+        error: 'Failed to update tonnage' 
+      }, { status: 500 });
+    }
+
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Tonnage updated successfully' 
     });
 
   } catch (error) {
