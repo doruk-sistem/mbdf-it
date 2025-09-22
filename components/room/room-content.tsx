@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { Users, FileText, Package, Vote, MessageCircle, Settings, MoreVertical, Archive } from "lucide-react";
 import { useRoom } from "@/hooks/use-rooms";
@@ -36,8 +37,20 @@ interface RoomContentProps {
 }
 
 export function RoomContent({ roomId }: RoomContentProps) {
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState("members");
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
+  
+  // Get URL parameters
+  const documentId = searchParams.get('documentId');
+  const tabParam = searchParams.get('tab');
+  
+  // Set initial tab based on URL parameters
+  useEffect(() => {
+    if (tabParam) {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
   
   // Query hooks
   const { data: room, isLoading, error } = useRoom(roomId);
@@ -269,7 +282,7 @@ export function RoomContent({ roomId }: RoomContentProps) {
           </TabsContent>
 
           <TabsContent value="documents" className="space-y-4">
-            <DocumentsTab roomId={roomId} isArchived={isRoomArchived(room)} />
+            <DocumentsTab roomId={roomId} isArchived={isRoomArchived(room)} highlightDocumentId={documentId} />
           </TabsContent>
 
           <TabsContent value="packages" className="space-y-4">

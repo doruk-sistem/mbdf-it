@@ -1,14 +1,35 @@
 "use client";
 
 import Link from "next/link";
-import { Building2, Users, FileText, Clock, ArrowRight, Plus, FlaskConical } from "lucide-react";
+import {
+  Building2,
+  Users,
+  FileText,
+  Clock,
+  ArrowRight,
+  Plus,
+  FlaskConical,
+  CheckCircle,
+} from "lucide-react";
 import { useRooms } from "@/hooks/use-rooms";
 import { DashboardSkeleton } from "./dashboard-skeleton";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { motion } from "framer-motion";
 
 interface DashboardStats {
@@ -43,12 +64,15 @@ export function DashboardContent() {
   }
 
   const rooms = roomsData?.items || [];
-  
+
   // Calculate stats from rooms data
   const stats: DashboardStats = {
     total_rooms: rooms.length,
-    active_rooms: rooms.filter((room: any) => room.status === 'active').length,
-    total_members: rooms.reduce((sum: number, room: any) => sum + (room.member_count || 0), 0),
+    active_rooms: rooms.filter((room: any) => room.status === "active").length,
+    total_members: rooms.reduce(
+      (sum: number, room: any) => sum + (room.member_count || 0),
+      0
+    ),
     pending_requests: 0, // This would need a separate API call
   };
 
@@ -58,7 +82,7 @@ export function DashboardContent() {
   return (
     <div className="space-y-8">
       {/* Stats Cards */}
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
@@ -71,9 +95,7 @@ export function DashboardContent() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.total_rooms}</div>
-            <p className="text-xs text-muted-foreground">
-              Katıldığınız odalar
-            </p>
+            <p className="text-xs text-muted-foreground">Katıldığınız odalar</p>
           </CardContent>
         </Card>
 
@@ -84,9 +106,7 @@ export function DashboardContent() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.active_rooms}</div>
-            <p className="text-xs text-muted-foreground">
-              Şu anda aktif
-            </p>
+            <p className="text-xs text-muted-foreground">Şu anda aktif</p>
           </CardContent>
         </Card>
 
@@ -97,22 +117,20 @@ export function DashboardContent() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.total_members}</div>
-            <p className="text-xs text-muted-foreground">
-              Tüm odalarda
-            </p>
+            <p className="text-xs text-muted-foreground">Tüm odalarda</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Bekleyen İstek</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Bekleyen İstek
+            </CardTitle>
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.pending_requests}</div>
-            <p className="text-xs text-muted-foreground">
-              Onay bekliyor
-            </p>
+            <p className="text-xs text-muted-foreground">Onay bekliyor</p>
           </CardContent>
         </Card>
       </motion.div>
@@ -183,15 +201,23 @@ export function DashboardContent() {
                   Yeni Oda Oluştur
                 </Link>
               </Button>
-              
-              <Button variant="outline" asChild className="w-full justify-start">
+
+              <Button
+                variant="outline"
+                asChild
+                className="w-full justify-start"
+              >
                 <Link href="/agreements">
                   <FileText className="mr-2 h-4 w-4" />
                   Sözleşmeler
                 </Link>
               </Button>
-              
-              <Button variant="outline" asChild className="w-full justify-start">
+
+              <Button
+                variant="outline"
+                asChild
+                className="w-full justify-start"
+              >
                 <Link href="/kks">
                   <Users className="mr-2 h-4 w-4" />
                   KKS Gönderimler
@@ -199,12 +225,14 @@ export function DashboardContent() {
               </Button>
 
               <Separator />
-              
+
               <div className="space-y-2">
                 <h4 className="text-sm font-medium">Sistem Durumu</h4>
                 <div className="flex items-center space-x-2">
                   <div className="h-2 w-2 rounded-full bg-green-500" />
-                  <span className="text-sm text-muted-foreground">Tüm servisler çalışıyor</span>
+                  <span className="text-sm text-muted-foreground">
+                    Tüm servisler çalışıyor
+                  </span>
                 </div>
               </div>
             </CardContent>
@@ -250,23 +278,49 @@ export function DashboardContent() {
                       <Link href={`/mbdf/${room.id}`}>
                         <CardHeader className="pb-3">
                           <div className="flex items-center justify-between">
-                            <CardTitle className="text-lg">{room.name}</CardTitle>
-                            <Badge 
-                              variant={room.status === "active" ? "default" : "secondary"}
+                            <div className="flex items-center space-x-2">
+                              <CardTitle className="text-lg">
+                                {room.name}
+                              </CardTitle>
+                              {/* Member indicator - only show if user is a member */}
+                              {room.user_role && room.user_role !== "none" && (
+                                <Badge
+                                  variant="outline"
+                                  className={
+                                    room.user_role === "lr"
+                                      ? "bg-blue-50 text-blue-700 border-blue-200 text-xs"
+                                      : "bg-green-50 text-green-700 border-green-200 text-xs"
+                                  }
+                                >
+                                  {room.user_role === "lr"
+                                    ? "Bu odada lidersiniz"
+                                    : "Bu odaya üyesiniz"}
+                                </Badge>
+                              )}
+                            </div>
+                            <Badge
+                              variant={
+                                room.status === "active"
+                                  ? "default"
+                                  : "secondary"
+                              }
                             >
-                              {room.status === "active" ? "Aktif" : 
-                               room.status === "closed" ? "Kapalı" : "Arşivlendi"}
+                              {room.status === "active"
+                                ? "Aktif"
+                                : room.status === "closed"
+                                ? "Kapalı"
+                                : "Arşivlendi"}
                             </Badge>
                           </div>
                           <div className="space-y-1">
                             <p className="text-sm text-muted-foreground">
-                              {room.substance?.name || 'Bilinmeyen madde'}
+                              {room.substance?.name || "Bilinmeyen madde"}
                             </p>
                             <p className="text-sm text-muted-foreground">
-                              EC: {room.substance?.ec_number || 'N/A'}
+                              EC: {room.substance?.ec_number || "N/A"}
                             </p>
                             <p className="text-sm text-muted-foreground">
-                              CAS: {room.substance?.cas_number || 'N/A'}
+                              CAS: {room.substance?.cas_number || "N/A"}
                             </p>
                           </div>
                         </CardHeader>
@@ -280,7 +334,9 @@ export function DashboardContent() {
                             </div>
                             <div className="flex items-center space-x-1 text-muted-foreground">
                               <span className="text-sm">
-                                {new Date(room.created_at).toLocaleDateString('tr-TR')}
+                                {new Date(room.created_at).toLocaleDateString(
+                                  "tr-TR"
+                                )}
                               </span>
                               <ArrowRight className="h-3 w-3" />
                             </div>
@@ -294,9 +350,12 @@ export function DashboardContent() {
             ) : (
               <div className="text-center py-12">
                 <FlaskConical className="mx-auto h-12 w-12 text-muted-foreground" />
-                <h3 className="mt-4 text-lg font-semibold">Madde Seçimi Gerekli</h3>
+                <h3 className="mt-4 text-lg font-semibold">
+                  Madde Seçimi Gerekli
+                </h3>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  MBDF süreçlerine başlamak için önce hangi madde ile ilgilendiğinizi seçmeniz gerekiyor.
+                  MBDF süreçlerine başlamak için önce hangi madde ile
+                  ilgilendiğinizi seçmeniz gerekiyor.
                 </p>
                 <div className="mt-6 space-y-3">
                   <Button asChild className="w-full sm:w-auto">
@@ -305,10 +364,12 @@ export function DashboardContent() {
                       Madde Seçimi Yap
                     </Link>
                   </Button>
-                  <div className="text-xs text-muted-foreground">
-                    veya
-                  </div>
-                  <Button variant="outline" asChild className="w-full sm:w-auto">
+                  <div className="text-xs text-muted-foreground">veya</div>
+                  <Button
+                    variant="outline"
+                    asChild
+                    className="w-full sm:w-auto"
+                  >
                     <Link href="/create-room">
                       <Plus className="mr-2 h-4 w-4" />
                       Doğrudan Oda Oluştur

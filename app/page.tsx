@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
-import { DashboardContent } from "@/components/dashboard/dashboard-content";
+import { PersonalizedDashboard } from "@/components/dashboard/personalized-dashboard";
 import { DashboardSkeleton } from "@/components/dashboard/dashboard-skeleton";
 import { createSSRQueryClient } from '@/lib/ssr-query-client';
 import { prefetchDashboard } from '@/lib/prefetch';
@@ -57,7 +57,7 @@ export default async function DashboardPage() {
         </div>
 
         <Suspense fallback={<DashboardSkeleton />}>
-          <DashboardContent />
+          <PersonalizedDashboard />
         </Suspense>
       </div>
     </HydrationBoundary>

@@ -38,7 +38,6 @@ export async function GET(request: NextRequest) {
     const { data: rooms, error } = await query;
 
     if (error) {
-      console.error('Error fetching rooms:', error);
       return NextResponse.json(
         { error: 'Failed to fetch rooms', success: false },
         { status: 500 }
@@ -61,8 +60,8 @@ export async function GET(request: NextRequest) {
         .eq('id', room.created_by)
         .single();
       
-      // Get counts
-      const [{ count: memberCount }, { count: documentCount }, { count: packageCount }] = await Promise.all([
+      // Get counts and user membership
+      const [{ count: memberCount }, { count: documentCount }, { count: packageCount }, { data: userMembership }] = await Promise.all([
         adminSupabase
         .from('mbdf_member')
         .select('*', { count: 'exact', head: true })
@@ -75,16 +74,26 @@ export async function GET(request: NextRequest) {
           .from('access_package')
           .select('*', { count: 'exact', head: true })
           .eq('room_id', room.id),
+        adminSupabase
+          .from('mbdf_member')
+          .select('role')
+          .eq('room_id', room.id)
+          .eq('user_id', user.id)
+          .single(),
       ]);
       
-      return {
+      const result = {
         ...room,
         substance: substance || null,
         created_by_profile: created_by_profile || null,
         member_count: memberCount || 0,
         document_count: documentCount || 0,
         package_count: packageCount || 0,
+        is_member: !!userMembership,
+        user_role: (userMembership as any)?.role || null,
       };
+      
+      return result;
     }));
 
     // Return response without validation to avoid stack depth issues

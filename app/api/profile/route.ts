@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
           name,
           vat_number,
           address,
+          contact_email,
           contact_phone
         )
       `)
