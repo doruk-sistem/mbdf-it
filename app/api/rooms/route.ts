@@ -176,6 +176,7 @@ export async function POST(request: NextRequest) {
           room_id: (room as any)?.id,
           user_id: user.id,
           role: 'member',
+          tonnage_range: validatedData.tonnage_range || null,
         },
       ]);
 

@@ -199,7 +199,8 @@ export async function POST(request: NextRequest) {
       .insert({
         room_id: actualRoomId,
         user_id: profile.id,
-        role: role
+        role: role,
+        tonnage_range: body.tonnageRange || null
       });
 
     if (insertError) {

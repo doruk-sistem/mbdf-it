@@ -285,6 +285,7 @@ export const CreateRoomSchema = z.object({
   name: z.string().min(1).max(255),
   description: z.string().optional(),
   substance_id: IdSchema,
+  tonnage_range: z.string().optional(),
 });
 
 export const UploadDocumentSchema = z.object({
