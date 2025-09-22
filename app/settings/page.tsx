@@ -67,7 +67,6 @@ export default async function SettingsPage() {
                 email: profile.email,
                 fullName: profile.full_name || "",
                 phone: profile.phone || "",
-                tonnage: profile.tonnage || null,
               }}
             />
           </CardContent>

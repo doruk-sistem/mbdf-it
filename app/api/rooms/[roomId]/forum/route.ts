@@ -47,7 +47,6 @@ export async function GET(
           id,
           full_name,
           avatar_url,
-          tonnage,
           company:company_id (
             name
           )
@@ -89,7 +88,6 @@ export async function GET(
           id, 
           full_name, 
           avatar_url,
-          tonnage,
           company:company_id (
             name
           )
@@ -110,7 +108,6 @@ export async function GET(
         id: message.sender_id, 
         full_name: "Unknown User", 
         avatar_url: null,
-        tonnage: null,
         company: null
       }
     })) || [];

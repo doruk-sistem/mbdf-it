@@ -31,7 +31,6 @@ interface ForumMessage {
     id: string;
     full_name: string;
     avatar_url?: string;
-    tonnage?: number | null;
     company?: {
       name: string;
     } | null;
@@ -612,11 +611,6 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
                           {message.profiles?.company?.name && (
                             <span className="text-muted-foreground ml-1">
                               - {message.profiles.company.name}
-                            </span>
-                          )}
-                          {message.profiles?.tonnage && (
-                            <span className="text-muted-foreground ml-1">
-                              ({message.profiles.tonnage} ton)
                             </span>
                           )}
                         </span>

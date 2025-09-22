@@ -332,7 +332,7 @@ export function MembersTab({ roomId, isArchived = false }: MembersTabProps) {
                   </TableCell>
                   <TableCell>
                     <span className="text-sm">
-                      {(member.profiles as any)?.tonnage ? `${(member.profiles as any).tonnage} ton` : "Belirtilmemiş"}
+                      Belirtilmemiş
                     </span>
                   </TableCell>
                   <TableCell>
