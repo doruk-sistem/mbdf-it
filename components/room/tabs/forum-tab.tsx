@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
+import { getTonnageLabel } from "@/lib/tonnage";
 
 interface ForumMessage {
   id: string;
@@ -31,7 +32,7 @@ interface ForumMessage {
     id: string;
     full_name: string;
     avatar_url?: string;
-    tonnage?: number | null;
+    tonnage_range?: string | null;
     company?: {
       name: string;
     } | null;
@@ -614,10 +615,10 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
                               - {message.profiles.company.name}
                             </span>
                           )}
-                          {message.profiles?.tonnage && (
-                            <span className="text-muted-foreground ml-1">
-                              ({message.profiles.tonnage} ton)
-                            </span>
+                          {message.profiles?.tonnage_range && (
+                            <Badge variant="secondary" className="ml-2 text-xs">
+                              {getTonnageLabel(message.profiles.tonnage_range)}
+                            </Badge>
                           )}
                         </span>
                         <span className="text-xs text-muted-foreground">

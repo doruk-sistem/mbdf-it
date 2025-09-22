@@ -82,10 +82,11 @@ export function useJoinRoom() {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: (data: { roomId: string; role?: 'member' | 'lr' | 'admin' }) => 
+    mutationFn: (data: { roomId: string; role?: 'member' | 'lr' | 'admin'; tonnageRange?: string }) => 
       post(API_ENDPOINTS.members, {
         roomId: data.roomId,
         role: data.role || 'member',
+        tonnageRange: data.tonnageRange,
       }),
     onSuccess: (data, variables) => {
     // Force refetch all member queries
