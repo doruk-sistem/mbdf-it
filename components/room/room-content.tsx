@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { Users, FileText, Vote, MessageCircle, Settings, MoreVertical, Archive } from "lucide-react";
+import { Users, FileText, Vote, MessageCircle, Settings, MoreVertical, Archive, BarChart3 } from "lucide-react";
 import { useRoom } from "@/hooks/use-rooms";
 import { useMembers } from "@/hooks/use-members";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -24,6 +25,7 @@ import { MembersTab } from "./tabs/members-tab";
 import { DocumentsTab } from "./tabs/documents-tab";
 import { VotingTab } from "./tabs/voting-tab";
 import { ForumTab } from "./tabs/forum-tab";
+import { RoomStatus } from "./room-status";
 // JoinRequestsTab is no longer needed - no join requests functionality
 import { ArchiveDialog } from "./archive-dialog";
 import { ArchivedBanner } from "./archived-banner";
@@ -39,6 +41,7 @@ export function RoomContent({ roomId }: RoomContentProps) {
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState("members");
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
+  const [leaderDashboardOpen, setLeaderDashboardOpen] = useState(false);
   
   // Get URL parameters
   const documentId = searchParams.get('documentId');
@@ -163,6 +166,28 @@ export function RoomContent({ roomId }: RoomContentProps) {
             roomName={room.name}
             isArchived={isRoomArchived(room)}
           />
+          {hasLeader && (
+            <Dialog open={leaderDashboardOpen} onOpenChange={setLeaderDashboardOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  <BarChart3 className="mr-2 h-4 w-4" />
+                  Oda Durumu
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-6xl max-h-[80vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center space-x-2">
+                    <BarChart3 className="h-5 w-5" />
+                    <span>Oda Durumu</span>
+                    <Badge variant="outline" className="text-xs">
+                      Genel Bakış
+                    </Badge>
+                  </DialogTitle>
+                </DialogHeader>
+                <RoomStatus roomId={roomId} />
+              </DialogContent>
+            </Dialog>
+          )}
           <Button variant="outline">
             <Settings className="mr-2 h-4 w-4" />
             Ayarlar
@@ -200,14 +225,14 @@ export function RoomContent({ roomId }: RoomContentProps) {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, delay: 0.1 }}
-        className="grid gap-4 md:grid-cols-3"
+        className="grid gap-4 md:grid-cols-2"
       >
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-center space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Üye Sayısı</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <Users className="h-4 w-4 text-muted-foreground ml-2" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="text-center">
             <div className="text-2xl font-bold">{room.member_count || 0}</div>
             <p className="text-xs text-muted-foreground">
               Aktif üyeler
@@ -216,11 +241,11 @@ export function RoomContent({ roomId }: RoomContentProps) {
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-center space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Dokümanlar</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
+            <FileText className="h-4 w-4 text-muted-foreground ml-2" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="text-center">
             <div className="text-2xl font-bold">{room.document_count || 0}</div>
             <p className="text-xs text-muted-foreground">
               Yüklenen dosyalar
