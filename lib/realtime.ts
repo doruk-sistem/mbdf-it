@@ -151,20 +151,6 @@ export function useMembersRealtime(roomId: string, enabled = true) {
   });
 }
 
-/**
- * Hook for access requests real-time updates
- */
-export function useAccessRequestsRealtime(roomId: string, enabled = true) {
-  useRealtimeInvalidate({
-    table: 'access_request',
-    keys: [
-      ['accessRequests'],
-      ['accessRequests', 'list', roomId],
-      ['packages', 'requests', roomId],
-    ],
-    enabled: enabled && !!roomId,
-  });
-}
 
 /**
  * Hook for votes real-time updates
@@ -247,7 +233,6 @@ export function useKKSRealtime(roomId?: string, enabled = true) {
 export function useRoomRealtime(roomId: string, enabled = true) {
   useDocumentsRealtime(roomId, enabled);
   useMembersRealtime(roomId, enabled);
-  useAccessRequestsRealtime(roomId, enabled);
   useVotesRealtime(roomId, enabled);
   useMessagesRealtime(roomId, enabled);
   useAgreementsRealtime(roomId, enabled);

@@ -83,7 +83,7 @@ export function ArchivedBanner({
             </div>
           </div>
           <div className="text-xs text-orange-600 dark:text-orange-400">
-            No new documents, messages, packages, or requests can be added.
+            No new documents, messages, or requests can be added.
           </div>
         </div>
         

@@ -103,35 +103,13 @@ export async function GET(
       );
     }
 
-    // Get package IDs first
-    const { data: packages } = await adminSupabase
-      .from('access_package')
-      .select('id')
-      .eq('room_id', roomId) as { data: Array<{ id: string }> | null };
-
-    const packageIds = packages?.map(p => p.id) || [];
 
     // Get counts of various entities that will be affected
     const [
-      pendingRequestsResult,
-      approvedRequestsResult, 
       openVotesResult,
       draftAgreementsResult,
       totalMembersResult
     ] = await Promise.all([
-      // Count pending access requests
-      adminSupabase
-        .from('access_request')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'pending')
-        .in('package_id', packageIds),
-      
-      // Count approved access requests
-      adminSupabase
-        .from('access_request')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'approved')
-        .in('package_id', packageIds),
       
       // Count open LR votes (where voting is still ongoing)
       adminSupabase
@@ -153,16 +131,12 @@ export async function GET(
     ]);
 
     const counts = {
-      pending_requests: pendingRequestsResult.count || 0,
-      approved_requests: approvedRequestsResult.count || 0,
       open_votes: openVotesResult.count || 0,
       draft_agreements: draftAgreementsResult.count || 0,
       total_members: totalMembersResult.count || 0,
     };
 
     const effects = {
-      pending_will_be_rejected: counts.pending_requests,
-      approved_will_be_revoked: counts.approved_requests,
       votes_will_be_closed: counts.open_votes,
     };
 

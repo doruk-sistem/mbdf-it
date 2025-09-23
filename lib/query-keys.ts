@@ -35,22 +35,6 @@ export const keys = {
       ['activities', 'detailed', limit, offset, type] as const,
   },
 
-  // Packages and Access Requests
-  packages: {
-    all: ['packages'] as const,
-    list: (roomId: string) => ['packages', 'list', roomId] as const,
-    byId: (id: string) => ['packages', 'byId', id] as const,
-    requests: (roomId: string) => ['packages', 'requests', roomId] as const,
-    myRequests: (userId: string) => ['packages', 'myRequests', userId] as const,
-  },
-
-  accessRequests: {
-    all: ['accessRequests'] as const,
-    list: (roomId: string) => ['accessRequests', 'list', roomId] as const,
-    byId: (id: string) => ['accessRequests', 'byId', id] as const,
-    byUserId: (userId: string) => ['accessRequests', 'byUserId', userId] as const,
-    pending: (roomId: string) => ['accessRequests', 'pending', roomId] as const,
-  },
 
   // Voting
   votes: {
@@ -149,7 +133,6 @@ export const invalidationHelpers = {
     keys.rooms.byId(roomId),
     keys.members.list(roomId),
     keys.documents.list(roomId),
-    keys.packages.list(roomId),
     keys.votes.summary(roomId),
     keys.messages.list(roomId),
   ],
@@ -168,13 +151,6 @@ export const invalidationHelpers = {
     keys.documents.list(roomId),
   ],
 
-  // When an access request is created/updated
-  accessRequest: (roomId: string, userId?: string) => [
-    keys.accessRequests.all,
-    keys.accessRequests.list(roomId),
-    keys.packages.requests(roomId),
-    ...(userId ? [keys.accessRequests.byUserId(userId)] : []),
-  ],
 
   // When voting occurs
   vote: (roomId: string) => [

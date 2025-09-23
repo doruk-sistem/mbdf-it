@@ -169,11 +169,6 @@ export type MemberWithProfile = Database['public']['Tables']['mbdf_member']['Row
   };
 };
 
-export type AccessRequestWithDetails = Database['public']['Tables']['access_request']['Row'] & {
-  access_package: Database['public']['Tables']['access_package']['Row'];
-  profiles: Database['public']['Tables']['profiles']['Row'];
-  approved_by_profile?: Database['public']['Tables']['profiles']['Row'];
-};
 
 export type DocumentWithUploader = Database['public']['Tables']['document']['Row'] & {
   profiles: Database['public']['Tables']['profiles']['Row'];

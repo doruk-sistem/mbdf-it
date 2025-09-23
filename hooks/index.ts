@@ -7,8 +7,6 @@ export * from './use-documents';
 // Member hooks
 export * from './use-members';
 
-// Access request hooks
-export * from './use-access-requests';
 
 // Voting hooks
 export * from './use-votes';

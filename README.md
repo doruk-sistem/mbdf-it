@@ -8,7 +8,6 @@ KKDİK MBDF süreçlerini yönetmek için geliştirilmiş modern web uygulaması
 - **MBDF Room Management**: MBDF odalarını oluşturma, yönetme ve üye kontrolü
 - **LR Voting System**: Lider Kayıtçı seçimi için puanlama sistemi
 - **Document Management**: Güvenli dokuman yükleme ve paylaşım
-- **Access Package System**: Veri paketlerine erişim yönetimi
 - **E-Signature Integration**: Sözleşme imzalama süreçleri
 - **KEP Integration**: KEP bildirim sistemi
 - **KKS Submission**: KKS'ye veri gönderimi ve takibi
@@ -321,7 +320,6 @@ EMAIL_FROM=noreply@yourdomain.com
   - `updateUserProfile()`: Profil güncelleme
   - `updateCompanyInfo()`: Şirket bilgileri güncelleme
 - `app/actions/rooms.ts`: MBDF oda yönetimi
-- `app/actions/packages.ts`: Erişim paketi yönetimi
 - `app/actions/documents.ts`: Dokuman yönetimi
 - `app/actions/voting.ts`: LR oylaması yönetimi
 

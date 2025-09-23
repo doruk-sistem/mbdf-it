@@ -853,7 +853,7 @@ Bu e-posta MBDF-IT Portal tarafından otomatik olarak gönderilmiştir.
           ` : ''}
           
           <div class="content">
-            <p><strong>Önemli:</strong> Arşivlenen oda artık salt okunur modundadır. Yeni doküman, mesaj, paket veya talep eklenemez, mevcut içerikler değiştirilemez.</p>
+            <p><strong>Önemli:</strong> Arşivlenen oda artık salt okunur modundadır. Yeni doküman, mesaj veya talep eklenemez, mevcut içerikler değiştirilemez.</p>
             <p>Oda verileriniz korunmuştur ve görüntülemeye devam edebilirsiniz.</p>
           </div>
           
@@ -885,7 +885,7 @@ ${pendingRejected > 0 ? `- ${pendingRejected} bekleyen istek reddedildi` : ''}
 ${approvedRevoked > 0 ? `- ${approvedRevoked} onaylanmış token iptal edildi` : ''}
 ` : ''}
 
-ÖNEMLİ: Arşivlenen oda artık salt okunur modundadır. Yeni doküman, mesaj, paket veya talep eklenemez, mevcut içerikler değiştirilemez.
+ÖNEMLİ: Arşivlenen oda artık salt okunur modundadır. Yeni doküman, mesaj veya talep eklenemez, mevcut içerikler değiştirilemez.
 
 Oda verileriniz korunmuştur ve görüntülemeye devam edebilirsiniz.
 
@@ -973,7 +973,7 @@ Sorularınız için sistem yöneticinizle iletişime geçin.
           </div>
           
           <div class="success-box">
-            <strong>✅ Oda Aktif:</strong> Artık yeniden doküman yükleyebilir, mesaj gönderebilir, paket oluşturabilir ve erişim talebinde bulunabilirsiniz.
+            <strong>✅ Oda Aktif:</strong> Artık yeniden doküman yükleyebilir, mesaj gönderebilir ve erişim talebinde bulunabilirsiniz.
           </div>
           
           <div class="content">
@@ -998,7 +998,7 @@ ${roomName}
 
 Etkinleştirme Tarihi: ${unarchivedAt}
 
-✅ Oda Aktif: Artık yeniden doküman yükleyebilir, mesaj gönderebilir, paket oluşturabilir ve erişim talebinde bulunabilirsiniz.
+✅ Oda Aktif: Artık yeniden doküman yükleyebilir, mesaj gönderebilir ve erişim talebinde bulunabilirsiniz.
 
 ÖNEMLİ NOT: Daha önce iptal edilen erişim tokenları otomatik olarak yeniden etkinleştirilmez. Gerekirse yeni erişim talepleri oluşturabilirsiniz.
 

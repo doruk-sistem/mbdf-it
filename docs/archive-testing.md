@@ -73,8 +73,6 @@ This document provides a comprehensive testing guide for the MBDF room archive/u
 - **Test**: Try to INSERT/UPDATE/DELETE on archived room for each table:
   - Documents
   - Messages
-  - Access packages
-  - Access requests
   - LR candidates
   - LR votes
 - **Expected Result**: All write operations should be blocked by RLS policies

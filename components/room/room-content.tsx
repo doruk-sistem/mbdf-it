@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { Users, FileText, Package, Vote, MessageCircle, Settings, MoreVertical, Archive } from "lucide-react";
+import { Users, FileText, Vote, MessageCircle, Settings, MoreVertical, Archive } from "lucide-react";
 import { useRoom } from "@/hooks/use-rooms";
 import { useMembers } from "@/hooks/use-members";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -22,7 +22,6 @@ import {
 
 import { MembersTab } from "./tabs/members-tab";
 import { DocumentsTab } from "./tabs/documents-tab";
-import { PackagesTab } from "./tabs/packages-tab";
 import { VotingTab } from "./tabs/voting-tab";
 import { ForumTab } from "./tabs/forum-tab";
 // JoinRequestsTab is no longer needed - no join requests functionality
@@ -229,18 +228,6 @@ export function RoomContent({ roomId }: RoomContentProps) {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Paketler</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{room.package_count || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              Erişim paketleri
-            </p>
-          </CardContent>
-        </Card>
       </motion.div>
 
       {/* Room Tabs */}
@@ -251,7 +238,7 @@ export function RoomContent({ roomId }: RoomContentProps) {
       >
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <TabsList className={`grid w-full ${
-            canSeeVoting ? 'grid-cols-5' : 'grid-cols-4'
+            canSeeVoting ? 'grid-cols-4' : 'grid-cols-3'
           }`}>
             <TabsTrigger value="members">
               <Users className="mr-2 h-4 w-4" />
@@ -260,10 +247,6 @@ export function RoomContent({ roomId }: RoomContentProps) {
             <TabsTrigger value="documents">
               <FileText className="mr-2 h-4 w-4" />
               Dokümanlar
-            </TabsTrigger>
-            <TabsTrigger value="packages">
-              <Package className="mr-2 h-4 w-4" />
-              Paketler
             </TabsTrigger>
             {canSeeVoting && (
               <TabsTrigger value="voting">
@@ -285,9 +268,6 @@ export function RoomContent({ roomId }: RoomContentProps) {
             <DocumentsTab roomId={roomId} isArchived={isRoomArchived(room)} highlightDocumentId={documentId} />
           </TabsContent>
 
-          <TabsContent value="packages" className="space-y-4">
-            <PackagesTab roomId={roomId} />
-          </TabsContent>
 
           {canSeeVoting && (
             <TabsContent value="voting" className="space-y-4">
