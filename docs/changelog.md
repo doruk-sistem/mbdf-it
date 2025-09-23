@@ -62,18 +62,18 @@
 ### Etki
 - Doküman indirme ve görüntüleme tüm dosyalar için güvenilir şekilde çalışır.
 
-## [2025-08-25] - Room Stats: Document and Package Counts Fixed
+## [2025-08-25] - Room Stats: Document Counts Fixed
 
 ### Düzeltilen
 - Oda detay sayfasında ve listede "Dokümanlar" kartı 0 gösteriyordu.
-- `document_count` ve `package_count` artık API tarafından doğru hesaplanıyor.
+- `document_count` artık API tarafından doğru hesaplanıyor.
 
 ### Teknik Detaylar
 - `app/api/rooms/[roomId]/route.ts`:
-  - GET ve PUT handler'larında `document` ve `access_package` tablolarından count sorguları eklendi.
-  - Response'a `document_count` ve `package_count` alanları eklendi.
+  - GET ve PUT handler'larında `document` tablosundan count sorgusu eklendi.
+  - Response'a `document_count` alanı eklendi.
 - `app/api/rooms/route.ts`:
-  - Listeleme endpoint'inde her oda için doküman ve paket sayıları paralel olarak hesaplanıyor.
+  - Listeleme endpoint'inde her oda için doküman sayıları paralel olarak hesaplanıyor.
 
 ### Etki
 - Oda üst kısmındaki istatistik kartları ve dashboard verileri gerçeği yansıtıyor.

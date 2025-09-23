@@ -61,17 +61,13 @@ export async function GET(request: NextRequest) {
         .single();
       
       // Get counts and user membership
-      const [{ count: memberCount }, { count: documentCount }, { count: packageCount }, { data: userMembership }] = await Promise.all([
+      const [{ count: memberCount }, { count: documentCount }, { data: userMembership }] = await Promise.all([
         adminSupabase
         .from('mbdf_member')
         .select('*', { count: 'exact', head: true })
         .eq('room_id', room.id),
         adminSupabase
           .from('document')
-          .select('*', { count: 'exact', head: true })
-          .eq('room_id', room.id),
-        adminSupabase
-          .from('access_package')
           .select('*', { count: 'exact', head: true })
           .eq('room_id', room.id),
         adminSupabase
@@ -88,7 +84,6 @@ export async function GET(request: NextRequest) {
         created_by_profile: created_by_profile || null,
         member_count: memberCount || 0,
         document_count: documentCount || 0,
-        package_count: packageCount || 0,
         is_member: !!userMembership,
         user_role: (userMembership as any)?.role || null,
       };

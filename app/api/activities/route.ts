@@ -149,38 +149,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 5. Get access requests by user
-    const { data: accessRequests } = await adminSupabase
-      .from('access_request')
-      .select(`
-        id,
-        created_at,
-        status,
-        mbdf_room:room_id (
-          name,
-          substance:substance_id (name)
-        )
-      `)
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(limit);
 
-    if (accessRequests) {
-      accessRequests.forEach((request: any) => {
-        const statusText = request.status === 'approved' ? 'onaylandı' : 
-                          request.status === 'rejected' ? 'reddedildi' : 'beklemede';
-        activities.push({
-          id: `request-${request.id}`,
-          action: `Erişim talebi ${statusText}`,
-          user: 'Sen',
-          room: request.mbdf_room?.substance?.name || request.mbdf_room?.name || 'Bilinmeyen',
-          roomId: request.mbdf_room?.id,
-          time: getTimeAgo(request.created_at),
-          type: 'Erişim',
-          timestamp: new Date(request.created_at).getTime()
-        });
-      });
-    }
 
     // 6. Get agreements signed by user
     const { data: agreements } = await adminSupabase

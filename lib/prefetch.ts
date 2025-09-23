@@ -5,7 +5,6 @@ import {
   RoomsListResponseSchema,
   DocumentsListResponseSchema,
   MembersListResponseSchema,
-  AccessRequestsListResponseSchema,
   VotingSummaryResponseSchema,
   RoomWithDetailsSchema 
 } from '@/lib/schemas';
@@ -295,59 +294,6 @@ export async function prefetchMembers(queryClient: QueryClient, roomId: string) 
   }
 }
 
-export async function prefetchAccessRequests(queryClient: QueryClient, roomId: string) {
-  const supabase = createServerSupabase();
-  
-  try {
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return;
-    }
-
-    // Check membership
-    const { data: membership, error: memberError } = await supabase
-      .from('mbdf_member')
-      .select('role')
-      .eq('room_id', roomId)
-      .eq('user_id', user.id)
-      .single();
-
-    if (memberError) {
-      return;
-    }
-
-    // Fetch access requests
-    const { data: requests, error } = await supabase
-      .from('access_request')
-      .select(`
-        *,
-        access_package!inner (*),
-        profiles:requester_id (*),
-        approved_by_profile:profiles!access_request_approved_by_fkey (*)
-      `)
-      .eq('access_package.room_id', roomId)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error prefetching access requests:', error);
-      return;
-    }
-
-    const response = AccessRequestsListResponseSchema.parse({
-      items: requests || [],
-      total: requests?.length || 0,
-    });
-
-    await queryClient.prefetchQuery({
-      queryKey: keys.accessRequests.list(roomId),
-      queryFn: () => Promise.resolve(response),
-      staleTime: 1000 * 30, // 30 seconds
-    });
-  } catch (error) {
-    console.error('Error in prefetchAccessRequests:', error);
-  }
-}
 
 export async function prefetchVotes(queryClient: QueryClient, roomId: string) {
   const supabase = createServerSupabase();
@@ -416,7 +362,6 @@ export async function prefetchRoomData(queryClient: QueryClient, roomId: string)
     prefetchRoom(queryClient, roomId),
     prefetchDocuments(queryClient, roomId),
     prefetchMembers(queryClient, roomId),
-    prefetchAccessRequests(queryClient, roomId),
     prefetchVotes(queryClient, roomId),
   ]);
 }
