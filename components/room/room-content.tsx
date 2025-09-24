@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Users, FileText, Package, Vote, MessageCircle, UserPlus, Settings, MoreVertical, Archive } from "lucide-react";
 import { useRoom } from "@/hooks/use-rooms";
+import { useMembers } from "@/hooks/use-members";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { Badge } from "@/components/ui/badge";
@@ -29,7 +30,6 @@ import { ArchivedBanner } from "./archived-banner";
 import { JoinRequestButton } from "./join-request-button";
 import { isRoomArchived, getRoomStatusText, getRoomStatusVariant } from "@/lib/archive-utils";
 import { useCanArchiveRoom, useIsRoomAdmin, useRoomMemberRole } from "@/hooks/use-user";
-import { useMembers } from "@/hooks/use-members";
 
 interface RoomContentProps {
   roomId: string;
@@ -59,6 +59,16 @@ export function RoomContent({ roomId }: RoomContentProps) {
   // 1. They are a member of the room AND
   // 2. Either there's no leader (all members can see) OR they are the leader
   const canSeeJoinRequests = currentUserRole && (!hasLeader || currentUserRole === 'lr');
+  
+  // LR Oylaması sekmesi sadece odada LR yokken görünür
+  const canSeeVoting = !hasLeader;
+
+  // LR seçildiğinde (hasLeader true olduğunda) Üyeler sekmesine yönlendir
+  useEffect(() => {
+    if (hasLeader && activeTab === "voting") {
+      setActiveTab("members");
+    }
+  }, [hasLeader, activeTab]);
 
   if (isLoading) {
     return (
@@ -235,7 +245,11 @@ export function RoomContent({ roomId }: RoomContentProps) {
         transition={{ duration: 0.3, delay: 0.2 }}
       >
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className={`grid w-full ${canSeeJoinRequests ? 'grid-cols-6' : 'grid-cols-5'}`}>
+          <TabsList className={`grid w-full ${
+            canSeeJoinRequests && canSeeVoting ? 'grid-cols-6' : 
+            canSeeJoinRequests || canSeeVoting ? 'grid-cols-5' : 
+            'grid-cols-4'
+          }`}>
             <TabsTrigger value="members">
               <Users className="mr-2 h-4 w-4" />
               Üyeler
@@ -248,10 +262,12 @@ export function RoomContent({ roomId }: RoomContentProps) {
               <Package className="mr-2 h-4 w-4" />
               Paketler
             </TabsTrigger>
-            <TabsTrigger value="voting">
-              <Vote className="mr-2 h-4 w-4" />
-              LR Oylaması
-            </TabsTrigger>
+            {canSeeVoting && (
+              <TabsTrigger value="voting">
+                <Vote className="mr-2 h-4 w-4" />
+                LR Oylaması
+              </TabsTrigger>
+            )}
             {canSeeJoinRequests && (
               <TabsTrigger value="join-requests">
                 <UserPlus className="mr-2 h-4 w-4" />
@@ -276,9 +292,11 @@ export function RoomContent({ roomId }: RoomContentProps) {
             <PackagesTab roomId={roomId} />
           </TabsContent>
 
-          <TabsContent value="voting" className="space-y-4">
-            <VotingTab roomId={roomId} />
-          </TabsContent>
+          {canSeeVoting && (
+            <TabsContent value="voting" className="space-y-4">
+              <VotingTab roomId={roomId} />
+            </TabsContent>
+          )}
 
           {canSeeJoinRequests && (
             <TabsContent value="join-requests" className="space-y-4">
