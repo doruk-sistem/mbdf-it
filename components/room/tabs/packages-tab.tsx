@@ -79,6 +79,8 @@ const mockAccessRequests = [
 export function PackagesTab({ roomId }: PackagesTabProps) {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const { toast } = useToast();
+  
+  // All authenticated users can create and manage packages
 
   const getStatusBadge = (status: string) => {
     switch (status) {

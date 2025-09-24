@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Users, FileText, Package, Vote, MessageCircle, UserPlus, Settings, MoreVertical, Archive } from "lucide-react";
+import { Users, FileText, Package, Vote, MessageCircle, Settings, MoreVertical, Archive } from "lucide-react";
 import { useRoom } from "@/hooks/use-rooms";
 import { useMembers } from "@/hooks/use-members";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -24,10 +24,10 @@ import { DocumentsTab } from "./tabs/documents-tab";
 import { PackagesTab } from "./tabs/packages-tab";
 import { VotingTab } from "./tabs/voting-tab";
 import { ForumTab } from "./tabs/forum-tab";
-import { JoinRequestsTab } from "./tabs/join-requests-tab";
+// JoinRequestsTab is no longer needed - no join requests functionality
 import { ArchiveDialog } from "./archive-dialog";
 import { ArchivedBanner } from "./archived-banner";
-import { JoinRequestButton } from "./join-request-button";
+import { JoinRoomButton } from "./join-room-button";
 import { isRoomArchived, getRoomStatusText, getRoomStatusVariant } from "@/lib/archive-utils";
 import { useCanArchiveRoom, useIsRoomAdmin, useRoomMemberRole } from "@/hooks/use-user";
 
@@ -47,19 +47,11 @@ export function RoomContent({ roomId }: RoomContentProps) {
   const isRoomAdmin = useIsRoomAdmin(roomId);
   const userRole = useRoomMemberRole(roomId);
   
-  // Check if user can see join requests based on leadership status
+  // Check if there's a leader in the room
   const { data: membersData } = useMembers(roomId);
   const members = membersData?.items || [];
-  const currentUserRole = membersData?.currentUserRole;
-  
-  // Check if there's a leader in the room
   const hasLeader = members.some((member: any) => member.role === 'lr');
-  
-  // User can see join requests if:
-  // 1. They are a member of the room AND
-  // 2. Either there's no leader (all members can see) OR they are the leader
-  const canSeeJoinRequests = currentUserRole && (!hasLeader || currentUserRole === 'lr');
-  
+
   // LR Oylaması sekmesi sadece odada LR yokken görünür
   const canSeeVoting = !hasLeader;
 
@@ -154,7 +146,7 @@ export function RoomContent({ roomId }: RoomContentProps) {
         </div>
         
         <div className="flex items-center space-x-2">
-          <JoinRequestButton 
+          <JoinRoomButton 
             roomId={roomId} 
             roomName={room.name}
             isArchived={isRoomArchived(room)}
@@ -246,9 +238,7 @@ export function RoomContent({ roomId }: RoomContentProps) {
       >
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <TabsList className={`grid w-full ${
-            canSeeJoinRequests && canSeeVoting ? 'grid-cols-6' : 
-            canSeeJoinRequests || canSeeVoting ? 'grid-cols-5' : 
-            'grid-cols-4'
+            canSeeVoting ? 'grid-cols-5' : 'grid-cols-4'
           }`}>
             <TabsTrigger value="members">
               <Users className="mr-2 h-4 w-4" />
@@ -266,12 +256,6 @@ export function RoomContent({ roomId }: RoomContentProps) {
               <TabsTrigger value="voting">
                 <Vote className="mr-2 h-4 w-4" />
                 LR Oylaması
-              </TabsTrigger>
-            )}
-            {canSeeJoinRequests && (
-              <TabsTrigger value="join-requests">
-                <UserPlus className="mr-2 h-4 w-4" />
-                Katılım Talepleri
               </TabsTrigger>
             )}
             <TabsTrigger value="forum">
@@ -298,11 +282,6 @@ export function RoomContent({ roomId }: RoomContentProps) {
             </TabsContent>
           )}
 
-          {canSeeJoinRequests && (
-            <TabsContent value="join-requests" className="space-y-4">
-              <JoinRequestsTab roomId={roomId} isArchived={isRoomArchived(room)} />
-            </TabsContent>
-          )}
 
           <TabsContent value="forum" className="space-y-4">
             <ForumTab roomId={roomId} isArchived={isRoomArchived(room)} />

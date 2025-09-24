@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
-import { createServerSupabase } from "@/lib/supabase";
+import { createServerSupabase, createAdminSupabase } from "@/lib/supabase";
 import { uploadFile, deleteFile } from "@/lib/supabase";
 
 // Get current user
@@ -111,24 +111,25 @@ export async function deleteDocument(documentId: string) {
   const supabase = createServerSupabase();
 
   try {
-    // Get document details
-    const { data: document } = await supabase
+    // Get document details using admin client to bypass RLS
+    const adminSupabase = createAdminSupabase();
+    const { data: document } = await adminSupabase
       .from("document")
       .select("room_id, file_path, name, uploaded_by")
       .eq("id", documentId)
-      .single();
+      .single() as { data: any; error: any };
 
     if (!document) {
       throw new Error("Document not found");
     }
 
-    // Check if user has permission to delete
-    const { data: member } = await supabase
+    // Check if user has permission to delete using admin client
+    const { data: member } = await adminSupabase
       .from("mbdf_member")
       .select("role")
       .eq("room_id", document.room_id)
       .eq("user_id", user.id)
-      .single();
+      .single() as { data: any; error: any };
 
     if (!member) {
       throw new Error("Not a room member");
@@ -151,8 +152,8 @@ export async function deleteDocument(documentId: string) {
       // Continue with database deletion even if storage fails
     }
 
-    // Delete from database
-    const { error } = await supabase
+    // Delete from database using admin client to bypass RLS
+    const { error } = await adminSupabase
       .from("document")
       .delete()
       .eq("id", documentId);

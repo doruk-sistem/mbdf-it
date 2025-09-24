@@ -67,7 +67,7 @@ export function VotingTab({ roomId }: VotingTabProps) {
   const candidates = candidatesData?.items || [];
   const members = (membersData as any)?.items || [];
   const votingResults = votingData?.results || [];
-  const currentUserRole = (membersData as any)?.currentUserRole || 'member';
+  const currentUserRole = 'member'; // All users have member role for voting
   const myVote = votingData?.my_vote;
   // More intelligent finalized check - if no candidates, it's not finalized
   // Use API's is_finalized value which already checks if all eligible members have voted
