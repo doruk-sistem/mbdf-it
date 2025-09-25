@@ -37,6 +37,7 @@ import { useMyKKSSubmissions } from "@/hooks/use-kks";
 import { useUserDocuments } from "@/hooks/use-documents";
 import { useRecentActivities, useDetailedActivities } from "@/hooks/use-activities";
 import { useDeleteDocument } from "@/hooks/use-documents";
+import { useToast } from "@/components/ui/use-toast";
 
 
 
@@ -63,6 +64,47 @@ export function PersonalizedDashboard() {
     type: activityFilter === "all" ? undefined : activityFilter,
   });
   const deleteDocumentMutation = useDeleteDocument();
+  const { toast } = useToast();
+
+  // Join room handler
+  const handleJoinRoom = async (roomId: string) => {
+    try {
+      const response = await fetch('/api/members', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          roomId: roomId,
+          role: 'member',
+          tonnageRange: '1-10' // Default tonnage range
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        toast({
+          title: "Başarılı!",
+          description: "Odaya başarıyla katıldınız.",
+        });
+        // Refresh rooms data
+        window.location.reload();
+      } else {
+        toast({
+          title: "Hata",
+          description: data.error || "Odaya katılırken bir hata oluştu.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Hata",
+        description: "Odaya katılırken bir hata oluştu.",
+        variant: "destructive",
+      });
+    }
+  };
 
   // Delete document handlers
   const handleDeleteClick = (documentId: string) => {
@@ -427,7 +469,6 @@ export function PersonalizedDashboard() {
                     <SelectItem value="all">Tümü</SelectItem>
                     <SelectItem value="member">Üye Olduğum Odalar</SelectItem>
                     <SelectItem value="leader">Lider Olduğum Odalar</SelectItem>
-                    <SelectItem value="not_member">Üye Olmadığım Odalar</SelectItem>
                   </SelectContent>
                 </Select>
                 <Button variant="outline">
@@ -440,10 +481,13 @@ export function PersonalizedDashboard() {
               <div className="space-y-4">
                 {(() => {
                   const filteredRooms = rooms.filter((room: any) => {
+                    // If search term exists, show all rooms (for discovery)
+                    // If no search term, only show rooms where user is a member
+                    if (!searchTerm && !room.is_member) return false;
+                    
                     // Membership filter
                     if (selectedMembership === 'member' && (!room.user_role || room.user_role === 'none')) return false;
                     if (selectedMembership === 'leader' && room.user_role !== 'lr') return false;
-                    if (selectedMembership === 'not_member' && room.user_role && room.user_role !== 'none') return false;
                     
                     // Search filter
                     if (searchTerm && !room.name?.toLowerCase().includes(searchTerm.toLowerCase()) &&
@@ -519,12 +563,24 @@ export function PersonalizedDashboard() {
                           </div>
                           <div className="flex items-center space-x-2">
                             <div className="flex flex-col space-y-2">
-                              <Button size="sm" variant="outline" asChild className="text-sm">
-                                <Link href={`/mbdf/${room.id}`}>
-                                  <Eye className="h-4 w-4 mr-2" />
-                                  Odayı Görüntüle
-                                </Link>
-                              </Button>
+                              {room.is_member ? (
+                                <Button size="sm" variant="outline" asChild className="text-sm">
+                                  <Link href={`/mbdf/${room.id}`}>
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    Odayı Görüntüle
+                                  </Link>
+                                </Button>
+                              ) : (
+                                <Button 
+                                  size="sm" 
+                                  variant="default" 
+                                  className="text-sm"
+                                  onClick={() => handleJoinRoom(room.id)}
+                                >
+                                  <Plus className="h-4 w-4 mr-2" />
+                                  Odaya Katıl
+                                </Button>
+                              )}
                               {room.user_role === 'admin' && (
                                 <Button size="sm" variant="outline" className="text-sm">
                                   <Edit className="h-4 w-4 mr-2" />
@@ -597,6 +653,7 @@ export function PersonalizedDashboard() {
                   <SelectContent>
                     <SelectItem value="all">Tüm Aktiviteler</SelectItem>
                     <SelectItem value="Oluşturma">MBDF Oluşturma</SelectItem>
+                    <SelectItem value="Katılım">Odaya Katılım</SelectItem>
                     <SelectItem value="Belge">Belge Yükleme</SelectItem>
                     <SelectItem value="Oylama">Oylama</SelectItem>
                     <SelectItem value="KKS">KKS Gönderme</SelectItem>

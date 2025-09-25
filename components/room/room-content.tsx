@@ -150,9 +150,6 @@ export function RoomContent({ roomId }: RoomContentProps) {
               {getRoomStatusText(room.status)}
             </Badge>
           </div>
-          <p className="text-muted-foreground">
-            {room.description || "MBDF odası"}
-          </p>
           <div className="flex items-center space-x-4 text-sm text-muted-foreground">
             <span>EC: {room.substance?.ec_number || 'N/A'}</span>
             <span>•</span>

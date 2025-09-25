@@ -136,6 +136,61 @@ export async function POST(request: NextRequest) {
     // Use admin client to bypass RLS for room creation
     const adminSupabase = createAdminSupabase();
     
+    // Check if room already exists for this substance
+    if (!validatedData.substance_id) {
+      return NextResponse.json(
+        { error: 'Substance ID is required', success: false },
+        { status: 400 }
+      );
+    }
+
+    const { data: existingRoom } = await (adminSupabase as any)
+      .from('mbdf_room')
+      .select('id, name')
+      .eq('substance_id', validatedData.substance_id)
+      .eq('status', 'active')
+      .single();
+
+    if (existingRoom) {
+      // Room already exists, add user as member instead
+      const { data: existingMember } = await (adminSupabase as any)
+        .from('mbdf_member')
+        .select('id')
+        .eq('room_id', existingRoom.id)
+        .eq('user_id', user.id)
+        .single();
+
+      if (!existingMember) {
+        // User is not a member, add them
+        const { error: memberError } = await (adminSupabase as any)
+          .from('mbdf_member')
+          .insert([
+            {
+              room_id: existingRoom.id,
+              user_id: user.id,
+              role: 'member',
+              tonnage_range: validatedData.tonnage_range || null,
+            },
+          ]);
+
+        if (memberError) {
+          console.error('Error adding user to existing room:', memberError);
+          return NextResponse.json(
+            { error: 'Failed to join existing room', success: false },
+            { status: 500 }
+          );
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'Joined existing room',
+        room_id: existingRoom.id,
+        room_name: existingRoom.name,
+        joined_existing: true
+      });
+    }
+    
     // Create room using admin client with type assertion
     const { data: room, error } = await (adminSupabase as any)
       .from('mbdf_room')

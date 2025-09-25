@@ -27,7 +27,6 @@ interface CreateRoomFormProps {
 export function CreateRoomForm({ preselectedSubstanceId }: CreateRoomFormProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [formData, setFormData] = useState({
-    description: "",
     substanceId: preselectedSubstanceId || "",
     tonnageRange: "",
   });
@@ -59,7 +58,7 @@ export function CreateRoomForm({ preselectedSubstanceId }: CreateRoomFormProps) 
     createRoomMutation.mutate(
       {
         name: roomName,
-        description: formData.description.trim(),
+        description: "",
         substance_id: formData.substanceId,
         tonnage_range: formData.tonnageRange,
       },
@@ -76,10 +75,12 @@ export function CreateRoomForm({ preselectedSubstanceId }: CreateRoomFormProps) 
   // Auto-generate room name from selected substance
   const generateRoomName = (substance: any) => {
     if (!substance) return "";
-    if (substance.cas_number) {
-      return `${substance.name} (CAS: ${substance.cas_number})`;
-    }
-    return substance.name;
+    
+    const casNumber = substance.cas_number ? `CAS: ${substance.cas_number}` : '';
+    const ecNumber = substance.ec_number ? `EC: ${substance.ec_number}` : '';
+    const identifiers = [casNumber, ecNumber].filter(Boolean).join(', ');
+    
+    return `${substance.name}${identifiers ? ` (${identifiers})` : ''}`;
   };
 
   return (
@@ -199,18 +200,6 @@ export function CreateRoomForm({ preselectedSubstanceId }: CreateRoomFormProps) 
             </Select>
           </div>
 
-          {/* Description */}
-          <div className="space-y-2">
-            <Label htmlFor="description">Açıklama</Label>
-            <Textarea
-              id="description"
-              placeholder="MBDF odası hakkında açıklama (opsiyonel)"
-              value={formData.description}
-              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              disabled={createRoomMutation.isPending}
-              rows={4}
-            />
-          </div>
 
           {/* Actions */}
           <div className="flex space-x-4 pt-4">
