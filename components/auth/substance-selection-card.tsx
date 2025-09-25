@@ -73,7 +73,7 @@ export function SubstanceSelectionCard({
   >([]);
   const [showCreateRoomDialog, setShowCreateRoomDialog] = useState(false);
   const [roomDetails, setRoomDetails] = useState<{
-    [key: string]: { name: string; description: string };
+    [key: string]: { name: string };
   }>({});
 
   const {
@@ -104,11 +104,8 @@ export function SubstanceSelectionCard({
     );
 
     if (!isAlreadySelected) {
-      // Add substance with default tonnage range
-      setSelectedSubstances((prev) => [
-        ...prev,
-        { substance, tonnageRange: "1-10" },
-      ]);
+      // Replace the entire array with just this substance (single selection)
+      setSelectedSubstances([{ substance, tonnageRange: "1-10" }]);
     }
   };
 
@@ -129,100 +126,66 @@ export function SubstanceSelectionCard({
   const handleJoinRooms = async () => {
     if (selectedSubstances.length === 0) return;
 
+    const item = selectedSubstances[0]; // Since we only allow one substance selection
     setIsLoading(true);
+    
     try {
-      const results = [];
+      // Check if room exists for this substance
+      const response = await fetch(
+        `/api/rooms?substance_id=${item.substance.id}`
+      );
+      const data = await response.json();
 
-      for (const item of selectedSubstances) {
-        // Check if room exists for this substance
-        const response = await fetch(
-          `/api/rooms?substance_id=${item.substance.id}`
-        );
-        const data = await response.json();
+      if (data.success && data.items && data.items.length > 0) {
+        // Room exists, join it
+        const room = data.items[0]; // Take the first active room
+        const joinPayload = {
+          roomId: room.id,
+          userEmail: userEmail,
+          role: "member",
+          tonnageRange: item.tonnageRange,
+        };
 
-        if (data.success && data.items && data.items.length > 0) {
-          // Room exists, join it
-          const room = data.items[0]; // Take the first active room
-          const joinPayload = {
-            roomId: room.id,
-            userEmail: userEmail,
-            role: "member",
-            tonnageRange: item.tonnageRange,
-          };
+        const joinResponse = await fetch("/api/members", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(joinPayload),
+        });
 
-          const joinResponse = await fetch("/api/members", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(joinPayload),
+        const joinData = await joinResponse.json();
+        
+        if (joinData.success) {
+          toast({
+            title: "Başarılı!",
+            description: `Odaya başarıyla katıldınız.`,
           });
-
-          const joinData = await joinResponse.json();
-          results.push({
-            substance: item.substance.name,
-            success: joinData.success,
-            error: joinData.error,
-            action: "joined",
-          });
+          onComplete();
         } else {
-          // No room exists for this substance
-          results.push({
-            substance: item.substance.name,
-            success: false,
-            error: "Bu madde için oda bulunamadı",
-            action: "no_room",
+          toast({
+            title: "Odaya katılamadınız",
+            description: joinData.error || "Bir hata oluştu.",
+            variant: "destructive",
           });
         }
-      }
-
-      const successful = results.filter((r) => r.success);
-      const failed = results.filter((r) => !r.success);
-      const noRooms = results.filter((r) => r.action === "no_room");
-
-      if (successful.length > 0) {
-        toast({
-          title: "Başarılı!",
-          description: `${successful.length} odaya başarıyla katıldınız.`,
-        });
-      }
-
-      if (failed.length > 0 && failed.some((f) => f.action !== "no_room")) {
-        toast({
-          title: "Bazı odalara katılamadınız",
-          description: failed
-            .filter((f) => f.action !== "no_room")
-            .map((f) => `${f.substance}: ${f.error}`)
-            .join(", "),
-          variant: "destructive",
-        });
-      }
-
-      if (noRooms.length > 0) {
-        // Store substances without rooms for potential room creation
-        const substancesToCreate = selectedSubstances.filter((item) =>
-          noRooms.some((nr) => nr.substance === item.substance.name)
-        );
-        setSubstancesWithoutRooms(substancesToCreate);
+      } else {
+        // No room exists for this substance
+        setSubstancesWithoutRooms([item]);
 
         // Initialize room details with default values
         const initialRoomDetails: {
-          [key: string]: { name: string; description: string };
+          [key: string]: { name: string };
         } = {};
-        substancesToCreate.forEach((item) => {
-          initialRoomDetails[item.substance.id || ""] = {
-            name: `${item.substance.name} (CAS: ${
-              item.substance.cas_number || "N/A"
-            })`,
-            description: "",
-          };
-        });
+        const casNumber = item.substance.cas_number ? `CAS: ${item.substance.cas_number}` : '';
+        const ecNumber = item.substance.ec_number ? `EC: ${item.substance.ec_number}` : '';
+        const identifiers = [casNumber, ecNumber].filter(Boolean).join(', ');
+        
+        initialRoomDetails[item.substance.id || ""] = {
+          name: `${item.substance.name}${identifiers ? ` (${identifiers})` : ''}`,
+        };
         setRoomDetails(initialRoomDetails);
         setShowCreateRoomDialog(true);
-      }
-
-      if (successful.length > 0 && noRooms.length === 0) {
-        onComplete();
       }
     } catch (error) {
       toast({
@@ -238,53 +201,41 @@ export function SubstanceSelectionCard({
   const handleCreateRoomsForSubstances = async () => {
     if (substancesWithoutRooms.length === 0) return;
 
-    // Validate that all room descriptions are filled
-    const missingDetails = substancesWithoutRooms.filter((item) => {
-      const details = roomDetails[item.substance.id || ""];
-      return !details?.description?.trim();
-    });
-
-    if (missingDetails.length > 0) {
-      toast({
-        title: "Eksik Bilgi",
-        description: "Lütfen tüm odalar için açıklama girin.",
-        variant: "destructive",
-      });
-      return;
-    }
+    const item = substancesWithoutRooms[0]; // Since we only allow one substance selection
+    
+    const details = roomDetails[item.substance.id || ""];
 
     setIsLoading(true);
     try {
-      // Create rooms for substances that don't have rooms
-      for (const item of substancesWithoutRooms) {
-        const details = roomDetails[item.substance.id || ""];
-        const roomPayload = {
-          substance_id: item.substance.id,
-          name: details.name,
-          description: details.description,
-          tonnage_range: item.tonnageRange,
-        };
-        const response = await fetch("/api/rooms", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(roomPayload),
-        });
+      // Create room for the substance
+      const roomPayload = {
+        substance_id: item.substance.id,
+        name: details.name,
+        description: "",
+        tonnage_range: item.tonnageRange,
+      };
+      
+      const response = await fetch("/api/rooms", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(roomPayload),
+      });
 
-        const data = await response.json();
-        if (!response.ok || !data.id) {
-          console.error(
-            `Failed to create room for ${item.substance.name}:`,
-            data.error || "Unknown error"
-          );
-        } else {
-        }
+      const data = await response.json();
+      if (!response.ok || !data.id) {
+        toast({
+          title: "Hata",
+          description: data.error || "Oda oluşturulurken bir hata oluştu.",
+          variant: "destructive",
+        });
+        return;
       }
 
       toast({
         title: "Başarılı!",
-        description: `${substancesWithoutRooms.length} madde için oda oluşturuldu ve katıldınız.`,
+        description: `Oda oluşturuldu ve katıldınız.`,
       });
 
       setShowCreateRoomDialog(false);
@@ -307,7 +258,7 @@ export function SubstanceSelectionCard({
 
   const handleRoomDetailChange = (
     substanceId: string,
-    field: "name" | "description",
+    field: "name",
     value: string
   ) => {
     setRoomDetails((prev) => ({
@@ -356,7 +307,7 @@ export function SubstanceSelectionCard({
         </CardTitle>
         <CardDescription>
           Hangi madde ile ilgilendiğinizi seçin. Mevcut bir oda varsa
-          katılabilir, yoksa yeni oda açabilirsiniz.
+          katılabilir, yoksa yeni oda açabilirsiniz. (Sadece 1 madde seçebilirsiniz)
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -444,10 +395,10 @@ export function SubstanceSelectionCard({
           <div className="space-y-4 p-4 bg-muted/50 rounded-lg">
             <div>
               <h4 className="font-medium">
-                Seçilen Maddeler ({selectedSubstances.length}):
+                Seçilen Madde:
               </h4>
               <p className="text-sm text-muted-foreground">
-                Her madde için tonnage aralığını seçin ve odalara katılın.
+                Tonnage aralığını seçin ve odaya katılın.
               </p>
             </div>
 
@@ -523,12 +474,12 @@ export function SubstanceSelectionCard({
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Odalara Katılıyor...
+                    Odaya Katılıyor...
                   </>
                 ) : (
                   <>
                     <Users className="mr-2 h-4 w-4" />
-                    Seçili Odalara Katıl
+                    Odaya Katıl
                   </>
                 )}
               </Button>
@@ -544,7 +495,7 @@ export function SubstanceSelectionCard({
                 ⚠️ Madde seçimi zorunludur
               </p>
               <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
-                Devam etmek için yukarıdan en az bir madde seçin
+                Devam etmek için yukarıdan bir madde seçin
               </p>
             </div>
           </div>
@@ -560,17 +511,15 @@ export function SubstanceSelectionCard({
           <DialogHeader>
             <DialogTitle>Oda Oluştur</DialogTitle>
             <DialogDescription>
-              Bazı maddeler için mevcut oda bulunamadı. Bu maddeler için yeni
-              oda oluşturmak ister misiniz?
+              Bu madde için mevcut oda bulunamadı. Yeni oda oluşturmak ister misiniz?
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 max-h-96 overflow-y-auto">
-            <h4 className="font-medium">Oda Oluşturulacak Maddeler:</h4>
+            <h4 className="font-medium">Oda Oluşturulacak Madde:</h4>
             {substancesWithoutRooms.map((item) => {
               const details = roomDetails[item.substance.id || ""] || {
                 name: "",
-                description: "",
               };
               return (
                 <div
@@ -605,27 +554,6 @@ export function SubstanceSelectionCard({
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <Label
-                      htmlFor={`room-description-${item.substance.id}`}
-                      className="text-sm"
-                    >
-                      Açıklama <span className="text-destructive">*</span>
-                    </Label>
-                    <Textarea
-                      id={`room-description-${item.substance.id}`}
-                      value={details.description}
-                      onChange={(e) =>
-                        handleRoomDetailChange(
-                          item.substance.id || "",
-                          "description",
-                          e.target.value
-                        )
-                      }
-                      placeholder="Oda açıklamasını girin"
-                      className="text-sm min-h-[60px]"
-                    />
-                  </div>
                 </div>
               );
             })}
@@ -653,7 +581,7 @@ export function SubstanceSelectionCard({
               ) : (
                 <>
                   <Plus className="mr-2 h-4 w-4" />
-                  Odaları Oluştur
+                  Odayı Oluştur
                 </>
               )}
             </Button>
