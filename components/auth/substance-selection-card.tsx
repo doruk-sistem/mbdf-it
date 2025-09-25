@@ -56,7 +56,7 @@ const tonnageRanges = [
   { value: "1-10", label: "1-10 ton" },
   { value: "10-100", label: "10-100 ton" },
   { value: "100-1000", label: "100-1000 ton" },
-  { value: "1000+", label: "1000+ ton" },
+  { value: "1000+", label: "1000 < ton" },
 ];
 
 export function SubstanceSelectionCard({
