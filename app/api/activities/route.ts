@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
     if (createdRooms) {
       createdRooms.forEach((room: any) => {
         activities.push({
-          id: `room-${room.id}`,
+          id: `room-created-${room.id}`,
           action: 'Yeni MBDF odası oluşturdunuz',
           user: 'Sen',
           room: room.substance?.name || room.name,
@@ -49,6 +49,38 @@ export async function GET(request: NextRequest) {
           time: getTimeAgo(room.created_at),
           type: 'Oluşturma',
           timestamp: new Date(room.created_at).getTime()
+        });
+      });
+    }
+
+    // 1.5. Get rooms joined by user (but not created by them)
+    const { data: joinedRooms } = await adminSupabase
+      .from('mbdf_member')
+      .select(`
+        joined_at,
+        mbdf_room!inner (
+          id,
+          name,
+          created_by,
+          substance:substance_id (name)
+        )
+      `)
+      .eq('user_id', user.id)
+      .neq('mbdf_room.created_by', user.id) // Exclude rooms created by user
+      .order('joined_at', { ascending: false })
+      .limit(limit);
+
+    if (joinedRooms) {
+      joinedRooms.forEach((member: any) => {
+        activities.push({
+          id: `room-joined-${member.mbdf_room.id}`,
+          action: 'MBDF odasına katıldınız',
+          user: 'Sen',
+          room: member.mbdf_room?.substance?.name || member.mbdf_room?.name,
+          roomId: member.mbdf_room.id,
+          time: getTimeAgo(member.joined_at),
+          type: 'Katılım',
+          timestamp: new Date(member.joined_at).getTime()
         });
       });
     }
