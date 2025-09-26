@@ -82,3 +82,61 @@ export function formatTonnageRange(min: number, max: number): string {
   }
   return `${min}-${max} ton`;
 }
+
+// Function to compare tonnage ranges for LR selection
+export function compareTonnageRanges(range1: string | null, range2: string | null): number {
+  if (!range1 && !range2) return 0;
+  if (!range1) return -1;
+  if (!range2) return 1;
+  
+  const numeric1 = getTonnageNumericRange(range1);
+  const numeric2 = getTonnageNumericRange(range2);
+  
+  if (!numeric1 && !numeric2) return 0;
+  if (!numeric1) return -1;
+  if (!numeric2) return 1;
+  
+  // Compare by minimum value first, then by maximum
+  if (numeric1.min !== numeric2.min) {
+    return numeric1.min - numeric2.min;
+  }
+  
+  if (numeric1.max === Infinity && numeric2.max === Infinity) return 0;
+  if (numeric1.max === Infinity) return 1;
+  if (numeric2.max === Infinity) return -1;
+  
+  return numeric1.max - numeric2.max;
+}
+
+// Function to find highest tonnage candidates
+export function findHighestTonnageCandidates(candidates: Array<{ 
+  id: string; 
+  user_id: string; 
+  profiles?: { tonnage_range?: string | null } 
+}>): Array<{ id: string; user_id: string; tonnage_range: string }> {
+  if (candidates.length === 0) return [];
+  
+  // Filter candidates with tonnage data
+  const candidatesWithTonnage = candidates
+    .filter(candidate => candidate.profiles?.tonnage_range)
+    .map(candidate => ({
+      id: candidate.id,
+      user_id: candidate.user_id,
+      tonnage_range: candidate.profiles!.tonnage_range!
+    }));
+  
+  if (candidatesWithTonnage.length === 0) return [];
+  
+  // Find the highest tonnage
+  let highestTonnage = candidatesWithTonnage[0].tonnage_range;
+  for (const candidate of candidatesWithTonnage) {
+    if (compareTonnageRanges(candidate.tonnage_range, highestTonnage) > 0) {
+      highestTonnage = candidate.tonnage_range;
+    }
+  }
+  
+  // Return all candidates with the highest tonnage
+  return candidatesWithTonnage.filter(candidate => 
+    compareTonnageRanges(candidate.tonnage_range, highestTonnage) === 0
+  );
+}
