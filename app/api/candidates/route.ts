@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get profile details for each candidate
+    // Get profile details for each candidate including tonnage
     const candidatesWithProfiles = await Promise.all(
       (candidates || []).map(async (candidate: any) => {
         const { data: profile, error: profileError } = await adminSupabase
@@ -66,10 +66,26 @@ export async function GET(request: NextRequest) {
           .eq('id', candidate.user_id)
           .single();
 
+        // Get member tonnage data for this room
+        const { data: memberData } = await adminSupabase
+          .from('mbdf_member')
+          .select('tonnage_range')
+          .eq('room_id', roomId)
+          .eq('user_id', candidate.user_id)
+          .single();
+
+        // Create profile object with tonnage
+        const profileWithTonnage = {
+          id: (profile as any)?.id || null,
+          full_name: (profile as any)?.full_name || null,
+          email: (profile as any)?.email || null,
+          company: (profile as any)?.company || null,
+          tonnage_range: (memberData as any)?.tonnage_range || null
+        };
 
         return {
           ...candidate,
-          profiles: profile
+          profiles: profileWithTonnage
         };
       })
     );

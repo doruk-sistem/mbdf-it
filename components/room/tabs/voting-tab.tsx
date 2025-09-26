@@ -18,6 +18,7 @@ import { useMembers } from "@/hooks/use-members";
 import { useCurrentUser } from "@/hooks/use-user";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CountdownTimer } from "@/components/ui/countdown-timer";
+import { findHighestTonnageCandidates, getTonnageLabel } from "@/lib/tonnage";
 
 interface VotingTabProps {
   roomId: string;
@@ -73,6 +74,21 @@ export function VotingTab({ roomId }: VotingTabProps) {
   // Use API's is_finalized value which already checks if all eligible members have voted
   const isFinalized = (votingData?.is_finalized || false) && candidates.length > 0;
   
+  // Tonnage-based pre-filtering logic - memoized to prevent infinite loops
+  const highestTonnageCandidates = React.useMemo(() => {
+    return findHighestTonnageCandidates(candidates);
+  }, [candidates]);
+  
+  const hasTonnagePreFilter = React.useMemo(() => {
+    return highestTonnageCandidates.length > 0 && highestTonnageCandidates.length < candidates.length;
+  }, [highestTonnageCandidates.length, candidates.length]);
+  
+  const filteredCandidates = React.useMemo(() => {
+    return hasTonnagePreFilter ? highestTonnageCandidates.map(htc => 
+      candidates.find((c: any) => c.id === htc.id)
+    ).filter(Boolean) : candidates;
+  }, [hasTonnagePreFilter, highestTonnageCandidates, candidates]);
+  
   // Check if current user is a candidate
   const currentUser = members.find((member: any) => member.user_id === user?.profile?.id);
   const isCurrentUserCandidate = candidates.some((candidate: any) => candidate.user_id === currentUser?.user_id);
@@ -94,16 +110,41 @@ export function VotingTab({ roomId }: VotingTabProps) {
     return votedCandidates;
   }, [myVote]);
 
+  // Check if all votes are completed first - memoized to prevent infinite loops
+  const candidatesToEvaluate = React.useMemo(() => {
+    return hasTonnagePreFilter ? filteredCandidates : candidates;
+  }, [hasTonnagePreFilter, filteredCandidates, candidates]);
+
+  // Check if current user has evaluated all relevant candidates
+  const hasEvaluatedAllRelevantCandidates = React.useMemo(() => {
+    return candidatesToEvaluate.every((candidate: any) => 
+      evaluatedCandidates.has(candidate.id)
+    );
+  }, [evaluatedCandidates, candidatesToEvaluate]);
+
   // Check for tie (equal scores) - but only if we're not already in a tie state
   const maxScore = votingResults.length > 0 ? Math.max(...votingResults.map(r => r.total_score)) : 0;
   const topCandidates = votingResults.filter(r => r.total_score === maxScore);
   
-  // Check if all votes are completed first
-  const candidateUserIds = candidates.map((c: any) => c.user_id);
-  const eligibleVoters = members.length - candidateUserIds.length; // Non-candidate members
-  const expectedTotalVotes = eligibleVoters * candidates.length;
-  const actualTotalVotes = votingResults.reduce((sum, result) => sum + result.vote_count, 0);
-  const allVotesCompleted = actualTotalVotes >= expectedTotalVotes;
+  const candidateUserIds = React.useMemo(() => {
+    return candidatesToEvaluate.map((c: any) => c.user_id);
+  }, [candidatesToEvaluate]);
+  
+  const eligibleVoters = React.useMemo(() => {
+    return members.length - candidateUserIds.length; // Non-candidate members
+  }, [members.length, candidateUserIds.length]);
+  
+  const expectedTotalVotes = React.useMemo(() => {
+    return eligibleVoters * candidatesToEvaluate.length;
+  }, [eligibleVoters, candidatesToEvaluate.length]);
+  
+  const actualTotalVotes = React.useMemo(() => {
+    return votingResults.reduce((sum, result) => sum + result.vote_count, 0);
+  }, [votingResults]);
+  
+  const allVotesCompleted = React.useMemo(() => {
+    return actualTotalVotes >= expectedTotalVotes;
+  }, [actualTotalVotes, expectedTotalVotes]);
   
   // Only check for tie if all votes are completed
   const hasTie = !isTieDetected && allVotesCompleted && topCandidates.length > 1 && maxScore > 0;
@@ -114,7 +155,7 @@ export function VotingTab({ roomId }: VotingTabProps) {
 
   // Reset evaluated candidates when tie is detected - BUT ONLY WHEN ALL VOTES ARE COMPLETED
   React.useEffect(() => {
-    if (hasTie && !isTieDetected && allVotesCompleted) {
+    if (hasTie && !isTieDetected && allVotesCompleted && !resetVotesMutation.isPending) {
       setIsTieDetected(true);
       
       // Cancel any pending finalize timeout
@@ -145,7 +186,7 @@ export function VotingTab({ roomId }: VotingTabProps) {
           }, 2000);
         },
         onError: (error) => {
-          console.error('❌ VOTES RESET ERROR:', error);
+          // Handle error silently
         }
       });
       
@@ -168,10 +209,10 @@ export function VotingTab({ roomId }: VotingTabProps) {
       // Reset tie detection when votes are cleared
       setIsTieDetected(false);
     }
-  }, [hasTie, isTieDetected, allVotesCompleted, votingResults.length]); // Only check tie when all votes are completed
+  }, [hasTie, isTieDetected, allVotesCompleted, votingResults.length, resetVotesMutation.isPending, roomId, maxScore]); // Only check tie when all votes are completed
 
   // Voting phase logic based on first candidate creation time
-  const getVotingPhase = (actualVotes: number, expectedVotes: number): 'no-candidates' | 'nomination' | 'voting' | 'completed' => {
+  const getVotingPhase = (actualVotes: number, expectedVotes: number): 'no-candidates' | 'nomination' | 'voting' | 'completed' | 'tonnage-pre-filter' => {
     if (candidates.length === 0) {
       return 'no-candidates';
     }
@@ -203,8 +244,40 @@ export function VotingTab({ roomId }: VotingTabProps) {
     if (now < votingStartTime) {
       return 'nomination';
     }
+    
+    // Before starting voting, check if we can skip it entirely
     if (now < votingEndTime) {
+      // Check for tonnage-based pre-filtering BEFORE voting
+      if (hasTonnagePreFilter && !isFinalized) {
+        // If only one highest tonnage candidate, auto-select as LR
+        if (highestTonnageCandidates.length === 1) {
+          return 'completed'; // Will trigger auto-finalization
+        }
+        // If multiple highest tonnage candidates, proceed to voting with filtered list
+        return 'tonnage-pre-filter';
+      }
+      
+      // If only one candidate total, no need for voting
+      if (candidates.length === 1 && !isFinalized) {
+        return 'completed';
+      }
+      
       return 'voting';
+    }
+    
+    // Time expired, now check for tonnage-based pre-filtering
+    if (hasTonnagePreFilter && !isFinalized) {
+      // If only one highest tonnage candidate, auto-select as LR
+      if (highestTonnageCandidates.length === 1) {
+        return 'completed'; // Will trigger auto-finalization
+      }
+      // If multiple highest tonnage candidates, proceed to voting with filtered list
+      return 'tonnage-pre-filter';
+    }
+    
+    // If only one candidate total, no need for voting
+    if (candidates.length === 1 && !isFinalized) {
+      return 'completed';
     }
     
     // Time expired, but check if all members have voted
@@ -216,6 +289,7 @@ export function VotingTab({ roomId }: VotingTabProps) {
   };
 
   const votingPhase = getVotingPhase(actualTotalVotes, expectedTotalVotes);
+  
   const firstCandidate = candidates.length > 0 ? candidates.sort((a: any, b: any) => 
     new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
   )[0] : null;
@@ -223,6 +297,69 @@ export function VotingTab({ roomId }: VotingTabProps) {
   
   const votingStartTime = firstCandidate ? new Date(new Date(firstCandidate.created_at).getTime() + (60 * 1000)) : null; // +1 minute for testing
   const votingEndTime = votingStartTime ? new Date(votingStartTime.getTime() + (60 * 1000)) : null; // +1 minute for testing
+
+  // Auto-finalize if only one highest tonnage candidate OR single candidate
+  React.useEffect(() => {
+    // Check for tonnage-based auto-finalize
+    if (votingPhase === 'completed' && hasTonnagePreFilter && highestTonnageCandidates.length === 1 && !isFinalized) {
+      const selectedCandidate = highestTonnageCandidates[0];
+      const candidateData = candidates.find((c: any) => c.id === selectedCandidate.id);
+      
+      if (candidateData && !finalizeLRMutation.isPending) {
+        toast({
+          title: "🎯 Tonaj Bazlı LR Seçimi",
+          description: `${candidateData.profiles?.full_name || 'Aday'} en yüksek tonaj (${getTonnageLabel(selectedCandidate.tonnage_range)}) ile otomatik LR seçildi.`,
+          variant: "default",
+          duration: 8000,
+        });
+        
+        finalizeLRMutation.mutate({
+          roomId: roomId,
+          candidateId: selectedCandidate.id
+        }, {
+          onSuccess: () => {
+            setForcePhaseUpdate(prev => prev + 1);
+          },
+          onError: (error: any) => {
+            toast({
+              title: 'Finalize Hatası',
+              description: error?.data?.error || 'LR seçimi tamamlanamadı',
+              variant: 'destructive',
+            });
+          }
+        });
+      }
+    }
+    // Check for single candidate auto-finalize
+    else if (votingPhase === 'completed' && candidates.length === 1 && !isFinalized && !hasTonnagePreFilter) {
+      const selectedCandidate = candidates[0];
+      
+      if (!finalizeLRMutation.isPending) {
+        toast({
+          title: "🎯 Tek Aday LR Seçimi",
+          description: `${selectedCandidate.profiles?.full_name || 'Aday'} tek aday olduğu için otomatik LR seçildi.`,
+          variant: "default",
+          duration: 8000,
+        });
+        
+        finalizeLRMutation.mutate({
+          roomId: roomId,
+          candidateId: selectedCandidate.id
+        }, {
+          onSuccess: () => {
+            setForcePhaseUpdate(prev => prev + 1);
+          },
+          onError: (error: any) => {
+            toast({
+              title: 'Finalize Hatası',
+              description: error?.data?.error || 'LR seçimi tamamlanamadı',
+              variant: 'destructive',
+            });
+          }
+        });
+      }
+    }
+  }, [votingPhase, hasTonnagePreFilter, highestTonnageCandidates.length, candidates.length, isFinalized, finalizeLRMutation.isPending, roomId]);
 
 
   const handleVoteChange = (candidateId: string, criterion: string, value: number[]) => {
@@ -251,7 +388,9 @@ export function VotingTab({ roomId }: VotingTabProps) {
   };
 
   const handleSubmitAllVotes = () => {
-    if (candidates.length === 0) {
+    const candidatesToEvaluate = hasTonnagePreFilter ? filteredCandidates : candidates;
+    
+    if (candidatesToEvaluate.length === 0) {
       toast({
         title: "Aday yok",
         description: "Değerlendirmek için en az bir aday olmalı.",
@@ -261,7 +400,7 @@ export function VotingTab({ roomId }: VotingTabProps) {
     }
 
     // Check if all candidates have been evaluated
-    const unevaluatedCandidates = candidates.filter((candidate: any) => !votes[candidate.id]);
+    const unevaluatedCandidates = candidatesToEvaluate.filter((candidate: any) => !votes[candidate.id]);
     if (unevaluatedCandidates.length > 0) {
       toast({
         title: "Eksik değerlendirme",
@@ -272,7 +411,7 @@ export function VotingTab({ roomId }: VotingTabProps) {
     }
 
     // Prepare all votes data
-    const allVotes = candidates.map((candidate: any) => {
+    const allVotes = candidatesToEvaluate.map((candidate: any) => {
       const candidateVotes = votes[candidate.id];
       return {
         candidate_id: candidate.id,
@@ -441,7 +580,6 @@ export function VotingTab({ roomId }: VotingTabProps) {
                           setForcePhaseUpdate(prev => prev + 1);
                         },
                         onError: (error: any) => {
-                          console.error('❌ FINALIZE ERROR:', error);
                           toast({
                             title: 'Finalize Hatası',
                             description: error?.data?.error || 'LR seçimi tamamlanamadı',
@@ -581,6 +719,7 @@ export function VotingTab({ roomId }: VotingTabProps) {
                 <CardDescription>
                   {votingPhase === 'no-candidates' && "Aday gösterme dönemi - 15 Aralık'a kadar aday gösterebilirsiniz"}
                   {votingPhase === 'nomination' && "Aday gösterme dönemi - Oylama 15 Aralık'a kadar yapılabilir"}
+                  {votingPhase === 'tonnage-pre-filter' && "Tonaj bazlı ön eleme - En yüksek tonajlı adaylar arasında oylama"}
                   {votingPhase === 'voting' && actualTotalVotes >= expectedTotalVotes && "Oylama tamamlandı - LR seçimi yapılacak"}
                   {votingPhase === 'voting' && actualTotalVotes < expectedTotalVotes && "Oylama dönemi - 15 Aralık'a kadar oylama yapabilirsiniz"}
                   {votingPhase === 'completed' && actualTotalVotes >= expectedTotalVotes && "Oylama tamamlandı - LR seçildi"}
@@ -700,20 +839,41 @@ export function VotingTab({ roomId }: VotingTabProps) {
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
+            {/* Tonnage Pre-filter Info */}
+            {hasTonnagePreFilter && (
+              <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center space-x-2 mb-2">
+                  <Users className="h-5 w-5 text-blue-600" />
+                  <h3 className="font-semibold text-blue-800">Tonaj Bazlı Ön Eleme</h3>
+                </div>
+                <p className="text-blue-700 text-sm mb-2">
+                  En yüksek tonajlı adaylar belirlendi. Sadece bu adaylar arasında oylama yapılacak.
+                </p>
+                <div className="text-sm text-blue-600">
+                  <p>• Toplam aday: {candidates.length}</p>
+                  <p>• Değerlendirilecek aday: {filteredCandidates.length}</p>
+                  <p>• En yüksek tonaj: {highestTonnageCandidates.map(htc => getTonnageLabel(htc.tonnage_range)).join(', ')}</p>
+                </div>
+              </div>
+            )}
+
             {/* Candidates List - Only show when there are candidates */}
             {candidates.length > 0 && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <Label>Adayları Değerlendirin:</Label>
+                  <Label>
+                    {hasTonnagePreFilter ? "En Yüksek Tonajlı Adayları Değerlendirin:" : "Adayları Değerlendirin:"}
+                  </Label>
                   <Badge variant="outline" className="text-xs">
-                    {candidates.length} aday
+                    {hasTonnagePreFilter ? `${filteredCandidates.length}/${candidates.length} aday` : `${candidates.length} aday`}
                   </Badge>
                 </div>
                 <div className="space-y-3">
-                  {candidates.map((candidate: any) => {
+                  {(hasTonnagePreFilter ? filteredCandidates : candidates).map((candidate: any) => {
                     const isEvaluated = evaluatedCandidates.has(candidate.id);
                     const candidateResult = votingResults.find(r => r.candidate_id === candidate.id);
                     const isCurrentUser = currentUser?.user_id === candidate.user_id;
+                    const isHighestTonnage = hasTonnagePreFilter && highestTonnageCandidates.some(htc => htc.id === candidate.id);
                   
                   return (
                       <Card key={candidate.id} className={`${candidate.is_selected ? "border-green-200" : ""} ${isEvaluated ? "border-blue-200 bg-blue-50" : ""}`}>
@@ -734,6 +894,12 @@ export function VotingTab({ roomId }: VotingTabProps) {
                             <p className="text-sm text-muted-foreground">
                               {candidate.profiles?.company?.name || "Şirket bilgisi yok"}
                             </p>
+                            {candidate.profiles?.tonnage_range && (
+                              <p className="text-sm text-green-600 font-medium">
+                                Tonaj: {getTonnageLabel(candidate.profiles.tonnage_range)}
+                                {isHighestTonnage && " (En Yüksek)"}
+                              </p>
+                            )}
                                 {candidateResult && (
                                   <p className="text-sm text-blue-600 font-medium">
                                     Puan: {candidateResult.total_score.toFixed(1)}/5.0
@@ -813,6 +979,20 @@ export function VotingTab({ roomId }: VotingTabProps) {
                 <h3 className="text-lg font-semibold text-blue-800 mb-2">Adaysınız</h3>
                 <p className="text-blue-700">Aday olarak kendinize oy veremezsiniz. Diğer üyeler sizi değerlendirecek.</p>
               </div>
+            ) : votingPhase === 'tonnage-pre-filter' ? (
+              <div className="text-center py-6 bg-blue-50 border border-blue-200 rounded-lg">
+                <Users className="h-12 w-12 mx-auto mb-3 text-blue-600" />
+                <h3 className="text-lg font-semibold text-blue-800 mb-2">🎯 Tonaj Bazlı Ön Eleme</h3>
+                <p className="text-blue-700 mb-2">
+                  En yüksek tonajlı adaylar belirlendi. Sadece bu adaylar arasında oylama yapılacak.
+                </p>
+                <p className="text-blue-600 text-sm">
+                  Değerlendirilecek: {filteredCandidates.length}/{candidates.length} aday
+                </p>
+                <p className="text-blue-600 text-sm">
+                  En yüksek tonaj: {highestTonnageCandidates.map(htc => getTonnageLabel(htc.tonnage_range)).join(', ')}
+                </p>
+              </div>
             ) : votingPhase === 'nomination' ? (
               <div className="text-center py-6 bg-blue-50 border border-blue-200 rounded-lg">
                 <Users className="h-12 w-12 mx-auto mb-3 text-blue-600" />
@@ -849,11 +1029,16 @@ export function VotingTab({ roomId }: VotingTabProps) {
                 <h3 className="text-lg font-semibold text-blue-800 mb-2">Aday Gösterin</h3>
                 <p className="text-blue-700">LR oylaması için kendinizi aday gösterebilirsiniz.</p>
               </div>
-            ) : votingPhase === 'voting' && evaluatedCandidates.size === candidates.length ? (
+            ) : votingPhase === 'voting' && hasEvaluatedAllRelevantCandidates ? (
               <div className="text-center py-6 bg-green-50 border border-green-200 rounded-lg">
                 <CheckCircle className="h-12 w-12 mx-auto mb-3 text-green-600" />
                 <h3 className="text-lg font-semibold text-green-800 mb-2">✅ Tüm Adayları Değerlendirdiniz</h3>
-                <p className="text-green-700">Tüm adayları değerlendirdiniz. Diğer üyeler de oy verene kadar bekleyin.</p>
+                <p className="text-green-700">
+                  {hasTonnagePreFilter 
+                    ? "En yüksek tonajlı tüm adayları değerlendirdiniz. Diğer üyeler de oy verene kadar bekleyin."
+                    : "Tüm adayları değerlendirdiniz. Diğer üyeler de oy verene kadar bekleyin."
+                  }
+                </p>
                 <p className="text-sm text-green-600 mt-2">
                   Çoğunluk sağlandığında LR seçimi otomatik olarak yapılacak.
                 </p>
@@ -862,9 +1047,14 @@ export function VotingTab({ roomId }: VotingTabProps) {
               <div className="text-center py-6 bg-blue-50 border border-blue-200 rounded-lg">
                 <Users className="h-12 w-12 mx-auto mb-3 text-blue-600" />
                 <h3 className="text-lg font-semibold text-blue-800 mb-2">Oylama Dönemi</h3>
-                <p className="text-blue-700">Adayları tek tek değerlendirin. Yukarıdaki "Değerlendir" butonlarını kullanın.</p>
+                <p className="text-blue-700">
+                  {hasTonnagePreFilter 
+                    ? "En yüksek tonajlı adayları tek tek değerlendirin. Yukarıdaki 'Değerlendir' butonlarını kullanın."
+                    : "Adayları tek tek değerlendirin. Yukarıdaki 'Değerlendir' butonlarını kullanın."
+                  }
+                </p>
                 <p className="text-sm text-blue-600 mt-2">
-                  Değerlendirilen: {evaluatedCandidates.size}/{candidates.length}
+                  Değerlendirilen: {evaluatedCandidates.size}/{hasTonnagePreFilter ? filteredCandidates.length : candidates.length}
                 </p>
               </div>
             ) : (
