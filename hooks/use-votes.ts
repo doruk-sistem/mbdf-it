@@ -15,6 +15,7 @@ export function useVotes(roomId: string) {
       .then(data => VotingSummaryResponseSchema.parse(data)),
     enabled: !!roomId,
     staleTime: 1000 * 30, // 30 seconds
+    refetchInterval: 5000, // Refetch every 5 seconds (like forum)
   });
 }
 
@@ -33,6 +34,7 @@ export function useCandidates(roomId: string) {
     queryFn: () => get(withQuery(API_ENDPOINTS.candidates, { roomId })),
     enabled: !!roomId,
     staleTime: 1000 * 60 * 5, // 5 minutes
+    refetchInterval: 5000, // Refetch every 5 seconds (like forum)
   });
 }
 
