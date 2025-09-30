@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
+import { getTonnageLabel } from "@/lib/tonnage";
 
 interface ForumMessage {
   id: string;
@@ -31,7 +32,7 @@ interface ForumMessage {
     id: string;
     full_name: string;
     avatar_url?: string;
-    tonnage?: number | null;
+    tonnage_range?: string | null;
     company?: {
       name: string;
     } | null;
@@ -82,12 +83,8 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
     getUser();
   }, []);
 
-  // Check if current user is a member
-  const isMember = currentUserId && membersData?.items?.some(member => 
-    member.id === currentUserId || 
-    member.user_id === currentUserId ||
-    member.profiles?.id === currentUserId
-  );
+  // All authenticated users are considered members for forum access
+  const isMember = true;
   // Fetch forum topics
   const { data: topics } = useQuery<{ topic: string; isPinned: boolean }[]>({
     queryKey: ["forum-topics", roomId],
@@ -146,9 +143,7 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
 
       if (!response.ok) {
         const errorData = await response.json();
-        if (response.status === 403 && errorData.code === "MEMBERSHIP_REQUIRED") {
-          throw new Error("MEMBERSHIP_REQUIRED");
-        }
+        console.error("Forum message error:", errorData);
         throw new Error("Failed to send message");
       }
 
@@ -164,19 +159,12 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
       });
     },
     onError: (error) => {
-      if (error.message === "MEMBERSHIP_REQUIRED") {
-        toast({
-          title: "Üyelik Gerekli",
-          description: "Bu odaya üye olmadığınız için mesaj yazamazsınız. Mesaj yazmak için odaya üye olmanız gerekmektedir.",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Hata",
-          description: "Mesaj gönderilirken bir hata oluştu.",
-          variant: "destructive",
-        });
-      }
+      console.error("Forum message send error:", error);
+      toast({
+        title: "Hata",
+        description: "Mesaj gönderilirken bir hata oluştu.",
+        variant: "destructive",
+      });
     },
   });
 
@@ -373,8 +361,6 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
   }
 
   if (error) {
-    const isAccessDenied = error.message === "ACCESS_DENIED";
-    
     return (
       <Card>
         <CardHeader>
@@ -384,15 +370,7 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {isAccessDenied ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <MessageCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p className="font-medium">Bu odaya erişim yetkiniz yok</p>
-              <p className="text-sm">Forum mesajlarını görüntülemek için oda üyesi olmanız gerekiyor.</p>
-            </div>
-          ) : (
-            <p className="text-destructive">Forum mesajları yüklenirken bir hata oluştu.</p>
-          )}
+          <p className="text-destructive">Forum mesajları yüklenirken bir hata oluştu.</p>
         </CardContent>
       </Card>
     );
@@ -637,10 +615,10 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
                               - {message.profiles.company.name}
                             </span>
                           )}
-                          {message.profiles?.tonnage && (
-                            <span className="text-muted-foreground ml-1">
-                              ({message.profiles.tonnage} ton)
-                            </span>
+                          {message.profiles?.tonnage_range && (
+                            <Badge variant="secondary" className="ml-2 text-xs">
+                              {getTonnageLabel(message.profiles.tonnage_range)}
+                            </Badge>
                           )}
                         </span>
                         <span className="text-xs text-muted-foreground">
@@ -683,28 +661,20 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
                 "{selectedTopic}" konusuna mesaj yazıyorsunuz
               </div>
               
-              {/* Membership warning */}
-              {isMember === false && (
-                <div className="rounded-lg border bg-yellow-50 p-3 dark:bg-yellow-950">
-                  <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                    <strong>Not:</strong> Bu odaya üye olmadığınız için mesaj yazamazsınız. 
-                    Mesaj yazmak için odaya üye olmanız gerekmektedir.
-                  </p>
-                </div>
-              )}
+              {/* All authenticated users can now participate in forum */}
               
               <div className="space-y-3">
                 <RichTextEditor
                   content={newMessage}
                   onChange={setNewMessage}
-                  placeholder={isMember === false ? "Üye olmadığınız için mesaj yazamazsınız..." : "Forum mesajınızı yazın..."}
-                  disabled={sendMessageMutation.isPending || isMember === false}
+                  placeholder="Forum mesajınızı yazın..."
+                  disabled={sendMessageMutation.isPending}
                   className="min-h-[120px]"
                 />
                 <div className="flex justify-end">
                   <Button
                     onClick={handleSendMessage}
-                    disabled={!newMessage.trim() || sendMessageMutation.isPending || isMember === false}
+                    disabled={!newMessage.trim() || sendMessageMutation.isPending}
                     size="sm"
                     className="flex items-center gap-2"
                   >

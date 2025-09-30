@@ -5,7 +5,6 @@ import {
   RoomsListResponseSchema,
   DocumentsListResponseSchema,
   MembersListResponseSchema,
-  AccessRequestsListResponseSchema,
   VotingSummaryResponseSchema,
   RoomWithDetailsSchema 
 } from '@/lib/schemas';
@@ -39,6 +38,8 @@ export async function prefetchRooms(queryClient: QueryClient) {
       return;
     }
 
+    // User already defined above, no need to redefine
+
     // Get all related data separately using admin client
     const roomsWithDetails = await Promise.all((rooms || []).map(async (room: any) => {
       // Get substance
@@ -61,11 +62,21 @@ export async function prefetchRooms(queryClient: QueryClient) {
         .select('*', { count: 'exact', head: true })
         .eq('room_id', room.id);
       
+      // Get user membership and role
+      const { data: userMembership } = await adminSupabase
+        .from('mbdf_member')
+        .select('role')
+        .eq('room_id', room.id)
+        .eq('user_id', user.id)
+        .single();
+      
       return {
         ...room,
         substance: substance || null,
         created_by_profile: created_by_profile || null,
-        member_count: count || 0
+        member_count: count || 0,
+        is_member: !!userMembership,
+        user_role: (userMembership as any)?.role || null
       };
     }));
 
@@ -169,20 +180,12 @@ export async function prefetchDocuments(queryClient: QueryClient, roomId: string
       return;
     }
 
-    // Check membership
-    const { data: membership, error: memberError } = await supabase
-      .from('mbdf_member')
-      .select('id')
-      .eq('room_id', roomId)
-      .eq('user_id', user.id)
-      .single();
+    // Allow all authenticated users to access documents
+    // No membership check needed - all users can access documents
 
-    if (memberError) {
-      return;
-    }
-
-    // Fetch documents
-    const { data: documents, error } = await supabase
+    // Fetch documents using admin client to bypass RLS
+    const adminSupabase = createAdminSupabase();
+    const { data: documents, error } = await adminSupabase
       .from('document')
       .select(`
         *,
@@ -198,7 +201,7 @@ export async function prefetchDocuments(queryClient: QueryClient, roomId: string
 
     // Create signed URLs for documents (server-side) and normalize path if needed
     const documentsWithUrls = await Promise.all(
-      (documents || []).map(async (doc) => {
+      (documents || []).map(async (doc: any) => {
         try {
           const storagePath = doc.file_path?.startsWith('docs/')
             ? doc.file_path.replace(/^docs\//, '')
@@ -291,59 +294,6 @@ export async function prefetchMembers(queryClient: QueryClient, roomId: string) 
   }
 }
 
-export async function prefetchAccessRequests(queryClient: QueryClient, roomId: string) {
-  const supabase = createServerSupabase();
-  
-  try {
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return;
-    }
-
-    // Check membership
-    const { data: membership, error: memberError } = await supabase
-      .from('mbdf_member')
-      .select('role')
-      .eq('room_id', roomId)
-      .eq('user_id', user.id)
-      .single();
-
-    if (memberError) {
-      return;
-    }
-
-    // Fetch access requests
-    const { data: requests, error } = await supabase
-      .from('access_request')
-      .select(`
-        *,
-        access_package!inner (*),
-        profiles:requester_id (*),
-        approved_by_profile:profiles!access_request_approved_by_fkey (*)
-      `)
-      .eq('access_package.room_id', roomId)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error prefetching access requests:', error);
-      return;
-    }
-
-    const response = AccessRequestsListResponseSchema.parse({
-      items: requests || [],
-      total: requests?.length || 0,
-    });
-
-    await queryClient.prefetchQuery({
-      queryKey: keys.accessRequests.list(roomId),
-      queryFn: () => Promise.resolve(response),
-      staleTime: 1000 * 30, // 30 seconds
-    });
-  } catch (error) {
-    console.error('Error in prefetchAccessRequests:', error);
-  }
-}
 
 export async function prefetchVotes(queryClient: QueryClient, roomId: string) {
   const supabase = createServerSupabase();
@@ -412,7 +362,6 @@ export async function prefetchRoomData(queryClient: QueryClient, roomId: string)
     prefetchRoom(queryClient, roomId),
     prefetchDocuments(queryClient, roomId),
     prefetchMembers(queryClient, roomId),
-    prefetchAccessRequests(queryClient, roomId),
     prefetchVotes(queryClient, roomId),
   ]);
 }
@@ -421,5 +370,214 @@ export async function prefetchRoomData(queryClient: QueryClient, roomId: string)
  * Prefetch dashboard data
  */
 export async function prefetchDashboard(queryClient: QueryClient) {
-  await prefetchRooms(queryClient);
+  const supabase = createServerSupabase();
+  
+  try {
+    // Get current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return;
+    }
+
+    // Prefetch all dashboard data in parallel
+    await Promise.all([
+      prefetchRooms(queryClient),
+      prefetchUserDocuments(queryClient, user.id),
+      prefetchUserActivities(queryClient, user.id),
+      prefetchUserKKS(queryClient, user.id)
+    ]);
+  } catch (error) {
+    console.error('Error in prefetchDashboard:', error);
+  }
+}
+
+/**
+ * Prefetch user documents
+ */
+export async function prefetchUserDocuments(queryClient: QueryClient, userId: string) {
+  try {
+    const adminSupabase = createAdminSupabase();
+    
+    const { data: documents, error } = await adminSupabase
+      .from('document')
+      .select(`
+        id,
+        name,
+        created_at,
+        room_id,
+        mbdf_room:room_id (
+          id,
+          name,
+          substance:substance_id (
+            name
+          )
+        )
+      `)
+      .eq('uploaded_by', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error prefetching user documents:', error);
+      return;
+    }
+
+    const response = {
+      items: documents || [],
+      total: documents?.length || 0,
+    };
+
+    await queryClient.prefetchQuery({
+      queryKey: ['documents', 'byUserId', userId],
+      queryFn: () => Promise.resolve(response),
+      staleTime: 1000 * 60 * 2, // 2 minutes
+    });
+  } catch (error) {
+    console.error('Error in prefetchUserDocuments:', error);
+  }
+}
+
+/**
+ * Prefetch user activities
+ */
+export async function prefetchUserActivities(queryClient: QueryClient, userId: string) {
+  try {
+    const adminSupabase = createAdminSupabase();
+    
+    // Get recent activities (limit 5)
+    const activities: any[] = [];
+    
+    // 1. Get rooms created by user
+    const { data: createdRooms } = await adminSupabase
+      .from('mbdf_room')
+      .select(`
+        id,
+        name,
+        created_at,
+        substance:substance_id (name)
+      `)
+      .eq('created_by', userId)
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    if (createdRooms) {
+      createdRooms.forEach((room: any) => {
+        activities.push({
+          id: `room-${room.id}`,
+          action: 'Yeni MBDF odası oluşturdunuz',
+          user: 'Sen',
+          room: room.substance?.name || room.name || 'Bilinmeyen',
+          roomId: room.id,
+          time: getTimeAgo(room.created_at),
+          type: 'Oluşturma',
+          timestamp: new Date(room.created_at).getTime()
+        });
+      });
+    }
+
+    // 2. Get documents uploaded by user
+    const { data: uploadedDocs } = await adminSupabase
+      .from('document')
+      .select(`
+        id,
+        name,
+        created_at,
+        room_id,
+        mbdf_room:room_id (
+          id,
+          name,
+          substance:substance_id (name)
+        )
+      `)
+      .eq('uploaded_by', userId)
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    if (uploadedDocs) {
+      uploadedDocs.forEach((doc: any) => {
+        activities.push({
+          id: `doc-${doc.id}`,
+          action: 'Belge yüklediniz',
+          user: 'Sen',
+          room: doc.mbdf_room?.substance?.name || doc.mbdf_room?.name || 'Bilinmeyen',
+          roomId: doc.room_id,
+          documentId: doc.id,
+          time: getTimeAgo(doc.created_at),
+          type: 'Belge',
+          timestamp: new Date(doc.created_at).getTime()
+        });
+      });
+    }
+
+    // Sort by timestamp and take first 5
+    activities.sort((a, b) => b.timestamp - a.timestamp);
+    const recentActivities = activities.slice(0, 5);
+
+    const response = {
+      items: recentActivities,
+      total: recentActivities.length,
+    };
+
+    await queryClient.prefetchQuery({
+      queryKey: ['activities', 'recent'],
+      queryFn: () => Promise.resolve(response),
+      staleTime: 1000 * 60 * 2, // 2 minutes
+    });
+  } catch (error) {
+    console.error('Error in prefetchUserActivities:', error);
+  }
+}
+
+/**
+ * Prefetch user KKS submissions
+ */
+export async function prefetchUserKKS(queryClient: QueryClient, userId: string) {
+  try {
+    const adminSupabase = createAdminSupabase();
+    
+    const { data: kks, error } = await adminSupabase
+      .from('kks_submission')
+      .select(`
+        id,
+        title,
+        created_at,
+        mbdf_room:room_id (
+          id,
+          name,
+          substance:substance_id (name)
+        )
+      `)
+      .eq('created_by', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error prefetching user KKS:', error);
+      return;
+    }
+
+    const response = {
+      items: kks || [],
+      total: kks?.length || 0,
+    };
+
+    await queryClient.prefetchQuery({
+      queryKey: ['kks', 'byUserId', userId],
+      queryFn: () => Promise.resolve(response),
+      staleTime: 1000 * 60 * 2, // 2 minutes
+    });
+  } catch (error) {
+    console.error('Error in prefetchUserKKS:', error);
+  }
+}
+
+// Helper function for time ago
+function getTimeAgo(dateString: string): string {
+  const now = new Date();
+  const date = new Date(dateString);
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+  
+  if (diffInSeconds < 60) return 'Az önce';
+  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} dakika önce`;
+  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} saat önce`;
+  if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 86400)} gün önce`;
+  return date.toLocaleDateString('tr-TR');
 }

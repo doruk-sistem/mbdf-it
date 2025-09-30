@@ -24,20 +24,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Check if user is a member of the room
-    const { data: membership, error: memberError } = await supabase
+    // Allow all authenticated users to view members
+    // No membership check needed - all users can see room members
+    const { data: membership } = await supabase
       .from("mbdf_member")
       .select("role")
       .eq("room_id", roomId)
       .eq("user_id", user.id)
       .single();
-
-    if (memberError || !membership) {
-      return NextResponse.json(
-        { error: 'Access denied: You must be a member of this room' },
-        { status: 403 }
-      );
-    }
 
     // Use admin client to bypass RLS for reading members
     const adminSupabase = createAdminSupabase();
@@ -46,9 +40,11 @@ export async function GET(request: NextRequest) {
     const { data: members, error } = await adminSupabase
       .from('mbdf_member')
       .select(`
+        id,
         user_id,
         role,
         joined_at,
+        tonnage_range,
         profiles:user_id (
           id,
           full_name,
@@ -73,7 +69,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       items: members || [],
       total: members?.length || 0,
-      currentUserRole: membership.role
+      currentUserRole: membership?.role || 'member' // Default to member if not found
     });
 
   } catch (error) {
@@ -98,25 +94,31 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { roomId, userEmail, role } = body;
+    const { roomId, room_id, userEmail, role } = body;
 
-    if (!roomId || !userEmail || !role) {
+    // Handle both roomId and room_id field names for backward compatibility
+    const actualRoomId = roomId || room_id;
+
+    if (!actualRoomId || !role) {
       return NextResponse.json({ 
-        error: 'Missing required fields: roomId, userEmail, role' 
+        error: 'Missing required fields: roomId, role' 
       }, { status: 400 });
     }
+
+    // For self-join, userEmail is not required - use current user's email
+    const actualUserEmail = userEmail || user.email;
 
     // Check if current user has permission to add members
     const { data: member, error: memberError } = await supabase
       .from("mbdf_member")
       .select("role")
-      .eq("room_id", roomId)
+      .eq("room_id", actualRoomId)
       .eq("user_id", user.id)
       .single();
 
 
     // Special case: If user is trying to join a room themselves (self-join)
-    const isSelfJoin = user.email === userEmail;
+    const isSelfJoin = user.email === actualUserEmail;
     
     if (isSelfJoin) {
       // Allow self-join if user is not already a member
@@ -146,7 +148,7 @@ export async function POST(request: NextRequest) {
     const { data: room, error: roomError } = await adminSupabase
       .from("mbdf_room")
       .select("status, name, description")
-      .eq("id", roomId)
+      .eq("id", actualRoomId)
       .single();
 
     if (roomError || !room) {
@@ -165,7 +167,7 @@ export async function POST(request: NextRequest) {
     const { data: targetProfile, error: profileError } = await adminSupabase
       .from("profiles")
       .select("id, full_name")
-      .eq("email", userEmail)
+      .eq("email", actualUserEmail)
       .single();
 
     if (profileError || !targetProfile) {
@@ -181,7 +183,7 @@ export async function POST(request: NextRequest) {
     const { data: existingMember, error: existingError } = await supabase
       .from("mbdf_member")
       .select("id")
-      .eq("room_id", roomId)
+      .eq("room_id", actualRoomId)
       .eq("user_id", profile.id)
       .single();
 
@@ -195,9 +197,10 @@ export async function POST(request: NextRequest) {
     const { error: insertError } = await supabase
       .from("mbdf_member")
       .insert({
-        room_id: roomId,
+        room_id: actualRoomId,
         user_id: profile.id,
-        role: role
+        role: role,
+        tonnage_range: body.tonnageRange || null
       });
 
     if (insertError) {
@@ -218,12 +221,12 @@ export async function POST(request: NextRequest) {
     await supabase
       .from("audit_log")
       .insert({
-        room_id: roomId,
+        room_id: actualRoomId,
         user_id: user.id,
         action: "member_added",
         resource_type: "mbdf_member",
         new_values: { 
-          room_id: roomId, 
+          room_id: actualRoomId, 
           user_id: profile.id, 
           role, 
           added_by: user.id 
@@ -234,6 +237,72 @@ export async function POST(request: NextRequest) {
       success: true, 
       message: 'Member added successfully',
       memberId: profile.id
+    });
+
+  } catch (error) {
+    return NextResponse.json({ 
+      error: 'Internal server error' 
+    }, { status: 500 });
+  }
+}
+
+// PUT /api/members - Update member tonnage
+export async function PUT(request: NextRequest) {
+  try {
+    const supabase = createServerSupabase();
+    
+    // Get current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { memberId, tonnageRange } = body;
+
+    if (!memberId) {
+      return NextResponse.json({ 
+        error: 'Missing required field: memberId' 
+      }, { status: 400 });
+    }
+
+    // Use admin client to bypass RLS
+    const adminSupabase = createAdminSupabase();
+    
+    // Get the member record to verify ownership
+    const { data: member, error: memberError } = await (adminSupabase as any)
+      .from("mbdf_member")
+      .select("room_id, user_id")
+      .eq("id", memberId)
+      .single();
+
+    if (memberError || !member) {
+      return NextResponse.json({ error: 'Member not found' }, { status: 404 });
+    }
+
+    // Allow only if user is updating their own tonnage
+    if (member.user_id !== user.id) {
+      return NextResponse.json({ 
+        error: 'You can only update your own tonnage' 
+      }, { status: 403 });
+    }
+
+    // Update member tonnage using admin client
+    const { error: updateError } = await (adminSupabase as any)
+      .from("mbdf_member")
+      .update({ tonnage_range: tonnageRange || null })
+      .eq("id", memberId);
+
+    if (updateError) {
+      return NextResponse.json({ 
+        error: 'Failed to update tonnage' 
+      }, { status: 500 });
+    }
+
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Tonnage updated successfully' 
     });
 
   } catch (error) {

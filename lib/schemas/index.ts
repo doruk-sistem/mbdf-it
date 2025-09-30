@@ -76,6 +76,7 @@ export const MemberSchema = z.object({
   user_id: IdSchema,
   role: UserRoleSchema,
   joined_at: DateSchema,
+   tonnage_range: z.string().nullable(),
 });
 
 export const DocumentSchema = z.object({
@@ -91,30 +92,6 @@ export const DocumentSchema = z.object({
   updated_at: DateSchema,
 });
 
-export const AccessPackageSchema = z.object({
-  id: IdSchema,
-  room_id: IdSchema,
-  name: z.string(),
-  description: z.string().nullable(),
-  package_data: z.any().nullable(),
-  created_by: IdSchema,
-  created_at: DateSchema,
-  updated_at: DateSchema,
-});
-
-export const AccessRequestSchema = z.object({
-  id: IdSchema,
-  package_id: IdSchema,
-  requester_id: IdSchema,
-  status: RequestStatusSchema,
-  justification: z.string().nullable(),
-  access_token: z.string().nullable(),
-  approved_by: IdSchema.nullable(),
-  approved_at: DateSchema.nullable(),
-  rejected_reason: z.string().nullable(),
-  created_at: DateSchema,
-  updated_at: DateSchema,
-});
 
 export const LrVoteSchema = z.object({
   id: IdSchema,
@@ -170,7 +147,6 @@ export const KksSubmissionSchema = z.object({
   created_by: IdSchema,
   submitted_at: DateSchema.nullable(),
   sent_at: DateSchema.nullable(),
-  tracking_number: z.string().nullable(),
   created_at: DateSchema,
   updated_at: DateSchema,
 });
@@ -215,7 +191,8 @@ export const RoomWithDetailsSchema = RoomSchema.extend({
   created_by_profile: ProfileSchema.nullable(),
   member_count: z.number().optional(),
   document_count: z.number().optional(),
-  package_count: z.number().optional(),
+  is_member: z.boolean().optional(),
+  user_role: z.string().nullable().optional(),
 });
 
 export const MemberWithProfileSchema = MemberSchema.extend({
@@ -224,15 +201,19 @@ export const MemberWithProfileSchema = MemberSchema.extend({
   }),
 });
 
-export const AccessRequestWithDetailsSchema = AccessRequestSchema.extend({
-  access_package: AccessPackageSchema,
-  profiles: ProfileSchema,
-  approved_by_profile: ProfileSchema.optional(),
-});
 
 export const DocumentWithUploaderSchema = DocumentSchema.extend({
-  profiles: ProfileSchema,
+  profiles: ProfileSchema.optional(),
   download_url: z.string().url().nullable().optional(),
+  mbdf_room: z.object({
+    id: z.string().uuid(),
+    name: z.string(),
+    substance: z.object({
+      name: z.string(),
+      cas_number: z.string().nullable(),
+      ec_number: z.string().nullable(),
+    }).nullable(),
+  }).nullable().optional(),
 });
 
 export const JoinRequestWithDetailsSchema = JoinRequestSchema.extend({
@@ -245,8 +226,8 @@ export const JoinRequestWithDetailsSchema = JoinRequestSchema.extend({
 
 // Now we can reference RoomWithDetailsSchema safely
 export const KksSubmissionWithDetailsSchema = KksSubmissionSchema.extend({
-  created_by_profile: ProfileSchema,
-  room: RoomWithDetailsSchema,
+  created_by_profile: ProfileSchema.nullable(),
+  room: RoomWithDetailsSchema.nullable(),
 });
 
 export const AgreementWithDetailsSchema = AgreementSchema.extend({
@@ -274,6 +255,7 @@ export const CreateRoomSchema = z.object({
   name: z.string().min(1).max(255),
   description: z.string().optional(),
   substance_id: IdSchema,
+  tonnage_range: z.string().optional(),
 });
 
 export const UploadDocumentSchema = z.object({
@@ -283,18 +265,6 @@ export const UploadDocumentSchema = z.object({
   visibility: z.enum(['public', 'private']).default('public'),
 });
 
-export const CreateAccessRequestSchema = z.object({
-  package_id: IdSchema,
-  justification: z.string().min(1).max(500),
-});
-
-export const ApproveAccessRequestSchema = z.object({
-  access_token: z.string().min(1),
-});
-
-export const RejectAccessRequestSchema = z.object({
-  rejected_reason: z.string().min(1).max(500),
-});
 
 export const SubmitVoteSchema = z.object({
   candidate_id: IdSchema,
@@ -341,6 +311,7 @@ export const RoomsListResponseSchema = z.object({
 export const DocumentsListResponseSchema = z.object({
   items: z.array(DocumentWithUploaderSchema),
   total: z.number(),
+  success: z.boolean().optional(),
   isMember: z.boolean().optional(),
 });
 
@@ -349,10 +320,6 @@ export const MembersListResponseSchema = z.object({
   total: z.number(),
 });
 
-export const AccessRequestsListResponseSchema = z.object({
-  items: z.array(AccessRequestWithDetailsSchema),
-  total: z.number(),
-});
 
 export const VotingSummaryResponseSchema = z.object({
   results: z.array(VotingResultSchema),
@@ -392,8 +359,6 @@ export type Substance = z.infer<typeof SubstanceSchema>;
 export type Room = z.infer<typeof RoomSchema>;
 export type Member = z.infer<typeof MemberSchema>;
 export type Document = z.infer<typeof DocumentSchema>;
-export type AccessPackage = z.infer<typeof AccessPackageSchema>;
-export type AccessRequest = z.infer<typeof AccessRequestSchema>;
 export type LrVote = z.infer<typeof LrVoteSchema>;
 export type LrCandidate = z.infer<typeof LrCandidateSchema>;
 export type Agreement = z.infer<typeof AgreementSchema>;
@@ -405,16 +370,12 @@ export type Message = z.infer<typeof MessageSchema>;
 
 export type RoomWithDetails = z.infer<typeof RoomWithDetailsSchema>;
 export type MemberWithProfile = z.infer<typeof MemberWithProfileSchema>;
-export type AccessRequestWithDetails = z.infer<typeof AccessRequestWithDetailsSchema>;
 export type DocumentWithUploader = z.infer<typeof DocumentWithUploaderSchema>;
 export type AgreementWithDetails = z.infer<typeof AgreementWithDetailsSchema>;
 export type VotingResult = z.infer<typeof VotingResultSchema>;
 
 export type CreateRoomInput = z.infer<typeof CreateRoomSchema>;
 export type UploadDocumentInput = z.infer<typeof UploadDocumentSchema>;
-export type CreateAccessRequestInput = z.infer<typeof CreateAccessRequestSchema>;
-export type ApproveAccessRequestInput = z.infer<typeof ApproveAccessRequestSchema>;
-export type RejectAccessRequestInput = z.infer<typeof RejectAccessRequestSchema>;
 export type SubmitVoteInput = z.infer<typeof SubmitVoteSchema>;
 export type CreateAgreementInput = z.infer<typeof CreateAgreementSchema>;
 export type CreateKksSubmissionInput = z.infer<typeof CreateKksSubmissionSchema>;

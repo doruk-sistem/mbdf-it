@@ -1,15 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { Users, FileText, Package, Vote, MessageCircle, UserPlus, Settings, MoreVertical, Archive } from "lucide-react";
+import { Users, FileText, Vote, MessageCircle, Settings, MoreVertical, Archive, BarChart3, UserPlus } from "lucide-react";
 import { useRoom } from "@/hooks/use-rooms";
+import { useMembers } from "@/hooks/use-members";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -20,24 +23,38 @@ import {
 
 import { MembersTab } from "./tabs/members-tab";
 import { DocumentsTab } from "./tabs/documents-tab";
-import { PackagesTab } from "./tabs/packages-tab";
 import { VotingTab } from "./tabs/voting-tab";
 import { ForumTab } from "./tabs/forum-tab";
-import { JoinRequestsTab } from "./tabs/join-requests-tab";
+import { RoomStatus } from "./room-status";
+import { InviteModal } from "./invite-modal";
+// JoinRequestsTab is no longer needed - no join requests functionality
 import { ArchiveDialog } from "./archive-dialog";
 import { ArchivedBanner } from "./archived-banner";
-import { JoinRequestButton } from "./join-request-button";
+import { JoinRoomButton } from "./join-room-button";
 import { isRoomArchived, getRoomStatusText, getRoomStatusVariant } from "@/lib/archive-utils";
 import { useCanArchiveRoom, useIsRoomAdmin, useRoomMemberRole } from "@/hooks/use-user";
-import { useMembers } from "@/hooks/use-members";
 
 interface RoomContentProps {
   roomId: string;
 }
 
 export function RoomContent({ roomId }: RoomContentProps) {
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState("members");
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
+  const [leaderDashboardOpen, setLeaderDashboardOpen] = useState(false);
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  
+  // Get URL parameters
+  const documentId = searchParams.get('documentId');
+  const tabParam = searchParams.get('tab');
+  
+  // Set initial tab based on URL parameters
+  useEffect(() => {
+    if (tabParam) {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
   
   // Query hooks
   const { data: room, isLoading, error } = useRoom(roomId);
@@ -47,18 +64,20 @@ export function RoomContent({ roomId }: RoomContentProps) {
   const isRoomAdmin = useIsRoomAdmin(roomId);
   const userRole = useRoomMemberRole(roomId);
   
-  // Check if user can see join requests based on leadership status
+  // Check if there's a leader in the room
   const { data: membersData } = useMembers(roomId);
   const members = membersData?.items || [];
-  const currentUserRole = membersData?.currentUserRole;
-  
-  // Check if there's a leader in the room
   const hasLeader = members.some((member: any) => member.role === 'lr');
-  
-  // User can see join requests if:
-  // 1. They are a member of the room AND
-  // 2. Either there's no leader (all members can see) OR they are the leader
-  const canSeeJoinRequests = currentUserRole && (!hasLeader || currentUserRole === 'lr');
+
+  // LR Oylaması sekmesi sadece odada LR yokken görünür
+  const canSeeVoting = !hasLeader;
+
+  // LR seçildiğinde (hasLeader true olduğunda) Üyeler sekmesine yönlendir
+  useEffect(() => {
+    if (hasLeader && activeTab === "voting") {
+      setActiveTab("members");
+    }
+  }, [hasLeader, activeTab]);
 
   if (isLoading) {
     return (
@@ -131,9 +150,6 @@ export function RoomContent({ roomId }: RoomContentProps) {
               {getRoomStatusText(room.status)}
             </Badge>
           </div>
-          <p className="text-muted-foreground">
-            {room.description || "MBDF odası"}
-          </p>
           <div className="flex items-center space-x-4 text-sm text-muted-foreground">
             <span>EC: {room.substance?.ec_number || 'N/A'}</span>
             <span>•</span>
@@ -144,11 +160,39 @@ export function RoomContent({ roomId }: RoomContentProps) {
         </div>
         
         <div className="flex items-center space-x-2">
-          <JoinRequestButton 
+          <JoinRoomButton 
             roomId={roomId} 
             roomName={room.name}
             isArchived={isRoomArchived(room)}
           />
+          {userRole && (
+            <Button variant="outline" onClick={() => setInviteModalOpen(true)}>
+              <UserPlus className="mr-2 h-4 w-4" />
+              Odaya Davet Et
+            </Button>
+          )}
+          {hasLeader && (
+            <Dialog open={leaderDashboardOpen} onOpenChange={setLeaderDashboardOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  <BarChart3 className="mr-2 h-4 w-4" />
+                  Oda Durumu
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-6xl max-h-[80vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center space-x-2">
+                    <BarChart3 className="h-5 w-5" />
+                    <span>Oda Durumu</span>
+                    <Badge variant="outline" className="text-xs">
+                      Genel Bakış
+                    </Badge>
+                  </DialogTitle>
+                </DialogHeader>
+                <RoomStatus roomId={roomId} />
+              </DialogContent>
+            </Dialog>
+          )}
           <Button variant="outline">
             <Settings className="mr-2 h-4 w-4" />
             Ayarlar
@@ -186,14 +230,14 @@ export function RoomContent({ roomId }: RoomContentProps) {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, delay: 0.1 }}
-        className="grid gap-4 md:grid-cols-3"
+        className="grid gap-4 md:grid-cols-2"
       >
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-center space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Üye Sayısı</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <Users className="h-4 w-4 text-muted-foreground ml-2" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="text-center">
             <div className="text-2xl font-bold">{room.member_count || 0}</div>
             <p className="text-xs text-muted-foreground">
               Aktif üyeler
@@ -202,11 +246,11 @@ export function RoomContent({ roomId }: RoomContentProps) {
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-center space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Dokümanlar</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
+            <FileText className="h-4 w-4 text-muted-foreground ml-2" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="text-center">
             <div className="text-2xl font-bold">{room.document_count || 0}</div>
             <p className="text-xs text-muted-foreground">
               Yüklenen dosyalar
@@ -214,18 +258,6 @@ export function RoomContent({ roomId }: RoomContentProps) {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Paketler</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{room.package_count || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              Erişim paketleri
-            </p>
-          </CardContent>
-        </Card>
       </motion.div>
 
       {/* Room Tabs */}
@@ -235,7 +267,9 @@ export function RoomContent({ roomId }: RoomContentProps) {
         transition={{ duration: 0.3, delay: 0.2 }}
       >
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className={`grid w-full ${canSeeJoinRequests ? 'grid-cols-6' : 'grid-cols-5'}`}>
+          <TabsList className={`grid w-full ${
+            canSeeVoting ? 'grid-cols-4' : 'grid-cols-3'
+          }`}>
             <TabsTrigger value="members">
               <Users className="mr-2 h-4 w-4" />
               Üyeler
@@ -244,18 +278,10 @@ export function RoomContent({ roomId }: RoomContentProps) {
               <FileText className="mr-2 h-4 w-4" />
               Dokümanlar
             </TabsTrigger>
-            <TabsTrigger value="packages">
-              <Package className="mr-2 h-4 w-4" />
-              Paketler
-            </TabsTrigger>
-            <TabsTrigger value="voting">
-              <Vote className="mr-2 h-4 w-4" />
-              LR Oylaması
-            </TabsTrigger>
-            {canSeeJoinRequests && (
-              <TabsTrigger value="join-requests">
-                <UserPlus className="mr-2 h-4 w-4" />
-                Katılım Talepleri
+            {canSeeVoting && (
+              <TabsTrigger value="voting">
+                <Vote className="mr-2 h-4 w-4" />
+                LR Oylaması
               </TabsTrigger>
             )}
             <TabsTrigger value="forum">
@@ -269,22 +295,16 @@ export function RoomContent({ roomId }: RoomContentProps) {
           </TabsContent>
 
           <TabsContent value="documents" className="space-y-4">
-            <DocumentsTab roomId={roomId} isArchived={isRoomArchived(room)} />
+            <DocumentsTab roomId={roomId} isArchived={isRoomArchived(room)} highlightDocumentId={documentId} />
           </TabsContent>
 
-          <TabsContent value="packages" className="space-y-4">
-            <PackagesTab roomId={roomId} />
-          </TabsContent>
 
-          <TabsContent value="voting" className="space-y-4">
-            <VotingTab roomId={roomId} />
-          </TabsContent>
-
-          {canSeeJoinRequests && (
-            <TabsContent value="join-requests" className="space-y-4">
-              <JoinRequestsTab roomId={roomId} isArchived={isRoomArchived(room)} />
+          {canSeeVoting && (
+            <TabsContent value="voting" className="space-y-4">
+              <VotingTab roomId={roomId} />
             </TabsContent>
           )}
+
 
           <TabsContent value="forum" className="space-y-4">
             <ForumTab roomId={roomId} isArchived={isRoomArchived(room)} />
@@ -298,6 +318,13 @@ export function RoomContent({ roomId }: RoomContentProps) {
         roomName={room.name}
         open={archiveDialogOpen}
         onOpenChange={setArchiveDialogOpen}
+      />
+      
+      <InviteModal
+        roomId={roomId}
+        roomName={room.name}
+        open={inviteModalOpen}
+        onOpenChange={setInviteModalOpen}
       />
     </div>
   );

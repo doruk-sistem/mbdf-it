@@ -18,6 +18,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSubstances } from "@/hooks/use-substances";
 import { useCreateRoom } from "@/hooks/use-rooms";
+import { TONNAGE_RANGES } from "@/lib/tonnage";
 
 interface CreateRoomFormProps {
   preselectedSubstanceId?: string;
@@ -26,8 +27,8 @@ interface CreateRoomFormProps {
 export function CreateRoomForm({ preselectedSubstanceId }: CreateRoomFormProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [formData, setFormData] = useState({
-    description: "",
     substanceId: preselectedSubstanceId || "",
+    tonnageRange: "",
   });
   
   const router = useRouter();
@@ -48,7 +49,7 @@ export function CreateRoomForm({ preselectedSubstanceId }: CreateRoomFormProps) 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.substanceId) {
+    if (!formData.substanceId || !formData.tonnageRange) {
       return;
     }
 
@@ -57,8 +58,9 @@ export function CreateRoomForm({ preselectedSubstanceId }: CreateRoomFormProps) 
     createRoomMutation.mutate(
       {
         name: roomName,
-        description: formData.description.trim(),
+        description: "",
         substance_id: formData.substanceId,
+        tonnage_range: formData.tonnageRange,
       },
       {
         onSuccess: () => {
@@ -73,10 +75,12 @@ export function CreateRoomForm({ preselectedSubstanceId }: CreateRoomFormProps) 
   // Auto-generate room name from selected substance
   const generateRoomName = (substance: any) => {
     if (!substance) return "";
-    if (substance.cas_number) {
-      return `${substance.name} (CAS: ${substance.cas_number})`;
-    }
-    return substance.name;
+    
+    const casNumber = substance.cas_number ? `CAS: ${substance.cas_number}` : '';
+    const ecNumber = substance.ec_number ? `EC: ${substance.ec_number}` : '';
+    const identifiers = [casNumber, ecNumber].filter(Boolean).join(', ');
+    
+    return `${substance.name}${identifiers ? ` (${identifiers})` : ''}`;
   };
 
   return (
@@ -172,18 +176,30 @@ export function CreateRoomForm({ preselectedSubstanceId }: CreateRoomFormProps) 
             )}
           </div>
 
-          {/* Description */}
+          {/* Tonnage Selection */}
           <div className="space-y-2">
-            <Label htmlFor="description">Açıklama</Label>
-            <Textarea
-              id="description"
-              placeholder="MBDF odası hakkında açıklama (opsiyonel)"
-              value={formData.description}
-              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+            <Label htmlFor="tonnage">
+              Tonaj Aralığı <span className="text-destructive">*</span>
+            </Label>
+            <Select
+              value={formData.tonnageRange}
+              onValueChange={(value) => setFormData(prev => ({ ...prev, tonnageRange: value }))}
               disabled={createRoomMutation.isPending}
-              rows={4}
-            />
+              required
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Oda oluşturmak için tonaj aralığını seçin" />
+              </SelectTrigger>
+              <SelectContent>
+                {TONNAGE_RANGES.map((range) => (
+                  <SelectItem key={range.value} value={range.value}>
+                    {range.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
+
 
           {/* Actions */}
           <div className="flex space-x-4 pt-4">
@@ -196,7 +212,7 @@ export function CreateRoomForm({ preselectedSubstanceId }: CreateRoomFormProps) 
             >
               İptal
             </Button>
-            <Button type="submit" disabled={createRoomMutation.isPending || !formData.substanceId} className="flex-1">
+            <Button type="submit" disabled={createRoomMutation.isPending || !formData.substanceId || !formData.tonnageRange} className="flex-1">
               {createRoomMutation.isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

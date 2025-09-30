@@ -13,7 +13,8 @@ import type { Database } from '@/types/supabase';
 export interface MembersListResponse {
   items: MemberWithProfile[];
   total: number;
-  currentUserRole: Database['public']['Enums']['user_role'];
+  currentUserRole: Database['public']['Enums']['user_role'] | null;
+  currentUserId?: string;
 }
 
 // Query hooks
@@ -25,7 +26,8 @@ export function useMembers(roomId: string) {
       return {
         items: data.members,
         total: data.members.length,
-        currentUserRole: data.currentUserRole
+        currentUserRole: data.currentUserRole,
+        currentUserId: data.currentUserId
       };
     },
     enabled: !!roomId,
@@ -80,26 +82,39 @@ export function useJoinRoom() {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: (data: { roomId: string; role?: 'member' | 'lr' | 'admin' }) => 
+    mutationFn: (data: { roomId: string; role?: 'member' | 'lr' | 'admin'; tonnageRange?: string }) => 
       post(API_ENDPOINTS.members, {
-        room_id: data.roomId,
+        roomId: data.roomId,
         role: data.role || 'member',
+        tonnageRange: data.tonnageRange,
       }),
     onSuccess: (data, variables) => {
-      // Invalidate member-related queries
-      invalidationHelpers.member(variables.roomId).forEach(key => {
-        queryClient.invalidateQueries({ queryKey: key });
+    // Force refetch all member queries
+      queryClient.invalidateQueries({ 
+        queryKey: ['members'],
+        exact: false 
+      });
+      
+      // Also invalidate specific room members
+      queryClient.invalidateQueries({ 
+        queryKey: ['members', 'list', variables.roomId],
+        exact: false 
+      });
+      
+      // Force refetch to ensure UI updates
+      queryClient.refetchQueries({ 
+        queryKey: ['members', 'list', variables.roomId] 
       });
       
       toast({
-        title: 'Success',
-        description: 'Joined room successfully',
+        title: 'Başarılı',
+        description: 'Odaya başarıyla katıldınız.',
       });
     },
     onError: (error: any) => {
       toast({
-        title: 'Error',
-        description: error?.data?.message || 'Failed to join room',
+        title: 'Hata',
+        description: error?.data?.message || 'Odaya katılırken bir hata oluştu',
         variant: 'destructive',
       });
     },
@@ -115,57 +130,36 @@ export function useLeaveRoom() {
       const endpoint = data.userId 
         ? `${API_ENDPOINTS.members}/${data.userId}`
         : API_ENDPOINTS.members;
+      
       return del(withQuery(endpoint, { roomId: data.roomId }));
     },
     onSuccess: (data, variables) => {
-      // Invalidate member-related queries
-      invalidationHelpers.member(variables.roomId, variables.userId).forEach(key => {
-        queryClient.invalidateQueries({ queryKey: key });
+      // Force refetch all member queries
+      queryClient.invalidateQueries({ 
+        queryKey: ['members'],
+        exact: false 
+      });
+      
+      // Also invalidate specific room members
+      queryClient.invalidateQueries({ 
+        queryKey: ['members', 'list', variables.roomId],
+        exact: false 
+      });
+      
+      // Force refetch to ensure UI updates
+      queryClient.refetchQueries({ 
+        queryKey: ['members', 'list', variables.roomId] 
       });
       
       toast({
-        title: 'Success',
-        description: 'Left room successfully',
+        title: 'Başarılı',
+        description: 'Odadan başarıyla ayrıldınız.',
       });
     },
     onError: (error: any) => {
       toast({
-        title: 'Error',
-        description: error?.data?.message || 'Failed to leave room',
-        variant: 'destructive',
-      });
-    },
-  });
-}
-
-export function useUpdateMemberRole() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: (data: { 
-      memberId: string; 
-      roomId: string; 
-      role: 'admin' | 'lr' | 'member' 
-    }) => 
-      put(`${API_ENDPOINTS.members}/${data.memberId}/role`, {
-        role: data.role,
-      }),
-    onSuccess: (data, variables) => {
-      // Invalidate member-related queries
-      invalidationHelpers.member(variables.roomId).forEach(key => {
-        queryClient.invalidateQueries({ queryKey: key });
-      });
-      
-      toast({
-        title: 'Success',
-        description: 'Member role updated successfully',
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: 'Error',
-        description: error?.data?.message || 'Failed to update member role',
+        title: 'Hata',
+        description: error?.data?.message || 'Odadan ayrılırken bir hata oluştu',
         variant: 'destructive',
       });
     },

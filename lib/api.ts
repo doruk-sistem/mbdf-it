@@ -268,18 +268,15 @@ export const API_ENDPOINTS = {
   documents: '/api/documents',
   document: (id: string) => `/api/documents/${id}`,
   documentUpload: '/api/documents/upload',
+  userDocuments: '/api/documents/user',
+
+  // Activities
+  activities: '/api/activities',
 
   // Members
   members: '/api/members',
   member: (id: string) => `/api/members/${id}`,
 
-  // Access Packages & Requests
-  packages: '/api/packages',
-  package: (id: string) => `/api/packages/${id}`,
-  accessRequests: '/api/access-requests',
-  accessRequest: (id: string) => `/api/access-requests/${id}`,
-  approveRequest: (id: string) => `/api/access-requests/${id}/approve`,
-  rejectRequest: (id: string) => `/api/access-requests/${id}/reject`,
 
   // Voting
   votes: '/api/votes',

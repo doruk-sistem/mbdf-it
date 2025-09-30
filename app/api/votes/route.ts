@@ -236,21 +236,8 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Check if user has access to this room using admin client
-    const { data: membership, error: memberError } = await adminSupabase
-      .from('mbdf_member')
-      .select('id')
-      .eq('room_id', candidate.room_id)
-      .eq('user_id', user.id)
-      .single();
-
-    if (memberError) {
-      console.error('Error checking membership:', memberError);
-      return NextResponse.json(
-        { error: 'Access denied', success: false },
-        { status: 403 }
-      );
-    }
+    // Allow all authenticated users to vote
+    // No membership check needed - all users can participate in voting
 
     // Check if user is a candidate (candidates cannot vote)
     const { data: isCandidate, error: candidateCheckError } = await adminSupabase

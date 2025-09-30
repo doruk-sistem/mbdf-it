@@ -33,24 +33,9 @@ export async function GET(request: NextRequest) {
     const adminSupabase = createAdminSupabase();
     
     // Allow all authenticated users to view documents
-    // Check if user is a member for role-based permissions
-    const { data: membership, error: memberError } = await adminSupabase
-      .from('mbdf_member')
-      .select('id, role')
-      .eq('room_id', roomId)
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    if (memberError && memberError.code !== 'PGRST116') {
-      console.error('Error checking membership:', memberError);
-      return NextResponse.json(
-        { error: 'Failed to verify access', success: false },
-        { status: 500 }
-      );
-    }
-
-    const isMember = !!membership;
-    const userRole = (membership as any)?.role;
+    // No membership check needed - all users can access documents
+    const isMember = true; // Always true for authenticated users
+    const userRole = 'member'; // Default role for access
 
     // Get documents with uploader profile using admin client to bypass RLS
     const { data: documents, error } = await adminSupabase
@@ -70,31 +55,38 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Create signed URLs for file downloads (only for members)
+    // Create signed URLs for file downloads (all authenticated users can download)
     const documentsWithUrls = await Promise.all(
       ((documents || []) as any[]).map(async (doc: any) => {
         try {
-          // Only create download URLs for members
-          if (!isMember) {
-            return {
-              ...doc,
-              download_url: null,
-              download_error: "Bu odaya üye olmadığınız için dokümanı indiremezsiniz. İndirmek için odaya üye olmanız gerekmektedir."
-            };
-          }
-
+          // All authenticated users can download documents
           const storagePath = doc.file_path?.startsWith('docs/')
             ? doc.file_path.replace(/^docs\//, '')
             : doc.file_path;
 
-          const { data: signedUrlData, error: urlError } = await supabase.storage
+          // Try to create signed URL with admin client first
+          const { data: signedUrlData, error: urlError } = await adminSupabase.storage
             .from('docs')
             .createSignedUrl(storagePath, 3600); // 1 hour expiry
 
+          if (urlError) {
+            console.error('Error creating signed URL with admin client:', urlError);
+            // Fallback: try with regular client
+            const { data: fallbackUrlData, error: fallbackError } = await supabase.storage
+              .from('docs')
+              .createSignedUrl(storagePath, 3600);
+            
+            return {
+              ...doc,
+              download_url: fallbackError ? null : fallbackUrlData.signedUrl,
+              download_error: fallbackError ? "İndirme linki oluşturulamadı." : null,
+            };
+          }
+
           return {
             ...doc,
-            download_url: urlError ? null : signedUrlData.signedUrl,
-            download_error: urlError ? "İndirme linki oluşturulamadı." : null,
+            download_url: signedUrlData.signedUrl,
+            download_error: null,
           };
         } catch (urlError) {
           console.error('Error creating signed URL for:', doc.file_path, urlError);

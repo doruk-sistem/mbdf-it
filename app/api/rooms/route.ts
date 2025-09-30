@@ -38,7 +38,6 @@ export async function GET(request: NextRequest) {
     const { data: rooms, error } = await query;
 
     if (error) {
-      console.error('Error fetching rooms:', error);
       return NextResponse.json(
         { error: 'Failed to fetch rooms', success: false },
         { status: 500 }
@@ -61,8 +60,8 @@ export async function GET(request: NextRequest) {
         .eq('id', room.created_by)
         .single();
       
-      // Get counts
-      const [{ count: memberCount }, { count: documentCount }, { count: packageCount }] = await Promise.all([
+      // Get counts and user membership
+      const [{ count: memberCount }, { count: documentCount }, { data: userMembership }] = await Promise.all([
         adminSupabase
         .from('mbdf_member')
         .select('*', { count: 'exact', head: true })
@@ -72,19 +71,24 @@ export async function GET(request: NextRequest) {
           .select('*', { count: 'exact', head: true })
           .eq('room_id', room.id),
         adminSupabase
-          .from('access_package')
-          .select('*', { count: 'exact', head: true })
-          .eq('room_id', room.id),
+          .from('mbdf_member')
+          .select('role')
+          .eq('room_id', room.id)
+          .eq('user_id', user.id)
+          .single(),
       ]);
       
-      return {
+      const result = {
         ...room,
         substance: substance || null,
         created_by_profile: created_by_profile || null,
         member_count: memberCount || 0,
         document_count: documentCount || 0,
-        package_count: packageCount || 0,
+        is_member: !!userMembership,
+        user_role: (userMembership as any)?.role || null,
       };
+      
+      return result;
     }));
 
     // Return response without validation to avoid stack depth issues
@@ -132,6 +136,61 @@ export async function POST(request: NextRequest) {
     // Use admin client to bypass RLS for room creation
     const adminSupabase = createAdminSupabase();
     
+    // Check if room already exists for this substance
+    if (!validatedData.substance_id) {
+      return NextResponse.json(
+        { error: 'Substance ID is required', success: false },
+        { status: 400 }
+      );
+    }
+
+    const { data: existingRoom } = await (adminSupabase as any)
+      .from('mbdf_room')
+      .select('id, name')
+      .eq('substance_id', validatedData.substance_id)
+      .eq('status', 'active')
+      .single();
+
+    if (existingRoom) {
+      // Room already exists, add user as member instead
+      const { data: existingMember } = await (adminSupabase as any)
+        .from('mbdf_member')
+        .select('id')
+        .eq('room_id', existingRoom.id)
+        .eq('user_id', user.id)
+        .single();
+
+      if (!existingMember) {
+        // User is not a member, add them
+        const { error: memberError } = await (adminSupabase as any)
+          .from('mbdf_member')
+          .insert([
+            {
+              room_id: existingRoom.id,
+              user_id: user.id,
+              role: 'member',
+              tonnage_range: validatedData.tonnage_range || null,
+            },
+          ]);
+
+        if (memberError) {
+          console.error('Error adding user to existing room:', memberError);
+          return NextResponse.json(
+            { error: 'Failed to join existing room', success: false },
+            { status: 500 }
+          );
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'Joined existing room',
+        room_id: existingRoom.id,
+        room_name: existingRoom.name,
+        joined_existing: true
+      });
+    }
+    
     // Create room using admin client with type assertion
     const { data: room, error } = await (adminSupabase as any)
       .from('mbdf_room')
@@ -167,6 +226,7 @@ export async function POST(request: NextRequest) {
           room_id: (room as any)?.id,
           user_id: user.id,
           role: 'member',
+          tonnage_range: validatedData.tonnage_range || null,
         },
       ]);
 

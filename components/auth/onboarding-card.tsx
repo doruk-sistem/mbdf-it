@@ -46,7 +46,6 @@ export function OnboardingCard({ userEmail }: OnboardingCardProps) {
     vatNumber: "",
     address: "",
     contactPhone: "",
-    tonnage: "",
   });
   
   const { toast } = useToast();
@@ -76,7 +75,6 @@ export function OnboardingCard({ userEmail }: OnboardingCardProps) {
               vatNumber: profile.company?.vat_number || "",
               address: profile.company?.address || "",
               contactPhone: profile.company?.contact_phone || "",
-              tonnage: profile.tonnage?.toString() || "",
             });
           }
         }
@@ -100,18 +98,6 @@ export function OnboardingCard({ userEmail }: OnboardingCardProps) {
       return;
     }
 
-    // Validate tonnage if provided
-    if (formData.tonnage && formData.tonnage.trim()) {
-      const tonnageValue = parseFloat(formData.tonnage);
-      if (isNaN(tonnageValue) || tonnageValue < 1 || tonnageValue > 1000) {
-        toast({
-          title: "Geçersiz Tonaj",
-          description: "Tonaj 1-1000 ton arası olmalıdır.",
-          variant: "destructive",
-        });
-        return;
-      }
-    }
 
     setIsLoading(true);
 
@@ -123,8 +109,6 @@ export function OnboardingCard({ userEmail }: OnboardingCardProps) {
         vatNumber: formData.vatNumber.trim() || null,
         address: formData.address.trim() || null,
         contactPhone: formData.contactPhone.trim() || null,
-        tonnage: formData.tonnage && formData.tonnage.trim() ? 
-          (isNaN(parseFloat(formData.tonnage)) ? null : parseFloat(formData.tonnage)) : null,
       });
 
       if (result.success) {
@@ -294,20 +278,6 @@ export function OnboardingCard({ userEmail }: OnboardingCardProps) {
               />
             </div>
             
-            <div className="space-y-2">
-              <Label htmlFor="tonnage">Tonaj (Ton)</Label>
-              <Input
-                id="tonnage"
-                type="number"
-                step="0.1"
-                min="1"
-                max="1000"
-                placeholder="Örn: 1.5"
-                value={formData.tonnage}
-                onChange={(e) => setFormData(prev => ({ ...prev, tonnage: e.target.value }))}
-                disabled={isLoading}
-              />
-            </div>
           </div>
           
           <div className="pt-4">

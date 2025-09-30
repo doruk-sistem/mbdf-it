@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabase } from '@/lib/supabase';
+import { createServerSupabase, createAdminSupabase } from '@/lib/supabase';
 
 // DELETE /api/members/[memberId] - Remove member from room
 export async function DELETE(
@@ -40,12 +40,7 @@ export async function DELETE(
       }, { status: 403 });
     }
 
-    // Only admins and LR can remove members
-    if (!['admin', 'lr'].includes(currentMember.role)) {
-      return NextResponse.json({ 
-        error: 'Insufficient permissions. Only admins and LR can remove members' 
-      }, { status: 403 });
-    }
+    // Permission check will be done later based on whether user is removing themselves or others
 
     // Check if room is archived
     const { data: room, error: roomError } = await supabase
@@ -91,15 +86,36 @@ export async function DELETE(
       }
     }
 
-    // Don't allow removing yourself
-    if (targetMember.user_id === user.id) {
-      return NextResponse.json({ 
-        error: 'You cannot remove yourself from the room' 
-      }, { status: 400 });
+    // Check permissions based on who is being removed
+    const isRemovingSelf = targetMember.user_id === user.id;
+    
+    if (isRemovingSelf) {
+      // User is trying to leave the room themselves
+      // Only normal members can leave themselves (admin/LR cannot leave themselves)
+      if (currentMember.role !== "member") {
+        return NextResponse.json({ 
+          error: 'Admins and LR cannot leave the room themselves. Transfer your role first.' 
+        }, { status: 403 });
+      }
+    } else {
+      // User is removing someone else - need admin/LR permissions
+      if (!['admin', 'lr'].includes(currentMember.role)) {
+        return NextResponse.json({ 
+          error: 'Insufficient permissions. Only admins and LR can remove other members' 
+        }, { status: 403 });
+      }
+      
+      // LR cannot remove other LR or admins
+      if (currentMember.role === "lr" && (targetMember.role === "lr" || targetMember.role === "admin")) {
+        return NextResponse.json({ 
+          error: 'LR can only remove regular members' 
+        }, { status: 403 });
+      }
     }
 
-    // Remove member
-    const { error: deleteError } = await supabase
+    // Remove member using admin client to bypass RLS
+    const adminSupabase = createAdminSupabase();
+    const { error: deleteError } = await adminSupabase
       .from("mbdf_member")
       .delete()
       .eq("id", memberId);
@@ -110,22 +126,6 @@ export async function DELETE(
         error: 'Failed to remove member' 
       }, { status: 500 });
     }
-
-    // Log the action
-    await supabase
-      .from("audit_log")
-      .insert({
-        room_id: roomId,
-        user_id: user.id,
-        action: "member_removed",
-        resource_type: "mbdf_member",
-        resource_id: memberId,
-        old_values: { 
-          user_id: targetMember.user_id, 
-          role: targetMember.role 
-        }
-      });
-
     return NextResponse.json({ 
       success: true, 
       message: 'Member removed successfully',
