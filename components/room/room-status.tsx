@@ -42,6 +42,9 @@ export function RoomStatus({ roomId }: RoomStatusProps) {
 
   // Calculate total tonnage (including LR)
   const tonnageStats = calculateTotalTonnage(membersWithTonnage);
+  
+  // Calculate leader tonnage (only LR members)
+  const leaderTonnageStats = calculateTotalTonnage(lrMembers);
 
   // Check ministry submission status (mock data for now - ministry_submitted field doesn't exist yet)
   const ministrySubmittedDocs: any[] = []; // Mock: no documents submitted yet
@@ -66,20 +69,20 @@ export function RoomStatus({ roomId }: RoomStatusProps) {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">
-            Toplam Kimyasal Tonaj
+            Lider Kayıt Tonajı
           </CardTitle>
           <TrendingUp className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">
-            {tonnageStats.memberCount > 0 
-              ? formatTonnageRange(tonnageStats.totalMin, tonnageStats.totalMax)
+            {leaderTonnageStats.memberCount > 0 
+              ? formatTonnageRange(leaderTonnageStats.totalMin, leaderTonnageStats.totalMax)
               : "0 ton"
             }
           </div>
           <p className="text-xs text-muted-foreground">
-            {tonnageStats.memberCount} üyenin tonaj bilgisi
-            {tonnageStats.hasUnspecified && " (bazı üyeler belirtmemiş)"}
+            {leaderTonnageStats.memberCount} liderin tonaj bilgisi
+            {leaderTonnageStats.hasUnspecified && " (bazı liderler belirtmemiş)"}
           </p>
         </CardContent>
       </Card>

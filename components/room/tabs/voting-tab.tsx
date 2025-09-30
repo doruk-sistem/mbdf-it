@@ -579,10 +579,10 @@ export function VotingTab({ roomId }: VotingTabProps) {
               <div>
                 <CardTitle>LR Oylaması</CardTitle>
                 <CardDescription>
-                  {votingPhase === 'no-candidates' && "Aday gösterme dönemi"}
-                  {votingPhase === 'nomination' && "Aday gösterme dönemi - Oylama 1 gün sonra başlayacak"}
+                  {votingPhase === 'no-candidates' && "Aday gösterme dönemi - 15 Aralık'a kadar aday gösterebilirsiniz"}
+                  {votingPhase === 'nomination' && "Aday gösterme dönemi - Oylama 15 Aralık'a kadar yapılabilir"}
                   {votingPhase === 'voting' && actualTotalVotes >= expectedTotalVotes && "Oylama tamamlandı - LR seçimi yapılacak"}
-                  {votingPhase === 'voting' && actualTotalVotes < expectedTotalVotes && "Oylama dönemi - Lider Kayıtçı adaylarını değerlendirin (0-5 puan)"}
+                  {votingPhase === 'voting' && actualTotalVotes < expectedTotalVotes && "Oylama dönemi - 15 Aralık'a kadar oylama yapabilirsiniz"}
                   {votingPhase === 'completed' && actualTotalVotes >= expectedTotalVotes && "Oylama tamamlandı - LR seçildi"}
                   {votingPhase === 'completed' && actualTotalVotes < expectedTotalVotes && !isFinalized && "Oylama devam ediyor - Tüm üyeler oy vermeli"}
                 </CardDescription>
