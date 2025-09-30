@@ -170,7 +170,6 @@ export const KksSubmissionSchema = z.object({
   created_by: IdSchema,
   submitted_at: DateSchema.nullable(),
   sent_at: DateSchema.nullable(),
-  tracking_number: z.string().nullable(),
   created_at: DateSchema,
   updated_at: DateSchema,
 });
@@ -216,6 +215,8 @@ export const RoomWithDetailsSchema = RoomSchema.extend({
   member_count: z.number().optional(),
   document_count: z.number().optional(),
   package_count: z.number().optional(),
+  is_member: z.boolean().optional(),
+  user_role: z.string().nullable().optional(),
 });
 
 export const MemberWithProfileSchema = MemberSchema.extend({
@@ -231,8 +232,17 @@ export const AccessRequestWithDetailsSchema = AccessRequestSchema.extend({
 });
 
 export const DocumentWithUploaderSchema = DocumentSchema.extend({
-  profiles: ProfileSchema,
+  profiles: ProfileSchema.optional(),
   download_url: z.string().url().nullable().optional(),
+  mbdf_room: z.object({
+    id: z.string().uuid(),
+    name: z.string(),
+    substance: z.object({
+      name: z.string(),
+      cas_number: z.string().nullable(),
+      ec_number: z.string().nullable(),
+    }).nullable(),
+  }).nullable().optional(),
 });
 
 export const JoinRequestWithDetailsSchema = JoinRequestSchema.extend({
@@ -245,8 +255,8 @@ export const JoinRequestWithDetailsSchema = JoinRequestSchema.extend({
 
 // Now we can reference RoomWithDetailsSchema safely
 export const KksSubmissionWithDetailsSchema = KksSubmissionSchema.extend({
-  created_by_profile: ProfileSchema,
-  room: RoomWithDetailsSchema,
+  created_by_profile: ProfileSchema.nullable(),
+  room: RoomWithDetailsSchema.nullable(),
 });
 
 export const AgreementWithDetailsSchema = AgreementSchema.extend({
@@ -341,6 +351,7 @@ export const RoomsListResponseSchema = z.object({
 export const DocumentsListResponseSchema = z.object({
   items: z.array(DocumentWithUploaderSchema),
   total: z.number(),
+  success: z.boolean().optional(),
   isMember: z.boolean().optional(),
 });
 

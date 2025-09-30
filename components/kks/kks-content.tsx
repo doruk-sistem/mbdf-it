@@ -373,13 +373,6 @@ export function KKSContent() {
                               </>
                             )}
                           </div>
-                          {submission.tracking_number && (
-                            <div className="flex items-center space-x-2">
-                              <Badge variant="outline" className="font-mono text-xs">
-                                {submission.tracking_number}
-                              </Badge>
-                            </div>
-                          )}
                         </div>
                         <div className="flex items-center space-x-2">
                           <Button variant="outline" size="sm">
