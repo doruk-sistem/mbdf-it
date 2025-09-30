@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { Users, FileText, Vote, MessageCircle, Settings, MoreVertical, Archive, BarChart3 } from "lucide-react";
+import { Users, FileText, Vote, MessageCircle, Settings, MoreVertical, Archive, BarChart3, UserPlus } from "lucide-react";
 import { useRoom } from "@/hooks/use-rooms";
 import { useMembers } from "@/hooks/use-members";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -26,6 +26,7 @@ import { DocumentsTab } from "./tabs/documents-tab";
 import { VotingTab } from "./tabs/voting-tab";
 import { ForumTab } from "./tabs/forum-tab";
 import { RoomStatus } from "./room-status";
+import { InviteModal } from "./invite-modal";
 // JoinRequestsTab is no longer needed - no join requests functionality
 import { ArchiveDialog } from "./archive-dialog";
 import { ArchivedBanner } from "./archived-banner";
@@ -42,6 +43,7 @@ export function RoomContent({ roomId }: RoomContentProps) {
   const [activeTab, setActiveTab] = useState("members");
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   const [leaderDashboardOpen, setLeaderDashboardOpen] = useState(false);
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
   
   // Get URL parameters
   const documentId = searchParams.get('documentId');
@@ -166,6 +168,12 @@ export function RoomContent({ roomId }: RoomContentProps) {
             roomName={room.name}
             isArchived={isRoomArchived(room)}
           />
+          {userRole && (
+            <Button variant="outline" onClick={() => setInviteModalOpen(true)}>
+              <UserPlus className="mr-2 h-4 w-4" />
+              Odaya Davet Et
+            </Button>
+          )}
           {hasLeader && (
             <Dialog open={leaderDashboardOpen} onOpenChange={setLeaderDashboardOpen}>
               <DialogTrigger asChild>
@@ -313,6 +321,13 @@ export function RoomContent({ roomId }: RoomContentProps) {
         roomName={room.name}
         open={archiveDialogOpen}
         onOpenChange={setArchiveDialogOpen}
+      />
+      
+      <InviteModal
+        roomId={roomId}
+        roomName={room.name}
+        open={inviteModalOpen}
+        onOpenChange={setInviteModalOpen}
       />
     </div>
   );
