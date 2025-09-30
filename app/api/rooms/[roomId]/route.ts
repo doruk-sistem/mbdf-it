@@ -55,7 +55,7 @@ export async function GET(
     }
 
     // Get related data separately to avoid stack depth issues
-    const [substanceResult, profileResult, memberCountResult, documentCountResult, packageCountResult] = await Promise.all([
+    const [substanceResult, profileResult, memberCountResult, documentCountResult] = await Promise.all([
       adminSupabase
         .from('substance')
         .select('*')
@@ -74,10 +74,6 @@ export async function GET(
         .from('document')
         .select('*', { count: 'exact', head: true })
         .eq('room_id', roomId),
-      adminSupabase
-        .from('access_package')
-        .select('*', { count: 'exact', head: true })
-        .eq('room_id', roomId)
     ]);
 
     // Transform data to include all related data
@@ -87,7 +83,6 @@ export async function GET(
       created_by_profile: profileResult.data || null,
       member_count: memberCountResult.count || 0,
       document_count: documentCountResult.count || 0,
-      package_count: packageCountResult.count || 0,
       // Ensure archive fields exist with null values if not present (for backwards compatibility)
       archived_at: room.archived_at || null,
       archive_reason: room.archive_reason || null,
@@ -186,7 +181,7 @@ export async function PUT(
     }
 
     // Get related data separately to avoid stack depth issues
-    const [substanceResult, profileResult, memberCountResult, documentCountResult, packageCountResult] = await Promise.all([
+    const [substanceResult, profileResult, memberCountResult, documentCountResult] = await Promise.all([
       adminSupabase
         .from('substance')
         .select('*')
@@ -205,10 +200,6 @@ export async function PUT(
         .from('document')
         .select('*', { count: 'exact', head: true })
         .eq('room_id', roomId),
-      adminSupabase
-        .from('access_package')
-        .select('*', { count: 'exact', head: true })
-        .eq('room_id', roomId)
     ]);
 
     // Transform data to include all related data
@@ -218,7 +209,6 @@ export async function PUT(
       created_by_profile: profileResult.data || null,
       member_count: memberCountResult.count || 0,
       document_count: documentCountResult.count || 0,
-      package_count: packageCountResult.count || 0,
       // Ensure archive fields exist with null values if not present (for backwards compatibility)
       archived_at: room.archived_at || null,
       archive_reason: room.archive_reason || null,
