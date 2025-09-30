@@ -18,6 +18,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSubstances } from "@/hooks/use-substances";
 import { useCreateRoom } from "@/hooks/use-rooms";
+import { TONNAGE_RANGES } from "@/lib/tonnage";
 
 interface CreateRoomFormProps {
   preselectedSubstanceId?: string;
@@ -28,6 +29,7 @@ export function CreateRoomForm({ preselectedSubstanceId }: CreateRoomFormProps) 
   const [formData, setFormData] = useState({
     description: "",
     substanceId: preselectedSubstanceId || "",
+    tonnageRange: "",
   });
   
   const router = useRouter();
@@ -48,7 +50,7 @@ export function CreateRoomForm({ preselectedSubstanceId }: CreateRoomFormProps) 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.substanceId) {
+    if (!formData.substanceId || !formData.tonnageRange) {
       return;
     }
 
@@ -59,6 +61,7 @@ export function CreateRoomForm({ preselectedSubstanceId }: CreateRoomFormProps) 
         name: roomName,
         description: formData.description.trim(),
         substance_id: formData.substanceId,
+        tonnage_range: formData.tonnageRange,
       },
       {
         onSuccess: () => {
@@ -172,6 +175,30 @@ export function CreateRoomForm({ preselectedSubstanceId }: CreateRoomFormProps) 
             )}
           </div>
 
+          {/* Tonnage Selection */}
+          <div className="space-y-2">
+            <Label htmlFor="tonnage">
+              Tonaj Aralığı <span className="text-destructive">*</span>
+            </Label>
+            <Select
+              value={formData.tonnageRange}
+              onValueChange={(value) => setFormData(prev => ({ ...prev, tonnageRange: value }))}
+              disabled={createRoomMutation.isPending}
+              required
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Oda oluşturmak için tonaj aralığını seçin" />
+              </SelectTrigger>
+              <SelectContent>
+                {TONNAGE_RANGES.map((range) => (
+                  <SelectItem key={range.value} value={range.value}>
+                    {range.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           {/* Description */}
           <div className="space-y-2">
             <Label htmlFor="description">Açıklama</Label>
@@ -196,7 +223,7 @@ export function CreateRoomForm({ preselectedSubstanceId }: CreateRoomFormProps) 
             >
               İptal
             </Button>
-            <Button type="submit" disabled={createRoomMutation.isPending || !formData.substanceId} className="flex-1">
+            <Button type="submit" disabled={createRoomMutation.isPending || !formData.substanceId || !formData.tonnageRange} className="flex-1">
               {createRoomMutation.isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

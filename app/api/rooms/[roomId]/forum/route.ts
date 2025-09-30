@@ -47,7 +47,6 @@ export async function GET(
           id,
           full_name,
           avatar_url,
-          tonnage,
           company:company_id (
             name
           )
@@ -76,9 +75,10 @@ export async function GET(
       return NextResponse.json({ error: "Failed to fetch messages" }, { status: 500 });
     }
 
-    // Get sender profiles separately to avoid stack depth issues
+    // Get sender profiles and tonnage information separately to avoid stack depth issues
     const senderIds = messages?.map((m: any) => m.sender_id) || [];
     let profiles: any[] = [];
+    let memberTonnage: any[] = [];
     
     if (senderIds.length > 0) {
       // Use admin client to bypass RLS for profiles
@@ -89,7 +89,6 @@ export async function GET(
           id, 
           full_name, 
           avatar_url,
-          tonnage,
           company:company_id (
             name
           )
@@ -101,19 +100,43 @@ export async function GET(
       }
       
       profiles = profilesData || [];
+
+      // Get tonnage information from mbdf_member table
+      const { data: tonnageData, error: tonnageError } = await adminSupabase
+        .from("mbdf_member")
+        .select(`
+          user_id,
+          tonnage_range
+        `)
+        .eq("room_id", params.roomId)
+        .in("user_id", senderIds);
+      
+      if (tonnageError) {
+        console.error("Error fetching tonnage:", tonnageError);
+      }
+      
+      memberTonnage = tonnageData || [];
     }
 
-    // Combine messages with profiles
-    const messagesWithProfiles = messages?.map((message: any) => ({
-      ...message,
-      profiles: profiles.find(p => p.id === message.sender_id) || { 
+    // Combine messages with profiles and tonnage
+    const messagesWithProfiles = messages?.map((message: any) => {
+      const profile = profiles.find(p => p.id === message.sender_id) || { 
         id: message.sender_id, 
         full_name: "Unknown User", 
         avatar_url: null,
-        tonnage: null,
         company: null
-      }
-    })) || [];
+      };
+      
+      const tonnage = memberTonnage.find(t => t.user_id === message.sender_id);
+      
+      return {
+        ...message,
+        profiles: {
+          ...profile,
+          tonnage_range: tonnage?.tonnage_range || null
+        }
+      };
+    }) || [];
 
     return NextResponse.json({ messages: messagesWithProfiles });
   } catch (error) {

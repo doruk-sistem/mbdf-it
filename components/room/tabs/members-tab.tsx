@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, UserX, Crown, Shield, MoreHorizontal } from "lucide-react";
+import { Plus, UserX, Crown, Shield, MoreHorizontal, Edit2, Check, X } from "lucide-react";
 import {
   useMembers,
   useJoinRoom,
@@ -56,6 +56,7 @@ import {
 } from "@/components/ui/table";
 
 import type { Database } from "@/types/supabase";
+import { TONNAGE_RANGES, getTonnageLabel } from "@/lib/tonnage";
 import type { MemberWithProfile } from "@/lib/schemas";
 
 interface MembersTabProps {
@@ -67,9 +68,11 @@ export function MembersTab({ roomId, isArchived = false }: MembersTabProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [addMemberDialogOpen, setAddMemberDialogOpen] = useState(false);
   const [newMemberEmail, setNewMemberEmail] = useState("");
+  const [editingTonnage, setEditingTonnage] = useState<string | null>(null);
+  const [tempTonnageValue, setTempTonnageValue] = useState("");
 
   // Query hooks
-  const { data: membersData, isLoading, error } = useMembers(roomId);
+  const { data: membersData, isLoading, error, refetch } = useMembers(roomId);
   const { user: currentUser } = useAuth();
   const addMemberMutation = useAddMember();
   const joinRoomMutation = useJoinRoom();
@@ -132,6 +135,47 @@ export function MembersTab({ roomId, isArchived = false }: MembersTabProps) {
       default:
         return "secondary";
     }
+  };
+
+  const handleTonnageEdit = (memberId: string, currentTonnage: string | null) => {
+    setEditingTonnage(memberId);
+    setTempTonnageValue(currentTonnage || "");
+  };
+
+  const handleTonnageSave = async (memberId: string) => {
+    try {
+      const response = await fetch('/api/members', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          memberId,
+          tonnageRange: tempTonnageValue,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Refresh members data using React Query
+        await refetch();
+      } else {
+        console.error('Failed to update tonnage:', data.error);
+        alert(`Hata: ${data.error}`);
+      }
+    } catch (error) {
+      console.error('Error updating tonnage:', error);
+      alert('Bir hata oluştu. Lütfen tekrar deneyin.');
+    } finally {
+      setEditingTonnage(null);
+      setTempTonnageValue("");
+    }
+  };
+
+  const handleTonnageCancel = () => {
+    setEditingTonnage(null);
+    setTempTonnageValue("");
   };
 
   // Handle adding new member
@@ -331,9 +375,57 @@ export function MembersTab({ roomId, isArchived = false }: MembersTabProps) {
                     </span>
                   </TableCell>
                   <TableCell>
-                    <span className="text-sm">
-                      {(member.profiles as any)?.tonnage ? `${(member.profiles as any).tonnage} ton` : "Belirtilmemiş"}
-                    </span>
+                    {editingTonnage === member.id ? (
+                      <div className="flex items-center space-x-2">
+                        <Select
+                          value={tempTonnageValue}
+                          onValueChange={setTempTonnageValue}
+                        >
+                          <SelectTrigger className="w-32">
+                            <SelectValue placeholder="Seçin" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {TONNAGE_RANGES.map((range) => (
+                              <SelectItem key={range.value} value={range.value}>
+                                {range.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleTonnageSave(member.id!)}
+                          className="h-6 w-6 p-0"
+                        >
+                          <Check className="h-3 w-3 text-green-600" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={handleTonnageCancel}
+                          className="h-6 w-6 p-0"
+                        >
+                          <X className="h-3 w-3 text-red-600" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center space-x-2">
+                        <span className="text-sm">
+                          {getTonnageLabel(member.tonnage_range || null)}
+                        </span>
+                        {member.user_id === currentUserId && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleTonnageEdit(member.id!, member.tonnage_range || null)}
+                            className="h-6 w-6 p-0"
+                          >
+                            <Edit2 className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Badge

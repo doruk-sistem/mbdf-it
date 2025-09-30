@@ -21,7 +21,6 @@ export async function GET(request: NextRequest) {
       .select(`
         id,
         full_name,
-        tonnage,
         company:company_id (
           id,
           name,

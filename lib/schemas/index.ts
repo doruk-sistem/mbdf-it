@@ -76,6 +76,7 @@ export const MemberSchema = z.object({
   user_id: IdSchema,
   role: UserRoleSchema,
   joined_at: DateSchema,
+   tonnage_range: z.string().nullable(),
 });
 
 export const DocumentSchema = z.object({
@@ -284,6 +285,7 @@ export const CreateRoomSchema = z.object({
   name: z.string().min(1).max(255),
   description: z.string().optional(),
   substance_id: IdSchema,
+  tonnage_range: z.string().optional(),
 });
 
 export const UploadDocumentSchema = z.object({
