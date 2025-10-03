@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
 import { PersonalizedDashboard } from "@/components/dashboard/personalized-dashboard";
+import { DashboardContent } from "@/components/dashboard/dashboard-content";
 import { DashboardSkeleton } from "@/components/dashboard/dashboard-skeleton";
 import { createSSRQueryClient } from '@/lib/ssr-query-client';
 import { prefetchDashboard } from '@/lib/prefetch';
@@ -20,7 +21,7 @@ export default async function DashboardPage() {
   // Check if user completed onboarding (both profile and substance selection)
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, company_id")
+    .select("full_name, company_id, role")
     .eq("id", user.id)
     .single();
 
@@ -29,16 +30,22 @@ export default async function DashboardPage() {
     redirect("/onboarding");
   }
 
-  // Check if user has joined any rooms (substance selection completed)
-  const { data: userRooms } = await supabase
-    .from("mbdf_member")
-    .select("room_id")
-    .eq("user_id", user.id)
-    .limit(1);
+  // Check user role
+  const isAdmin = profile?.role === 'admin';
 
-  const needsSubstanceSelection = !userRooms || userRooms.length === 0;
-  if (needsSubstanceSelection) {
-    redirect("/onboarding");
+  // For admin, skip substance selection requirement
+  if (!isAdmin) {
+    // Check if user has joined any rooms (substance selection completed)
+    const { data: userRooms } = await supabase
+      .from("mbdf_member")
+      .select("room_id")
+      .eq("user_id", user.id)
+      .limit(1);
+
+    const needsSubstanceSelection = !userRooms || userRooms.length === 0;
+    if (needsSubstanceSelection) {
+      redirect("/onboarding");
+    }
   }
 
   const queryClient = createSSRQueryClient();
@@ -50,14 +57,16 @@ export default async function DashboardPage() {
     <HydrationBoundary state={dehydrate(queryClient)}>
       <div className="container mx-auto p-6 space-y-8">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">MBDF-IT Dashboard</h1>
+          <h1 className="text-3xl font-bold tracking-tight">
+            {isAdmin ? 'Admin Dashboard' : 'MBDF-IT Dashboard'}
+          </h1>
           <p className="text-muted-foreground">
-            KKDİK MBDF süreçlerinizi yönetin
+            {isAdmin ? 'Sistem yönetimi ve istatistikler' : 'KKDİK MBDF süreçlerinizi yönetin'}
           </p>
         </div>
 
         <Suspense fallback={<DashboardSkeleton />}>
-          <PersonalizedDashboard />
+          {isAdmin ? <DashboardContent /> : <PersonalizedDashboard />}
         </Suspense>
       </div>
     </HydrationBoundary>

@@ -58,12 +58,14 @@ interface DocumentsTabProps {
   roomId: string;
   isArchived?: boolean;
   highlightDocumentId?: string | null;
+  isAdmin?: boolean;
 }
 
 export function DocumentsTab({
   roomId,
   isArchived = false,
   highlightDocumentId,
+  isAdmin = false,
 }: DocumentsTabProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState("all");
@@ -205,7 +207,7 @@ export function DocumentsTab({
               Oda dokümanlarını görüntüleyin ve yönetin
             </CardDescription>
           </div>
-          {isMember && (
+          {isMember && !isAdmin && (
             <Dialog
               open={isUploadDialogOpen}
               onOpenChange={setIsUploadDialogOpen}
@@ -296,7 +298,15 @@ export function DocumentsTab({
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {!isMember && !isLoading && (
+        {isAdmin && !isLoading && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+            <p className="text-sm text-amber-700">
+              <strong>Admin İzleme Modu:</strong> Tüm belgeleri görüntüleyebilirsiniz. 
+              Operasyonel işlemler (yükleme, silme) admin yetkisiyle yapılamaz.
+            </p>
+          </div>
+        )}
+        {!isMember && !isAdmin && !isLoading && (
           <div className="rounded-lg border bg-muted/50 p-4">
             <p className="text-sm text-muted-foreground">
               <strong>Not:</strong> Bu odaya üye olmadığınız için sadece

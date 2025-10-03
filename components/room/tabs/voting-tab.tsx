@@ -22,6 +22,7 @@ import { findHighestTonnageCandidates, getTonnageLabel } from "@/lib/tonnage";
 
 interface VotingTabProps {
   roomId: string;
+  isAdmin?: boolean;
 }
 
 
@@ -33,7 +34,7 @@ const scoreLabels = {
   leadership: "Liderlik"
 };
 
-export function VotingTab({ roomId }: VotingTabProps) {
+export function VotingTab({ roomId, isAdmin = false }: VotingTabProps) {
   const [votes, setVotes] = useState<Record<string, {
     technical: number[];
     experience: number[];
@@ -816,7 +817,7 @@ export function VotingTab({ roomId }: VotingTabProps) {
                   </div>
                 )}
               </div>
-              {(votingPhase === 'no-candidates' || votingPhase === 'nomination') && !isCurrentUserCandidate && (
+              {(votingPhase === 'no-candidates' || votingPhase === 'nomination') && !isCurrentUserCandidate && !isAdmin && (
               <Button
                 onClick={() => setShowNominateDialog(true)}
                 size="sm"
