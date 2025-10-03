@@ -42,9 +42,10 @@ interface ForumMessage {
 interface ForumTabProps {
   roomId: string;
   isArchived?: boolean;
+  isAdmin?: boolean;
 }
 
-export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
+export function ForumTab({ roomId, isArchived = false, isAdmin = false }: ForumTabProps) {
   const [newMessage, setNewMessage] = useState("");
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [newTopic, setNewTopic] = useState("");
@@ -415,7 +416,7 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
                 )}
               </div>
               
-              {isMember && (
+              {isMember && !isAdmin && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -428,7 +429,7 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
             </div>
 
             {/* New Topic Input */}
-            {showNewTopicInput && isMember && (
+            {showNewTopicInput && isMember && !isAdmin && (
               <div className="flex gap-2 items-center">
                 <Input
                   placeholder="Yeni konu adı..."
@@ -655,7 +656,7 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
           </div>
 
           {/* Message Input */}
-          {!isArchived && (
+          {!isArchived && !isAdmin && (
             <div className="space-y-2">
               <div className="text-sm text-muted-foreground">
                 "{selectedTopic}" konusuna mesaj yazıyorsunuz
@@ -683,6 +684,14 @@ export function ForumTab({ roomId, isArchived = false }: ForumTabProps) {
                   </Button>
                 </div>
               </div>
+            </div>
+          )}
+
+          {isAdmin && (
+            <div className="text-center py-4 text-muted-foreground bg-amber-50 rounded-lg border border-amber-200">
+              <p className="text-amber-700 text-sm">
+                Admin olarak sadece görüntüleme yetkisine sahipsiniz. Mesaj gönderemezsiniz.
+              </p>
             </div>
           )}
 

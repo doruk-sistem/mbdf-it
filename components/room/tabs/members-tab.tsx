@@ -62,9 +62,10 @@ import type { MemberWithProfile } from "@/lib/schemas";
 interface MembersTabProps {
   roomId: string;
   isArchived?: boolean;
+  isAdmin?: boolean;
 }
 
-export function MembersTab({ roomId, isArchived = false }: MembersTabProps) {
+export function MembersTab({ roomId, isArchived = false, isAdmin = false }: MembersTabProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [addMemberDialogOpen, setAddMemberDialogOpen] = useState(false);
   const [newMemberEmail, setNewMemberEmail] = useState("");
@@ -319,6 +320,16 @@ export function MembersTab({ roomId, isArchived = false }: MembersTabProps) {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Admin Info Banner */}
+        {isAdmin && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+            <p className="text-sm text-amber-700">
+              <strong>Admin İzleme Modu:</strong> Tüm üye bilgilerini ve şirket detaylarını görüntüleyebilirsiniz. 
+              Üye ekleme/çıkarma işlemleri admin yetkisiyle yapılamaz.
+            </p>
+          </div>
+        )}
+        
         {/* Search */}
         <div className="flex items-center space-x-2">
           <Input

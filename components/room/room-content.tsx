@@ -32,7 +32,7 @@ import { ArchiveDialog } from "./archive-dialog";
 import { ArchivedBanner } from "./archived-banner";
 import { JoinRoomButton } from "./join-room-button";
 import { isRoomArchived, getRoomStatusText, getRoomStatusVariant } from "@/lib/archive-utils";
-import { useCanArchiveRoom, useIsRoomAdmin, useRoomMemberRole } from "@/hooks/use-user";
+import { useCanArchiveRoom, useIsRoomAdmin, useRoomMemberRole, useUserRole } from "@/hooks/use-user";
 
 interface RoomContentProps {
   roomId: string;
@@ -63,6 +63,8 @@ export function RoomContent({ roomId }: RoomContentProps) {
   const canArchive = useCanArchiveRoom(roomId);
   const isRoomAdmin = useIsRoomAdmin(roomId);
   const userRole = useRoomMemberRole(roomId);
+  const globalUserRole = useUserRole(); // Get global role (admin, lr, member)
+  const isAdmin = globalUserRole === 'admin';
   
   // Check if there's a leader in the room
   const { data: membersData } = useMembers(roomId);
@@ -160,17 +162,32 @@ export function RoomContent({ roomId }: RoomContentProps) {
         </div>
         
         <div className="flex items-center space-x-2">
-          <JoinRoomButton 
-            roomId={roomId} 
-            roomName={room.name}
-            isArchived={isRoomArchived(room)}
-          />
-          {userRole && (
+          {/* Admin Badge */}
+          {isAdmin && (
+            <Badge variant="outline" className="text-amber-700 border-amber-300">
+              <Users className="mr-1 h-3 w-3" />
+              Admin İzleme Modu
+            </Badge>
+          )}
+          
+          {/* Join Room Button - Hidden for admin */}
+          {!isAdmin && (
+            <JoinRoomButton 
+              roomId={roomId} 
+              roomName={room.name}
+              isArchived={isRoomArchived(room)}
+            />
+          )}
+          
+          {/* Invite Button - Hidden for admin */}
+          {!isAdmin && userRole && (
             <Button variant="outline" onClick={() => setInviteModalOpen(true)}>
               <UserPlus className="mr-2 h-4 w-4" />
               Odaya Davet Et
             </Button>
           )}
+          
+          {/* Leader Dashboard - Visible for admin (read-only) */}
           {hasLeader && (
             <Dialog open={leaderDashboardOpen} onOpenChange={setLeaderDashboardOpen}>
               <DialogTrigger asChild>
@@ -193,35 +210,43 @@ export function RoomContent({ roomId }: RoomContentProps) {
               </DialogContent>
             </Dialog>
           )}
-          <Button variant="outline">
-            <Settings className="mr-2 h-4 w-4" />
-            Ayarlar
-          </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon">
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem disabled={isRoomArchived(room)}>
-                Odayı düzenle
-              </DropdownMenuItem>
-              <DropdownMenuItem disabled={isRoomArchived(room)}>
-                Üye ekle
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              {!isRoomArchived(room) && canArchive && (
-                <DropdownMenuItem 
-                  className="text-destructive"
-                  onClick={() => setArchiveDialogOpen(true)}
-                >
-                  <Archive className="mr-2 h-4 w-4" />
-                  Odayı arşivle
+          
+          {/* Settings Button - Hidden for admin */}
+          {!isAdmin && (
+            <Button variant="outline">
+              <Settings className="mr-2 h-4 w-4" />
+              Ayarlar
+            </Button>
+          )}
+          
+          {/* Dropdown Menu - Hidden for admin */}
+          {!isAdmin && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem disabled={isRoomArchived(room)}>
+                  Odayı düzenle
                 </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                <DropdownMenuItem disabled={isRoomArchived(room)}>
+                  Üye ekle
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                {!isRoomArchived(room) && canArchive && (
+                  <DropdownMenuItem 
+                    className="text-destructive"
+                    onClick={() => setArchiveDialogOpen(true)}
+                  >
+                    <Archive className="mr-2 h-4 w-4" />
+                    Odayı arşivle
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </motion.div>
 
@@ -291,23 +316,23 @@ export function RoomContent({ roomId }: RoomContentProps) {
           </TabsList>
 
           <TabsContent value="members" className="space-y-4">
-            <MembersTab roomId={roomId} isArchived={isRoomArchived(room)} />
+            <MembersTab roomId={roomId} isArchived={isRoomArchived(room)} isAdmin={isAdmin} />
           </TabsContent>
 
           <TabsContent value="documents" className="space-y-4">
-            <DocumentsTab roomId={roomId} isArchived={isRoomArchived(room)} highlightDocumentId={documentId} />
+            <DocumentsTab roomId={roomId} isArchived={isRoomArchived(room)} highlightDocumentId={documentId} isAdmin={isAdmin} />
           </TabsContent>
 
 
           {canSeeVoting && (
             <TabsContent value="voting" className="space-y-4">
-              <VotingTab roomId={roomId} />
+              <VotingTab roomId={roomId} isAdmin={isAdmin} />
             </TabsContent>
           )}
 
 
           <TabsContent value="forum" className="space-y-4">
-            <ForumTab roomId={roomId} isArchived={isRoomArchived(room)} />
+            <ForumTab roomId={roomId} isArchived={isRoomArchived(room)} isAdmin={isAdmin} />
           </TabsContent>
         </Tabs>
       </motion.div>
