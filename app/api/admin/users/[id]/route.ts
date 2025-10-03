@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase, createAdminSupabase } from '@/lib/supabase';
 
-export async function GET(request: NextRequest) {
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
   try {
     const supabase = createServerSupabase();
     
@@ -25,11 +28,35 @@ export async function GET(request: NextRequest) {
       }, { status: 403 });
     }
 
-    // Use admin client to get all users
+    // Get request body
+    const body = await request.json();
+    const { full_name, email, phone, company_id, role } = body;
+
+    // Use admin client to update user
     const adminSupabase = createAdminSupabase();
 
-    const { data: users, error } = await adminSupabase
+    // Build update object
+    const updateData: {
+      full_name?: string;
+      email?: string;
+      phone?: string | null;
+      company_id?: string | null;
+      role?: string;
+      updated_at: string;
+    } = {
+      updated_at: new Date().toISOString(),
+    };
+
+    if (full_name !== undefined) updateData.full_name = full_name;
+    if (email !== undefined) updateData.email = email;
+    if (phone !== undefined) updateData.phone = phone;
+    if (company_id !== undefined) updateData.company_id = company_id;
+    if (role !== undefined) updateData.role = role;
+
+    const { data: updatedUser, error } = await (adminSupabase as any)
       .from('profiles')
+      .update(updateData)
+      .eq('id', params.id)
       .select(`
         id,
         full_name,
@@ -37,33 +64,32 @@ export async function GET(request: NextRequest) {
         phone,
         role,
         created_at,
+        updated_at,
         company:company_id (
           id,
           name
         )
       `)
-      .order('created_at', { ascending: false });
+      .single();
 
     if (error) {
-      console.error('Error fetching users:', error);
+      console.error('Error updating user:', error);
       return NextResponse.json({ 
-        error: 'Failed to fetch users' 
+        error: 'Failed to update user',
+        details: error.message 
       }, { status: 500 });
     }
 
     return NextResponse.json({ 
       success: true,
-      users: users || []
+      user: updatedUser
     });
 
   } catch (error) {
-    console.error('Admin users API error:', error);
+    console.error('Admin user update API error:', error);
     return NextResponse.json({ 
       error: 'Internal server error' 
     }, { status: 500 });
   }
 }
-
-
-
 

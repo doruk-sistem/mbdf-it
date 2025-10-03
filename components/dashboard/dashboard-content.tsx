@@ -17,6 +17,9 @@ import {
   TrendingUp,
   CheckCircle,
   Search,
+  Pencil,
+  X,
+  Save,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { get } from "@/lib/api";
@@ -33,8 +36,13 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { motion } from "framer-motion";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { patch } from "@/lib/api";
+import { useToast } from "@/components/ui/use-toast";
 
 interface AdminStats {
   total_users: number;
@@ -580,7 +588,10 @@ function AdminDetailModal({
 }) {
   const [modalSearchTerm, setModalSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(0);
+  const [editingItem, setEditingItem] = useState<any>(null);
   const itemsPerPage = 10; // Her sayfada 10 öğe
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin', type],
@@ -591,11 +602,56 @@ function AdminDetailModal({
     enabled: open && !!type,
   });
 
+  // Update mutation for users
+  const updateUserMutation = useMutation({
+    mutationFn: (data: { id: string; updates: any }) => 
+      patch(`/api/admin/users/${data.id}`, data.updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
+      toast({
+        title: "Başarılı",
+        description: "Kullanıcı bilgileri güncellendi",
+      });
+      setEditingItem(null);
+    },
+    onError: (error: any) => {
+      const errorMessage = error?.data?.error || error?.data?.details || error.message || "Kullanıcı güncellenirken bir hata oluştu";
+      toast({
+        title: "Hata",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Update mutation for companies
+  const updateCompanyMutation = useMutation({
+    mutationFn: (data: { id: string; updates: any }) => 
+      patch(`/api/admin/companies/${data.id}`, data.updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'companies'] });
+      toast({
+        title: "Başarılı",
+        description: "Şirket bilgileri güncellendi",
+      });
+      setEditingItem(null);
+    },
+    onError: (error: any) => {
+      const errorMessage = error?.data?.error || error?.data?.details || error.message || "Şirket güncellenirken bir hata oluştu";
+      toast({
+        title: "Hata",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    },
+  });
+
   // Modal kapanınca state'i sıfırla
   useEffect(() => {
     if (!open) {
       setModalSearchTerm("");
       setCurrentPage(0);
+      setEditingItem(null);
     }
   }, [open]);
 
@@ -661,6 +717,33 @@ function AdminDetailModal({
 
   const { items, total, totalPages } = getFilteredAndPaginatedData();
 
+  const handleSave = () => {
+    if (!editingItem) return;
+
+    if (type === 'users') {
+      updateUserMutation.mutate({
+        id: editingItem.id,
+        updates: {
+          full_name: editingItem.full_name,
+          email: editingItem.email,
+          phone: editingItem.phone || null,
+          role: editingItem.role,
+        },
+      });
+    } else if (type === 'companies') {
+      updateCompanyMutation.mutate({
+        id: editingItem.id,
+        updates: {
+          name: editingItem.name,
+          vat_number: editingItem.vat_number || null,
+          address: editingItem.address || null,
+          contact_email: editingItem.contact_email || null,
+          contact_phone: editingItem.contact_phone || null,
+        },
+      });
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
@@ -700,21 +783,156 @@ function AdminDetailModal({
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
             <p className="mt-2 text-sm text-muted-foreground">Yükleniyor...</p>
           </div>
+        ) : editingItem ? (
+          // Edit Form
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <div className="flex items-center space-x-2 text-amber-800">
+                <Pencil className="h-4 w-4" />
+                <span className="text-sm font-semibold">
+                  {type === 'users' ? 'Kullanıcı' : 'Şirket'} Düzenleniyor
+                </span>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setEditingItem(null)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {type === 'users' ? (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="full_name">Ad Soyad</Label>
+                  <Input
+                    id="full_name"
+                    value={editingItem.full_name || ''}
+                    onChange={(e) => setEditingItem({ ...editingItem, full_name: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">E-posta</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={editingItem.email || ''}
+                    onChange={(e) => setEditingItem({ ...editingItem, email: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Telefon</Label>
+                  <Input
+                    id="phone"
+                    value={editingItem.phone || ''}
+                    onChange={(e) => setEditingItem({ ...editingItem, phone: e.target.value || null })}
+                    placeholder="Telefon numarası"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="role">Rol</Label>
+                  <Select
+                    value={editingItem.role || 'member'}
+                    onValueChange={(value) => setEditingItem({ ...editingItem, role: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="member">Member</SelectItem>
+                      <SelectItem value="lr">LR</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            ) : type === 'companies' ? (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="company_name">Şirket Adı</Label>
+                  <Input
+                    id="company_name"
+                    value={editingItem.name || ''}
+                    onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="vat_number">Vergi Numarası</Label>
+                  <Input
+                    id="vat_number"
+                    value={editingItem.vat_number || ''}
+                    onChange={(e) => setEditingItem({ ...editingItem, vat_number: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="address">Adres</Label>
+                  <Input
+                    id="address"
+                    value={editingItem.address || ''}
+                    onChange={(e) => setEditingItem({ ...editingItem, address: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="contact_email">İletişim E-posta</Label>
+                  <Input
+                    id="contact_email"
+                    type="email"
+                    value={editingItem.contact_email || ''}
+                    onChange={(e) => setEditingItem({ ...editingItem, contact_email: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="contact_phone">İletişim Telefon</Label>
+                  <Input
+                    id="contact_phone"
+                    value={editingItem.contact_phone || ''}
+                    onChange={(e) => setEditingItem({ ...editingItem, contact_phone: e.target.value })}
+                  />
+                </div>
+              </div>
+            ) : null}
+
+            <div className="flex justify-end space-x-2 pt-4 border-t">
+              <Button
+                variant="outline"
+                onClick={() => setEditingItem(null)}
+              >
+                İptal
+              </Button>
+              <Button
+                onClick={handleSave}
+                disabled={updateUserMutation.isPending || updateCompanyMutation.isPending}
+              >
+                <Save className="mr-2 h-4 w-4" />
+                Kaydet
+              </Button>
+            </div>
+          </div>
         ) : type === 'users' ? (
           <div className="space-y-2">
             {items.map((user: any) => (
               <div key={user.id} className="p-3 border rounded-lg hover:bg-muted/50">
                 <div className="flex items-center justify-between">
-                  <div>
+                  <div className="flex-1">
                     <p className="font-medium">{user.full_name || 'İsimsiz'}</p>
                     <p className="text-sm text-muted-foreground">{user.email}</p>
                     {user.company && (
                       <p className="text-xs text-muted-foreground">🏢 {user.company.name}</p>
                     )}
                   </div>
-                  <Badge variant={user.role === 'admin' ? 'default' : 'outline'}>
-                    {user.role === 'admin' ? 'Admin' : user.role === 'lr' ? 'LR' : 'Member'}
-                  </Badge>
+                  <div className="flex items-center space-x-2">
+                    <Badge variant={user.role === 'admin' ? 'default' : 'outline'}>
+                      {user.role === 'admin' ? 'Admin' : user.role === 'lr' ? 'LR' : 'Member'}
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setEditingItem({ ...user })}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -723,18 +941,29 @@ function AdminDetailModal({
           <div className="space-y-2">
             {items.map((company: any) => (
               <div key={company.id} className="p-3 border rounded-lg hover:bg-muted/50">
-                <p className="font-medium">{company.name}</p>
-                <div className="grid grid-cols-2 gap-2 mt-2 text-sm text-muted-foreground">
-                  <div>
-                    <span className="font-medium">Vergi No:</span> {company.vat_number || 'N/A'}
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <p className="font-medium">{company.name}</p>
+                    <div className="grid grid-cols-2 gap-2 mt-2 text-sm text-muted-foreground">
+                      <div>
+                        <span className="font-medium">Vergi No:</span> {company.vat_number || 'N/A'}
+                      </div>
+                      <div>
+                        <span className="font-medium">İletişim:</span> {company.contact_email || company.contact_phone || 'N/A'}
+                      </div>
+                    </div>
+                    {company.address && (
+                      <p className="text-xs text-muted-foreground mt-1">📍 {company.address}</p>
+                    )}
                   </div>
-                  <div>
-                    <span className="font-medium">İletişim:</span> {company.contact_email || company.contact_phone || 'N/A'}
-                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setEditingItem({ ...company })}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
                 </div>
-                {company.address && (
-                  <p className="text-xs text-muted-foreground mt-1">📍 {company.address}</p>
-                )}
               </div>
             ))}
           </div>
@@ -770,7 +999,7 @@ function AdminDetailModal({
         ) : null}
 
         {/* Pagination */}
-        {totalPages > 1 && (
+        {!editingItem && totalPages > 1 && (
           <div className="flex justify-center items-center space-x-4 pt-4 border-t">
             <Button
               variant="outline"
