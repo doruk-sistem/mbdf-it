@@ -20,6 +20,9 @@ import {
   Pencil,
   X,
   Save,
+  Trash2,
+  AlertTriangle,
+  Loader2,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { get } from "@/lib/api";
@@ -602,6 +605,10 @@ function AdminDetailModal({
     enabled: open && !!type,
   });
 
+  // Delete user state
+  const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+
   // Update mutation for users
   const updateUserMutation = useMutation({
     mutationFn: (data: { id: string; updates: any }) => 
@@ -621,6 +628,42 @@ function AdminDetailModal({
         description: errorMessage,
         variant: "destructive",
       });
+    },
+  });
+
+  // Delete mutation for users
+  const deleteUserMutation = useMutation({
+    mutationFn: (userId: string) => {
+      return fetch(`/api/admin/users/${userId}`, { method: 'DELETE' })
+        .then(res => res.json())
+        .then(data => {
+          if (!data.success) throw new Error(data.error || 'Failed to delete user');
+          return data;
+        });
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'stats'] });
+      
+      // Show detailed success message with transfer summary
+      const totalItems = data.total_items_transferred || 0;
+      toast({
+        title: "Başarılı",
+        description: totalItems > 0 
+          ? `Kullanıcı silindi ve ${totalItems} kayıt SUPER ADMIN'e transfer edildi.`
+          : "Kullanıcı başarıyla silindi.",
+      });
+      setDeleteUserId(null);
+      setDeleteConfirmOpen(false);
+    },
+    onError: (error: any) => {
+      const errorMessage = error?.message || "Kullanıcı silinirken bir hata oluştu";
+      toast({
+        title: "Hata",
+        description: errorMessage,
+        variant: "destructive",
+      });
+      setDeleteConfirmOpen(false);
     },
   });
 
@@ -932,10 +975,86 @@ function AdminDetailModal({
                     >
                       <Pencil className="h-4 w-4" />
                     </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setDeleteUserId(user.id);
+                        setDeleteConfirmOpen(true);
+                      }}
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
               </div>
             ))}
+
+            {/* Delete Confirmation Dialog */}
+            <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center space-x-2 text-destructive">
+                    <AlertTriangle className="h-5 w-5" />
+                    <span>Kullanıcıyı Sil</span>
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Bu kullanıcıyı silmek üzeresiniz. Bu işlem geri alınamaz.
+                  </p>
+                  <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 space-y-2">
+                    <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
+                      ⚠️ Önemli Bilgi:
+                    </p>
+                    <ul className="text-xs text-amber-800 dark:text-amber-200 space-y-1 list-disc list-inside">
+                      <li>Kullanıcının oluşturduğu odalar sistem yöneticisine transfer edilecek</li>
+                      <li>Yüklediği dokümanlar sistem yöneticisine transfer edilecek</li>
+                      <li>Oluşturduğu anlaşmalar sistem yöneticisine transfer edilecek</li>
+                      <li>Oda üyelikleri ve forum mesajları silinecek</li>
+                      <li>Audit log kayıtları korunacak</li>
+                    </ul>
+                  </div>
+                  <p className="text-sm font-medium">
+                    Devam etmek istediğinizden emin misiniz?
+                  </p>
+                </div>
+                <div className="flex justify-end space-x-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setDeleteConfirmOpen(false);
+                      setDeleteUserId(null);
+                    }}
+                    disabled={deleteUserMutation.isPending}
+                  >
+                    İptal
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => {
+                      if (deleteUserId) {
+                        deleteUserMutation.mutate(deleteUserId);
+                      }
+                    }}
+                    disabled={deleteUserMutation.isPending}
+                  >
+                    {deleteUserMutation.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Siliniyor...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Evet, Sil
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         ) : type === 'companies' ? (
           <div className="space-y-2">
