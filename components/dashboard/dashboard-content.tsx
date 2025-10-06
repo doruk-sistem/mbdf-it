@@ -1013,6 +1013,8 @@ function AdminDetailModal({
                       <li>Yüklediği dokümanlar sistem yöneticisine transfer edilecek</li>
                       <li>Oluşturduğu anlaşmalar sistem yöneticisine transfer edilecek</li>
                       <li>Oda üyelikleri ve forum mesajları silinecek</li>
+                      <li>Eğer LR ise, oylama verileri sıfırlanacak (yeni oylama başlatılabilir)</li>
+                      <li>Şirket bilgisi silinecek (1 şirket = 1 kullanıcı)</li>
                       <li>Audit log kayıtları korunacak</li>
                     </ul>
                   </div>

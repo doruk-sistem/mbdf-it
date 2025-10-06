@@ -300,7 +300,38 @@ export async function DELETE(
         .eq('created_by', params.id);
     }
 
-    // 8. Preserve audit_log by removing FK reference to user
+    // 8. Clean up LR voting data if user is/was an LR
+    // If user is LR in any room, delete ALL voting data for those rooms
+    // This prevents invalid voting state and allows fresh LR election
+    const { data: lrRooms } = await (adminSupabase as any)
+      .from('mbdf_member')
+      .select('room_id, mbdf_room(name)')
+      .eq('user_id', params.id)
+      .eq('role', 'lr');
+
+    if (lrRooms && lrRooms.length > 0) {
+      for (const lr of lrRooms) {
+        // Delete ALL lr_vote records for this room
+        await (adminSupabase as any)
+          .from('lr_vote')
+          .delete()
+          .eq('room_id', lr.room_id);
+
+        // Delete ALL lr_candidate records for this room
+        await (adminSupabase as any)
+          .from('lr_candidate')
+          .delete()
+          .eq('room_id', lr.room_id);
+      }
+      
+      // Add to transfer summary
+      transferSummary.lr_voting_cleanup = {
+        rooms_affected: lrRooms.length,
+        room_names: lrRooms.map((r: any) => r.mbdf_room?.name).filter(Boolean)
+      };
+    }
+
+    // 9. Preserve audit_log by removing FK reference to user
     // Set user_id to NULL for all audit_log entries of this user
     // This preserves the audit trail while allowing user deletion
     await (adminSupabase as any)
