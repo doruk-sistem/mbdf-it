@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Upload, Download, FileText, Trash2, Eye, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Upload, Download, FileText, Trash2, Eye, Loader2, ArrowRightLeft } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -53,6 +53,7 @@ import { useMembers } from "@/hooks/use-members";
 import { useAuth } from "@/components/auth/auth-wrapper";
 import { useQueryClient } from "@tanstack/react-query";
 import { keys, invalidationHelpers } from "@/lib/query-keys";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface DocumentsTabProps {
   roomId: string;
@@ -60,6 +61,9 @@ interface DocumentsTabProps {
   highlightDocumentId?: string | null;
   isAdmin?: boolean;
 }
+
+// System admin ID for transfer detection
+const SYSTEM_ADMIN_ID = '5dbbd138-c2a5-4ac0-b7cf-422374bf579c';
 
 export function DocumentsTab({
   roomId,
@@ -73,6 +77,8 @@ export function DocumentsTab({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [transferInfoOpen, setTransferInfoOpen] = useState(false);
+  const [selectedTransferDoc, setSelectedTransferDoc] = useState<any>(null);
   const { toast } = useToast();
 
   // API hooks
@@ -392,9 +398,33 @@ export function DocumentsTab({
                               .toUpperCase() || "U"}
                           </AvatarFallback>
                         </Avatar>
-                        <span className="text-sm">
-                          {document.profiles?.full_name || "Bilinmiyor"}
-                        </span>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-sm">
+                            {document.profiles?.full_name || "Bilinmiyor"}
+                          </span>
+                          {document.uploaded_by === SYSTEM_ADMIN_ID && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Badge 
+                                    variant="outline" 
+                                    className="text-xs border-amber-300 text-amber-700 dark:text-amber-400 cursor-pointer hover:bg-amber-50 dark:hover:bg-amber-950/30"
+                                    onClick={() => {
+                                      setSelectedTransferDoc(document);
+                                      setTransferInfoOpen(true);
+                                    }}
+                                  >
+                                    <ArrowRightLeft className="h-3 w-3 mr-1" />
+                                    Transfer
+                                  </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p className="text-xs">Orijinal yükleyeni görmek için tıklayın</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -487,7 +517,7 @@ export function DocumentsTab({
           </div>
         )}
 
-        {filteredDocuments.length === 0 && (
+        {filteredDocuments.length === 0 && !isLoading && (
           <div className="text-center py-12">
             <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
             <h3 className="mt-4 text-lg font-semibold">Doküman bulunamadı</h3>
@@ -503,7 +533,108 @@ export function DocumentsTab({
             )}
           </div>
         )}
+
+        {/* Transfer Info Modal */}
+        <Dialog open={transferInfoOpen} onOpenChange={setTransferInfoOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center space-x-2">
+                <ArrowRightLeft className="h-5 w-5 text-amber-600" />
+                <span>Transfer Bilgisi</span>
+              </DialogTitle>
+              <DialogDescription>
+                Bu doküman silinen bir kullanıcıdan transfer edilmiştir
+              </DialogDescription>
+            </DialogHeader>
+            
+            {selectedTransferDoc && (
+              <TransferInfoContent documentId={selectedTransferDoc.id} />
+            )}
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );
 }
+
+// Transfer info component with data fetching
+function TransferInfoContent({ documentId }: { documentId: string }) {
+  const [transferInfo, setTransferInfo] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Fetch transfer info from user_deletion_transfers
+    const fetchTransferInfo = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(`/api/admin/transfers/document/${documentId}`);
+        const data = await response.json();
+        setTransferInfo(data);
+      } catch (error) {
+        console.error('Error fetching transfer info:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchTransferInfo();
+  }, [documentId]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="h-6 w-6 animate-spin text-amber-600" />
+        <span className="ml-2 text-sm">Yükleniyor...</span>
+      </div>
+    );
+  }
+
+  if (!transferInfo || !transferInfo.found) {
+    return (
+      <div className="text-center py-4 text-sm text-muted-foreground">
+        Transfer bilgisi bulunamadı
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 space-y-3">
+        <div>
+          <p className="text-xs text-muted-foreground mb-1">Orijinal Yükleyen:</p>
+          <p className="font-medium text-amber-900 dark:text-amber-100">
+            {transferInfo.original_uploader_name}
+          </p>
+        </div>
+        
+        <div>
+          <p className="text-xs text-muted-foreground mb-1">Email:</p>
+          <p className="text-sm text-amber-800 dark:text-amber-200">
+            {transferInfo.original_uploader_email}
+          </p>
+        </div>
+        
+        {transferInfo.original_company && (
+          <div>
+            <p className="text-xs text-muted-foreground mb-1">Şirket:</p>
+            <p className="text-sm text-amber-800 dark:text-amber-200">
+              {transferInfo.original_company}
+            </p>
+          </div>
+        )}
+        
+        <div>
+          <p className="text-xs text-muted-foreground mb-1">Kullanıcı Silinme Tarihi:</p>
+          <p className="text-sm text-amber-800 dark:text-amber-200">
+            {new Date(transferInfo.deleted_at).toLocaleString('tr-TR')}
+          </p>
+        </div>
+      </div>
+      
+      <div className="text-xs text-muted-foreground">
+        Bu doküman, kullanıcı silindikten sonra sistem yöneticisine transfer edilmiştir. Doküman içeriği ve metadata korunmuştur.
+      </div>
+    </div>
+  );
+}
+
