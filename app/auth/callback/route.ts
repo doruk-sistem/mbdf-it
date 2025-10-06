@@ -39,9 +39,18 @@ export async function GET(request: NextRequest) {
     }
 
     if (next) {
-      // If next is reset-password, go there directly
+      // If next is reset-password, this is a password recovery flow
       if (next.startsWith('/auth/reset-password')) {
-        return NextResponse.redirect(new URL(next, request.url));
+        // Set a temporary cookie to mark this as a valid recovery session
+        const response = NextResponse.redirect(new URL(next, request.url));
+        response.cookies.set('password_recovery', 'true', {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 300, // 5 minutes - enough time to change password
+          path: '/'
+        });
+        return response;
       }
     }
 

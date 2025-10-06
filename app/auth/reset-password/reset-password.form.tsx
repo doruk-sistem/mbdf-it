@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { updatePassword } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +15,7 @@ export default function ResetPasswordForm() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,7 +38,10 @@ export default function ResetPasswordForm() {
       toast({ title: "Hata", description: result.error || "Bir hata oluştu.", variant: "destructive" });
       return;
     }
-    // updatePassword redirects on success
+    // Success! Show message and redirect
+    // The cookie will be automatically deleted by the server action
+    toast({ title: "Başarılı", description: "Şifreniz başarıyla güncellendi." });
+    setTimeout(() => router.push('/'), 1500);
   };
 
   return (

@@ -29,8 +29,13 @@ export async function middleware(request: NextRequest) {
 
   // Handle authentication routes
   if (isAuthRoute) {
-    // If user is already authenticated and trying to access auth pages, redirect to dashboard
-    if (user && !error && (pathname === '/auth/sign-in' || pathname === '/auth/sign-up' || pathname === '/auth/forgot-password' || pathname === '/auth/reset-password')) {
+    // Allow access to reset-password page even when authenticated (needed for password reset flow)
+    if (pathname === '/auth/reset-password') {
+      return response;
+    }
+    
+    // If user is already authenticated and trying to access other auth pages, redirect to dashboard
+    if (user && !error && (pathname === '/auth/sign-in' || pathname === '/auth/sign-up' || pathname === '/auth/forgot-password')) {
       return NextResponse.redirect(new URL('/', request.url));
     }
     return response;
