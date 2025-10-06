@@ -213,8 +213,13 @@ export const updatePassword = async (newPassword: string) => {
       return { success: false, error: "Şifre güncellenemedi. Lütfen tekrar deneyin." };
     }
 
-    // Successful update → redirect home
-    redirect('/');
+    // Delete the password recovery cookie after successful password update
+    const { cookies } = require('next/headers');
+    const cookieStore = cookies();
+    cookieStore.delete('password_recovery');
+
+    // Successful update - return success so client can redirect
+    return { success: true };
   } catch (error) {
     console.error('Update password error:', error);
     return { success: false, error: "Beklenmeyen bir hata oluştu." };
