@@ -897,7 +897,7 @@ Sorularınız için sistem yöneticinizle iletişime geçin.
   // Room invitation notification
   roomInvitation: {
     subject: (roomName: string) => `MBDF Odası Daveti: ${roomName}`,
-    html: (recipientName: string, roomName: string, inviterName: string, message: string, roomId: string) => `
+    html: (recipientName: string, roomName: string, inviterName: string, message: string, invitationToken: string, isRegistered: boolean) => `
       <!DOCTYPE html>
       <html lang="tr">
       <head>
@@ -991,8 +991,26 @@ Sorularınız için sistem yöneticinizle iletişime geçin.
             ${message || 'Bu odaya katılmak için davet edildiniz.'}
           </div>
           
+          ${!isRegistered ? `
+          <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 16px; margin: 16px 0; color: #856404;">
+            <strong>⚠️ Önemli:</strong><br>
+            Sistemimizde kayıtlı değilsiniz. Daveti kabul etmek için öncelikle:
+            <ol style="margin: 8px 0; padding-left: 20px;">
+              <li>Aşağıdaki linke tıklayın</li>
+              <li>Kayıt olun (${recipientName.includes('@') ? recipientName : 'e-posta adresiniz ile'})</li>
+              <li>Giriş yapın</li>
+              <li>Daveti kabul edin</li>
+            </ol>
+          </div>
+          ` : `
+          <div style="background: #d1fae5; border: 1px solid #10b981; border-radius: 8px; padding: 16px; margin: 16px 0; color: #065f46;">
+            <strong>✅ Kayıtlı Kullanıcı:</strong><br>
+            Daveti kabul etmek için aşağıdaki linke tıklayın. Eğer oturum açmadıysanız, önce giriş yapmanız gerekecek.
+          </div>
+          `}
+          
           <div style="text-align: center;">
-            <a href="${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/mbdf/${roomId}" class="button">Odaya Katıl</a>
+            <a href="${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/invite/${invitationToken}" class="button">✨ Daveti Kabul Et ve Odaya Katıl</a>
           </div>
           
           <div class="content">
@@ -1008,7 +1026,7 @@ Sorularınız için sistem yöneticinizle iletişime geçin.
       </body>
       </html>
     `,
-    text: (recipientName: string, roomName: string, inviterName: string, message: string, roomId: string) => `
+    text: (recipientName: string, roomName: string, inviterName: string, message: string, invitationToken: string, isRegistered: boolean) => `
 MBDF Odası Daveti
 
 Merhaba ${recipientName},
@@ -1018,7 +1036,19 @@ ${roomName}
 
 Davet Mesajı: ${message || 'Bu odaya katılmak için davet edildiniz.'}
 
-Odaya katılmak için: ${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/mbdf/${roomId}
+${!isRegistered ? `
+⚠️ ÖNEMLİ: Sistemimizde kayıtlı değilsiniz.
+Daveti kabul etmek için:
+1. Aşağıdaki linke tıklayın
+2. Kayıt olun (${recipientName.includes('@') ? recipientName : 'e-posta adresiniz ile'})
+3. Giriş yapın
+4. Daveti kabul edin
+` : `
+✅ Kayıtlı kullanıcı: Daveti kabul etmek için linke tıklayın.
+Eğer oturum açmadıysanız, önce giriş yapmanız gerekecek.
+`}
+
+Daveti kabul etmek ve odaya katılmak için: ${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/invite/${invitationToken}
 
 MBDF Odası Nedir?
 MBDF odaları, KKDİK MBDF süreçlerinizi yönetmek, doküman paylaşmak, oylamalar yapmak ve sözleşmeler imzalamak için kullanılan dijital çalışma alanlarıdır.
@@ -1185,11 +1215,11 @@ export function getEmailTemplate(
       text: (template as any).text(memberName, roomName, archiveReason, archivedAt, pendingRejected, approvedRevoked)
     };
   } else if (type === 'roomInvitation') {
-    const [recipientName, roomName, inviterName, message, roomId] = Object.values(params) as [string, string, string, string, string];
+    const [recipientName, roomName, inviterName, message, invitationToken, isRegistered] = Object.values(params) as [string, string, string, string, string, boolean];
     return {
       subject: (template as any).subject(roomName),
-      html: (template as any).html(recipientName, roomName, inviterName, message, roomId),
-      text: (template as any).text(recipientName, roomName, inviterName, message, roomId)
+      html: (template as any).html(recipientName, roomName, inviterName, message, invitationToken, isRegistered),
+      text: (template as any).text(recipientName, roomName, inviterName, message, invitationToken, isRegistered)
     };
   } else if (type === 'roomUnarchived') {
     const [memberName, roomName, unarchivedAt] = Object.values(params) as [string, string, string];

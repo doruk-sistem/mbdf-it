@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase, createAdminSupabase } from '@/lib/supabase';
 import { sendEmail } from '@/lib/email';
+import crypto from 'crypto';
 
 interface RouteParams {
   params: {
     roomId: string;
   };
+}
+
+// Generate a secure random token
+function generateInvitationToken(): string {
+  return crypto.randomBytes(32).toString('hex');
 }
 
 export async function POST(
@@ -80,9 +86,14 @@ export async function POST(
       .single();
 
     let recipientName = 'Kullanıcı';
+    let isRegistered = false;
     if (existingUser && !userError) {
       const user = existingUser as { id: string; full_name: string | null; email: string };
       recipientName = user.full_name || user.email || 'Kullanıcı';
+      isRegistered = true;
+    } else {
+      // User not registered, use email as name
+      recipientName = email;
     }
 
     // Get inviter's name
@@ -94,7 +105,72 @@ export async function POST(
 
     const actualInviterName = inviterProfile?.full_name || inviterName || 'MBDF Üyesi';
 
-    // Send invitation email
+    // Check if user is already a member of the room
+    if (existingUser) {
+      const { data: existingMember } = await adminSupabase
+        .from("mbdf_member")
+        .select("id")
+        .eq("room_id", roomId)
+        .eq("user_id", (existingUser as any).id)
+        .single();
+
+      if (existingMember) {
+        return NextResponse.json({ 
+          success: false,
+          error: 'Bu kullanıcı zaten odanın bir üyesidir' 
+        }, { status: 400 });
+      }
+    }
+
+    // Check if there's already a pending invitation for this email and room
+    const { data: existingInvitation } = await adminSupabase
+      .from("room_invitations")
+      .select("id, status, expires_at")
+      .eq("room_id", roomId)
+      .eq("email", email)
+      .eq("status", "pending")
+      .gt("expires_at", new Date().toISOString())
+      .single();
+
+    if (existingInvitation) {
+      return NextResponse.json({ 
+        success: false,
+        error: 'Bu e-posta adresi için aktif bir davet zaten mevcut' 
+      }, { status: 400 });
+    }
+
+    // Generate invitation token
+    const invitationToken = generateInvitationToken();
+    
+    // Set expiration date (7 days from now)
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+
+    // Create invitation record in database
+    const { data: invitation, error: invitationError } = await adminSupabase
+      .from("room_invitations")
+      .insert({
+        room_id: roomId,
+        email: email,
+        token: invitationToken,
+        invited_by: user.id,
+        status: 'pending',
+        message: message || null,
+        expires_at: expiresAt.toISOString()
+      } as any)
+      .select()
+      .single() as any;
+
+    if (invitationError || !invitation) {
+      console.error('Error creating invitation:', invitationError);
+      return NextResponse.json({ 
+        success: false,
+        error: 'Davet oluşturulamadı',
+        details: invitationError?.message
+      }, { status: 500 });
+    }
+
+    // Send invitation email with token
     try {
       const emailResult = await sendEmail({
         to: email,
@@ -104,7 +180,8 @@ export async function POST(
           roomName: roomName,
           inviterName: actualInviterName,
           message: message || '',
-          roomId: roomId
+          invitationToken: invitationToken,
+          isRegistered: isRegistered
         }
       });
 
@@ -119,21 +196,30 @@ export async function POST(
           resource_id: roomId,
           new_values: { 
             invited_email: email,
+            invitation_id: (invitation as any).id,
             invitation_message: message || '',
             inviter_name: actualInviterName,
+            expires_at: expiresAt.toISOString(),
             email_result: emailResult
           }
         });
 
       return NextResponse.json({ 
         success: true, 
-        message: emailResult.message || 'Invitation sent successfully',
+        message: emailResult.message || 'Davet başarıyla gönderildi',
         recipientEmail: email,
+        invitationId: (invitation as any).id,
+        expiresAt: expiresAt.toISOString(),
         emailResult: emailResult
       });
 
     } catch (emailError) {
-      
+      // Delete the invitation if email fails
+      await adminSupabase
+        .from("room_invitations")
+        .delete()
+        .eq("id", (invitation as any).id);
+
       // Log the failed invitation attempt
       await supabase
         .from("audit_log")
@@ -153,7 +239,7 @@ export async function POST(
 
       return NextResponse.json({ 
         success: false,
-        error: 'Failed to send invitation email',
+        error: 'Davet e-postası gönderilemedi',
         details: (emailError as Error).message,
         recipientEmail: email
       }, { status: 500 });
