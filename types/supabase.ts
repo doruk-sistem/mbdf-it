@@ -577,6 +577,47 @@ export interface Database {
           updated_at?: string
         }
       }
+      room_invitations: {
+        Row: {
+          accepted_at: string | null
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          invited_by: string
+          message: string | null
+          room_id: string
+          status: Database["public"]["Enums"]["invitation_status"]
+          token: string
+          updated_at: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string
+          email: string
+          expires_at: string
+          id?: string
+          invited_by: string
+          message?: string | null
+          room_id: string
+          status?: Database["public"]["Enums"]["invitation_status"]
+          token: string
+          updated_at?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          invited_by?: string
+          message?: string | null
+          room_id?: string
+          status?: Database["public"]["Enums"]["invitation_status"]
+          token?: string
+          updated_at?: string
+        }
+      }
       substance: {
         Row: {
           cas_number: string | null
@@ -614,6 +655,7 @@ export interface Database {
       [_ in never]: never
     }
     Enums: {
+      invitation_status: "pending" | "accepted" | "rejected" | "expired"
       kks_status: "draft" | "submitted" | "sent"
       request_status: "pending" | "approved" | "rejected"
       room_status: "active" | "closed" | "archived"
