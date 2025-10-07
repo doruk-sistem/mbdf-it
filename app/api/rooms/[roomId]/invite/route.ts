@@ -31,7 +31,7 @@ export async function POST(
 
     // Parse request body
     const body = await request.json();
-    const { email, message, roomName, inviterName } = body;
+    const { email, message, roomName, inviterName, recipientName, recipientCompany } = body;
 
     if (!email || !roomName) {
       return NextResponse.json({ 
@@ -85,15 +85,26 @@ export async function POST(
       .eq("email", email)
       .single();
 
-    let recipientName = 'Kullanıcı';
+    // Determine recipient name - Priority: CSV name > DB name > Email
+    let finalRecipientName = 'Kullanıcı';
     let isRegistered = false;
-    if (existingUser && !userError) {
+    
+    if (recipientName && recipientName !== email) {
+      // Use name from CSV if provided and not just email
+      finalRecipientName = recipientName;
+    } else if (existingUser && !userError) {
+      // Use name from database if user is registered
       const user = existingUser as { id: string; full_name: string | null; email: string };
-      recipientName = user.full_name || user.email || 'Kullanıcı';
+      finalRecipientName = user.full_name || user.email || 'Kullanıcı';
       isRegistered = true;
     } else {
-      // User not registered, use email as name
-      recipientName = email;
+      // Fallback to email
+      finalRecipientName = email;
+    }
+    
+    // Check if user is registered
+    if (existingUser && !userError) {
+      isRegistered = true;
     }
 
     // Get inviter's name
@@ -176,12 +187,13 @@ export async function POST(
         to: email,
         template: 'roomInvitation',
         data: {
-          recipientName,
+          recipientName: finalRecipientName,
           roomName: roomName,
           inviterName: actualInviterName,
           message: message || '',
           invitationToken: invitationToken,
-          isRegistered: isRegistered
+          isRegistered: isRegistered,
+          recipientCompany: recipientCompany || null
         }
       });
 
@@ -199,6 +211,8 @@ export async function POST(
             invitation_id: (invitation as any).id,
             invitation_message: message || '',
             inviter_name: actualInviterName,
+            recipient_name: finalRecipientName,
+            recipient_company: recipientCompany || null,
             expires_at: expiresAt.toISOString(),
             email_result: emailResult
           }
