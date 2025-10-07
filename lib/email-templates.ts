@@ -897,7 +897,7 @@ Sorularınız için sistem yöneticinizle iletişime geçin.
   // Room invitation notification
   roomInvitation: {
     subject: (roomName: string) => `MBDF Odası Daveti: ${roomName}`,
-    html: (recipientName: string, roomName: string, inviterName: string, message: string, invitationToken: string, isRegistered: boolean) => `
+    html: (recipientName: string, roomName: string, inviterName: string, message: string, invitationToken: string, isRegistered: boolean, recipientCompany?: string | null) => `
       <!DOCTYPE html>
       <html lang="tr">
       <head>
@@ -982,6 +982,7 @@ Sorularınız için sistem yöneticinizle iletişime geçin.
           
           <div class="content">
             <p>Merhaba ${recipientName},</p>
+            ${recipientCompany ? `<p style="color: #64748b; font-size: 14px;">🏢 ${recipientCompany}</p>` : ''}
             <p><strong>${inviterName}</strong> sizi aşağıdaki MBDF odasına davet etti:</p>
             <p><strong>${roomName}</strong></p>
           </div>
@@ -1026,11 +1027,11 @@ Sorularınız için sistem yöneticinizle iletişime geçin.
       </body>
       </html>
     `,
-    text: (recipientName: string, roomName: string, inviterName: string, message: string, invitationToken: string, isRegistered: boolean) => `
+    text: (recipientName: string, roomName: string, inviterName: string, message: string, invitationToken: string, isRegistered: boolean, recipientCompany?: string | null) => `
 MBDF Odası Daveti
 
 Merhaba ${recipientName},
-
+${recipientCompany ? `🏢 ${recipientCompany}\n` : ''}
 ${inviterName} sizi aşağıdaki MBDF odasına davet etti:
 ${roomName}
 
@@ -1215,11 +1216,11 @@ export function getEmailTemplate(
       text: (template as any).text(memberName, roomName, archiveReason, archivedAt, pendingRejected, approvedRevoked)
     };
   } else if (type === 'roomInvitation') {
-    const [recipientName, roomName, inviterName, message, invitationToken, isRegistered] = Object.values(params) as [string, string, string, string, string, boolean];
+    const [recipientName, roomName, inviterName, message, invitationToken, isRegistered, recipientCompany] = Object.values(params) as [string, string, string, string, string, boolean, string | null];
     return {
       subject: (template as any).subject(roomName),
-      html: (template as any).html(recipientName, roomName, inviterName, message, invitationToken, isRegistered),
-      text: (template as any).text(recipientName, roomName, inviterName, message, invitationToken, isRegistered)
+      html: (template as any).html(recipientName, roomName, inviterName, message, invitationToken, isRegistered, recipientCompany),
+      text: (template as any).text(recipientName, roomName, inviterName, message, invitationToken, isRegistered, recipientCompany)
     };
   } else if (type === 'roomUnarchived') {
     const [memberName, roomName, unarchivedAt] = Object.values(params) as [string, string, string];
