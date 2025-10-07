@@ -32,7 +32,7 @@ export async function GET(
       .from("room_invitations")
       .select("room_id, email")
       .eq("token", token)
-      .single();
+      .single() as any;
 
     if (invitationError || !invitation) {
       return NextResponse.json({ 
@@ -44,16 +44,16 @@ export async function GET(
     const { data: existingMember } = await adminSupabase
       .from("mbdf_member")
       .select("id, role")
-      .eq("room_id", invitation.room_id)
+      .eq("room_id", (invitation as any).room_id)
       .eq("user_id", user.id)
       .single();
 
     return NextResponse.json({ 
       isMember: !!existingMember,
       requiresAuth: false,
-      emailMatch: user.email === invitation.email,
+      emailMatch: user.email === (invitation as any).email,
       currentEmail: user.email,
-      invitedEmail: invitation.email
+      invitedEmail: (invitation as any).email
     });
 
   } catch (error) {
