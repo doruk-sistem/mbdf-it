@@ -304,20 +304,20 @@ export function InviteModal({ roomId, roomName, open, onOpenChange }: InviteModa
 
     setIsLoading(false);
 
-    // Reset after success
-    if (successCount > 0) {
+    // Eğer %100 başarılıysa, 3 saniye sonra otomatik kapat
+    if (failedCount === 0 && successCount > 0) {
       setTimeout(() => {
         handleRemoveFile();
         setMessage("");
         onOpenChange(false);
-      }, 2000);
+      }, 3000);
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center space-x-2">
             <UserPlus className="h-5 w-5" />
             <span>Odaya Davet Et</span>
@@ -327,8 +327,8 @@ export function InviteModal({ roomId, roomName, open, onOpenChange }: InviteModa
           </DialogTitle>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col flex-1 overflow-hidden">
+          <TabsList className="grid w-full grid-cols-2 flex-shrink-0">
             <TabsTrigger value="manual" className="flex items-center space-x-2">
               <Mail className="h-4 w-4" />
               <span>Manuel Davet</span>
@@ -339,7 +339,7 @@ export function InviteModal({ roomId, roomName, open, onOpenChange }: InviteModa
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="manual" className="space-y-4">
+          <TabsContent value="manual" className="space-y-4 overflow-y-auto pr-2">
             <Card>
               <CardHeader>
                 <CardTitle className="text-sm">E-posta ile Davet Et</CardTitle>
@@ -391,7 +391,7 @@ export function InviteModal({ roomId, roomName, open, onOpenChange }: InviteModa
             </Card>
           </TabsContent>
 
-          <TabsContent value="file" className="space-y-4">
+          <TabsContent value="file" className="space-y-4 overflow-y-auto pr-2">
             <Card>
               <CardHeader>
                 <CardTitle className="text-sm">Dosya ile Toplu Davet</CardTitle>
@@ -449,6 +449,32 @@ export function InviteModal({ roomId, roomName, open, onOpenChange }: InviteModa
                   </div>
                 )}
 
+                {/* Dosya yüklendi ama boş */}
+                {uploadedFile && !isProcessing && parsedEmails.length === 0 && (
+                  <div className="bg-red-50 border-2 border-red-300 rounded-lg p-6">
+                    <div className="flex flex-col items-center space-y-3">
+                      <AlertCircle className="h-12 w-12 text-red-600" />
+                      <div className="text-center">
+                        <p className="font-bold text-red-900 mb-2">❌ Dosya Boş!</p>
+                        <p className="text-sm text-red-700 mb-1">
+                          Yüklediğiniz dosyada hiç e-posta bulunamadı.
+                        </p>
+                        <p className="text-xs text-red-600 mb-4">
+                          Dosyanızda "email" sütunu olduğundan ve içerisinde e-posta adreslerinin bulunduğundan emin olun.
+                        </p>
+                      </div>
+                      <Button 
+                        onClick={handleRemoveFile}
+                        variant="destructive"
+                        className="w-full"
+                      >
+                        <Upload className="mr-2 h-4 w-4" />
+                        Yeni Dosya Yükle
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
                 {/* File Preview */}
                 {uploadedFile && !isProcessing && parsedEmails.length > 0 && (
                   <>
@@ -475,120 +501,193 @@ export function InviteModal({ roomId, roomName, open, onOpenChange }: InviteModa
                       </div>
                     </div>
 
-                    {/* Email List Preview */}
-                    <div className="border rounded-lg p-4 max-h-60 overflow-y-auto">
-                      <p className="text-sm font-medium mb-3">E-posta Listesi:</p>
-                      <div className="space-y-2">
-                        {parsedEmails.slice(0, 10).map((emailData, index) => (
-                          <div
-                            key={index}
-                            className={`flex items-center justify-between text-sm p-2 rounded ${
-                              emailData.valid 
-                                ? 'bg-green-50 text-green-800' 
-                                : 'bg-red-50 text-red-800'
-                            }`}
-                          >
-                            <div className="flex items-center space-x-2">
-                              {emailData.valid ? (
-                                <CheckCircle className="h-4 w-4 text-green-600" />
-                              ) : (
-                                <AlertCircle className="h-4 w-4 text-red-600" />
-                              )}
-                              <span className="font-medium">{emailData.email}</span>
-                              {emailData.name && (
-                                <span className="text-xs">({emailData.name})</span>
-                              )}
-                            </div>
-                            {!emailData.valid && (
-                              <span className="text-xs">{emailData.error}</span>
+                    {/* Geçerli e-posta yoksa uyarı */}
+                    {parsedEmails.filter(e => e.valid).length === 0 && (
+                      <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4">
+                        <div className="flex items-start space-x-3">
+                          <AlertCircle className="h-6 w-6 text-red-600 flex-shrink-0 mt-0.5" />
+                          <div className="flex-1">
+                            <p className="font-bold text-red-900 mb-1">❌ Geçerli E-posta Bulunamadı!</p>
+                            <p className="text-sm text-red-700 mb-3">
+                              Dosyanızda hiç geçerli e-posta adresi bulunamadı. Lütfen dosyanızı kontrol edip yeni bir dosya yükleyin.
+                            </p>
+                            <Button 
+                              onClick={handleRemoveFile}
+                              variant="destructive"
+                              size="sm"
+                              className="w-full"
+                            >
+                              <Upload className="mr-2 h-4 w-4" />
+                              Yeni Dosya Yükle
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Email List Preview - Sadece geçerli e-posta varsa göster */}
+                    {parsedEmails.filter(e => e.valid).length > 0 && (
+                      <>
+                        {/* Email List Preview */}
+                        <div className="border rounded-lg p-4 max-h-40 overflow-y-auto">
+                          <p className="text-sm font-medium mb-3">E-posta Listesi:</p>
+                          <div className="space-y-2">
+                            {parsedEmails.slice(0, 5).map((emailData, index) => (
+                              <div
+                                key={index}
+                                className={`flex items-center justify-between text-sm p-2 rounded ${
+                                  emailData.valid 
+                                    ? 'bg-green-50 text-green-800' 
+                                    : 'bg-red-50 text-red-800'
+                                }`}
+                              >
+                                <div className="flex items-center space-x-2 truncate">
+                                  {emailData.valid ? (
+                                    <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
+                                  ) : (
+                                    <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0" />
+                                  )}
+                                  <span className="font-medium truncate">{emailData.email}</span>
+                                  {emailData.name && (
+                                    <span className="text-xs truncate">({emailData.name})</span>
+                                  )}
+                                </div>
+                                {!emailData.valid && (
+                                  <span className="text-xs flex-shrink-0 ml-2">{emailData.error}</span>
+                                )}
+                              </div>
+                            ))}
+                            {parsedEmails.length > 5 && (
+                              <p className="text-xs text-gray-500 text-center pt-2">
+                                ... ve {parsedEmails.length - 5} kişi daha
+                              </p>
                             )}
                           </div>
-                        ))}
-                        {parsedEmails.length > 10 && (
-                          <p className="text-xs text-gray-500 text-center pt-2">
-                            ... ve {parsedEmails.length - 10} kişi daha
-                          </p>
-                        )}
-                      </div>
-                    </div>
+                        </div>
 
-                    {/* Stats */}
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                        <p className="text-xs text-green-700">Geçerli</p>
-                        <p className="text-2xl font-bold text-green-900">
-                          {parsedEmails.filter(e => e.valid).length}
-                        </p>
-                      </div>
-                      <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                        <p className="text-xs text-red-700">Geçersiz</p>
-                        <p className="text-2xl font-bold text-red-900">
-                          {parsedEmails.filter(e => !e.valid).length}
-                        </p>
-                      </div>
-                    </div>
+                        {/* Stats */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                            <p className="text-xs text-green-700">Geçerli</p>
+                            <p className="text-2xl font-bold text-green-900">
+                              {parsedEmails.filter(e => e.valid).length}
+                            </p>
+                          </div>
+                          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                            <p className="text-xs text-red-700">Geçersiz</p>
+                            <p className="text-2xl font-bold text-red-900">
+                              {parsedEmails.filter(e => !e.valid).length}
+                            </p>
+                          </div>
+                        </div>
 
-                    {/* Message Input */}
-                    <div className="space-y-2">
-                      <Label htmlFor="bulk-message">Davet Mesajı (Tümü için)</Label>
-                      <Textarea
-                        id="bulk-message"
-                        placeholder="Toplu davet mesajınızı buraya yazın..."
-                        value={message}
-                        onChange={(e) => setMessage(e.target.value)}
-                        rows={3}
-                      />
-                    </div>
+                        {/* Message Input */}
+                        <div className="space-y-2">
+                          <Label htmlFor="bulk-message">Davet Mesajı (Tümü için)</Label>
+                          <Textarea
+                            id="bulk-message"
+                            placeholder="Toplu davet mesajınızı buraya yazın..."
+                            value={message}
+                            onChange={(e) => setMessage(e.target.value)}
+                            rows={3}
+                          />
+                        </div>
 
-                    {/* Send Button */}
-                    <Button 
-                      onClick={handleBulkInvite}
-                      disabled={isLoading || parsedEmails.filter(e => e.valid).length === 0}
-                      className="w-full"
-                    >
-                      {isLoading ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Davetler Gönderiliyor... ({bulkResults.length}/{parsedEmails.filter(e => e.valid).length})
-                        </>
-                      ) : (
-                        <>
-                          <Mail className="mr-2 h-4 w-4" />
-                          {parsedEmails.filter(e => e.valid).length} Kişiye Davet Gönder
-                        </>
-                      )}
-                    </Button>
+                        {/* Send Button */}
+                        <Button 
+                          onClick={handleBulkInvite}
+                          disabled={isLoading || parsedEmails.filter(e => e.valid).length === 0}
+                          className="w-full"
+                        >
+                          {isLoading ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Davetler Gönderiliyor... ({bulkResults.length}/{parsedEmails.filter(e => e.valid).length})
+                            </>
+                          ) : (
+                            <>
+                              <Mail className="mr-2 h-4 w-4" />
+                              {parsedEmails.filter(e => e.valid).length} Kişiye Davet Gönder
+                            </>
+                          )}
+                        </Button>
+                      </>
+                    )}
                   </>
                 )}
 
                 {/* Results */}
                 {bulkResults.length > 0 && (
-                  <div className="border rounded-lg p-4">
-                    <p className="text-sm font-medium mb-3">Sonuçlar:</p>
-                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                  <div className={`border-2 rounded-lg p-4 ${
+                    bulkResults.filter(r => r.status === 'failed').length === 0 
+                      ? 'border-green-500 bg-green-50' 
+                      : 'border-blue-500 bg-blue-50'
+                  }`}>
+                    <div className="flex items-center justify-between mb-3">
+                      <p className={`text-sm font-bold ${
+                        bulkResults.filter(r => r.status === 'failed').length === 0 
+                          ? 'text-green-900' 
+                          : 'text-blue-900'
+                      }`}>
+                        {bulkResults.filter(r => r.status === 'failed').length === 0 
+                          ? '✅ Tüm Davetler Başarıyla Gönderildi!' 
+                          : '📊 Gönderim Sonuçları'}
+                      </p>
+                      <div className="flex items-center space-x-2">
+                        <Badge variant="default" className="bg-green-600">
+                          ✓ {bulkResults.filter(r => r.status === 'success').length}
+                        </Badge>
+                        {bulkResults.filter(r => r.status === 'failed').length > 0 && (
+                          <Badge variant="destructive">
+                            ✗ {bulkResults.filter(r => r.status === 'failed').length}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    <div className="space-y-2 max-h-48 overflow-y-auto bg-white rounded p-2">
                       {bulkResults.map((result, index) => (
                         <div
                           key={index}
                           className={`flex items-center justify-between text-sm p-2 rounded ${
                             result.status === 'success' 
-                              ? 'bg-green-50 text-green-800' 
-                              : 'bg-red-50 text-red-800'
+                              ? 'bg-green-50 text-green-800 border border-green-200' 
+                              : 'bg-red-50 text-red-800 border border-red-200'
                           }`}
                         >
-                          <div className="flex items-center space-x-2">
+                          <div className="flex items-center space-x-2 truncate flex-1">
                             {result.status === 'success' ? (
-                              <CheckCircle className="h-4 w-4 text-green-600" />
+                              <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
                             ) : (
-                              <X className="h-4 w-4 text-red-600" />
+                              <X className="h-4 w-4 text-red-600 flex-shrink-0" />
                             )}
-                            <span>{result.email}</span>
+                            <span className="truncate">{result.email}</span>
                           </div>
                           {result.status === 'failed' && result.reason && (
-                            <span className="text-xs">{result.reason}</span>
+                            <span className="text-xs flex-shrink-0 ml-2 bg-red-100 px-2 py-1 rounded">
+                              {result.reason}
+                            </span>
                           )}
                         </div>
                       ))}
                     </div>
+                    {bulkResults.filter(r => r.status === 'failed').length === 0 ? (
+                      <p className="text-center text-sm text-green-700 mt-3 italic">
+                        Modal 3 saniye sonra otomatik kapanacak...
+                      </p>
+                    ) : (
+                      <Button 
+                        onClick={() => {
+                          handleRemoveFile();
+                          setMessage("");
+                          onOpenChange(false);
+                        }}
+                        className="w-full mt-4"
+                        variant="default"
+                      >
+                        <CheckCircle className="mr-2 h-4 w-4" />
+                        Sonuçları Gördüm, Kapat
+                      </Button>
+                    )}
                   </div>
                 )}
 
@@ -597,7 +696,7 @@ export function InviteModal({ roomId, roomName, open, onOpenChange }: InviteModa
           </TabsContent>
         </Tabs>
 
-        <div className="flex items-center justify-between pt-4 border-t">
+        <div className="flex items-center justify-between pt-4 border-t flex-shrink-0">
           <div className="flex items-center space-x-2 text-sm text-muted-foreground">
             <Users className="h-4 w-4" />
             <span>Davet edilen kişiler e-posta ile bilgilendirilecek</span>
