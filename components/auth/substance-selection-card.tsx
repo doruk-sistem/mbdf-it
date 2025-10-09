@@ -253,7 +253,11 @@ export function SubstanceSelectionCard({
 
   const handleSkipRoomCreation = () => {
     setShowCreateRoomDialog(false);
-    onComplete();
+    // Clear selections so user can select another substance
+    setSelectedSubstances([]);
+    setSubstancesWithoutRooms([]);
+    setRoomDetails({});
+    // Don't call onComplete() - let user select another substance
   };
 
   const handleRoomDetailChange = (
