@@ -905,123 +905,363 @@ Sorularınız için sistem yöneticinizle iletişime geçin.
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>MBDF Odası Daveti</title>
         <style>
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
           body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
-            line-height: 1.6;
-            color: #333;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Helvetica Neue', sans-serif;
+            line-height: 1.7;
+            color: #1e293b;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px 20px;
+            margin: 0;
+          }
+          .email-wrapper {
             max-width: 600px;
             margin: 0 auto;
-            padding: 20px;
-            background-color: #f8fafc;
           }
           .container {
             background: white;
-            border-radius: 16px;
-            padding: 40px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border-radius: 24px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
           }
           .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 48px 40px 40px;
             text-align: center;
-            margin-bottom: 32px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+          }
+          .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            animation: pulse 15s ease-in-out infinite;
+          }
+          @keyframes pulse {
+            0%, 100% { transform: scale(1) translate(0, 0); }
+            50% { transform: scale(1.1) translate(-5%, -5%); }
+          }
+          .logo-container {
+            position: relative;
+            z-index: 1;
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            padding: 20px 32px;
+            border-radius: 16px;
+            margin-bottom: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
           }
           .logo {
-            font-size: 24px;
-            font-weight: bold;
-            color: #3b82f6;
-            margin-bottom: 8px;
+            font-size: 32px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.2);
           }
-          .title {
+          .header-title {
+            position: relative;
+            z-index: 1;
+            font-size: 28px;
+            font-weight: 700;
+            margin-top: 16px;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+          }
+          .header-subtitle {
+            position: relative;
+            z-index: 1;
+            font-size: 16px;
+            opacity: 0.95;
+            margin-top: 8px;
+            font-weight: 400;
+          }
+          .content-wrapper {
+            padding: 40px;
+          }
+          .greeting {
             font-size: 20px;
             font-weight: 600;
-            margin-bottom: 16px;
             color: #1e293b;
+            margin-bottom: 24px;
           }
-          .content {
-            margin-bottom: 32px;
+          .inviter-section {
+            background: linear-gradient(135deg, #f0f4ff 0%, #e8eeff 100%);
+            border-left: 4px solid #667eea;
+            border-radius: 12px;
+            padding: 24px;
+            margin: 24px 0;
+          }
+          .inviter-name {
+            font-size: 18px;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+          }
+          .room-name {
+            font-size: 22px;
+            font-weight: 700;
+            color: #1e293b;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin: 8px 0;
+          }
+          ${recipientCompany ? `
+          .company-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: #f1f5f9;
             color: #64748b;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            margin-top: 8px;
+          }
+          ` : ''}
+          .message-box {
+            background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+            border: 2px dashed #fb923c;
+            border-radius: 16px;
+            padding: 24px;
+            margin: 24px 0;
+            position: relative;
+          }
+          .message-icon {
+            position: absolute;
+            top: -16px;
+            left: 24px;
+            background: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 700;
+            color: #fb923c;
+            box-shadow: 0 4px 12px rgba(251, 146, 60, 0.2);
+          }
+          .message-content {
+            margin-top: 16px;
+            color: #92400e;
+            font-size: 15px;
+            line-height: 1.6;
+            font-style: italic;
+          }
+          .status-box {
+            border-radius: 16px;
+            padding: 24px;
+            margin: 24px 0;
+            ${!isRegistered ? `
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border: 2px solid #fbbf24;
+            ` : `
+            background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+            border: 2px solid #10b981;
+            `}
+          }
+          .status-title {
+            font-size: 16px;
+            font-weight: 700;
+            ${!isRegistered ? `color: #92400e;` : `color: #065f46;`}
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+          }
+          .status-content {
+            ${!isRegistered ? `color: #78350f;` : `color: #047857;`}
+            font-size: 14px;
+            line-height: 1.6;
+          }
+          .status-steps {
+            margin: 12px 0 0 0;
+            padding-left: 20px;
+          }
+          .status-steps li {
+            margin: 6px 0;
+            line-height: 1.5;
+          }
+          .button-container {
+            text-align: center;
+            margin: 32px 0;
           }
           .button {
             display: inline-block;
-            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-            color: white;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white !important;
             text-decoration: none;
-            padding: 16px 32px;
-            border-radius: 12px;
-            font-weight: 600;
-            text-align: center;
-            margin: 16px 0;
-            transition: transform 0.2s;
+            padding: 18px 40px;
+            border-radius: 14px;
+            font-weight: 700;
+            font-size: 16px;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+            transition: all 0.3s ease;
           }
-          .button:hover {
-            transform: translateY(-1px);
+          .info-section {
+            background: #f8fafc;
+            border-radius: 16px;
+            padding: 28px;
+            margin: 24px 0;
+            border: 1px solid #e2e8f0;
           }
-          .invitation-box {
-            background: #eff6ff;
-            border: 1px solid #3b82f6;
-            border-radius: 8px;
-            padding: 16px;
-            margin: 16px 0;
-            color: #1e40af;
+          .info-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
           }
-          .footer {
-            text-align: center;
-            margin-top: 32px;
-            padding-top: 32px;
-            border-top: 1px solid #e2e8f0;
+          .info-text {
             color: #64748b;
             font-size: 14px;
+            line-height: 1.7;
+          }
+          .features-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 16px;
+          }
+          .feature-item {
+            background: white;
+            border-radius: 10px;
+            padding: 12px;
+            font-size: 13px;
+            color: #475569;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid #e2e8f0;
+          }
+          .footer {
+            background: #f8fafc;
+            text-align: center;
+            padding: 32px 40px;
+            border-top: 1px solid #e2e8f0;
+          }
+          .footer-text {
+            color: #94a3b8;
+            font-size: 13px;
+            line-height: 1.6;
+            margin: 4px 0;
+          }
+          .footer-brand {
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+          }
+          @media only screen and (max-width: 600px) {
+            .content-wrapper {
+              padding: 24px;
+            }
+            .features-grid {
+              grid-template-columns: 1fr;
+            }
+            .header-title {
+              font-size: 24px;
+            }
+            .button {
+              padding: 16px 32px;
+              font-size: 15px;
+            }
           }
         </style>
       </head>
       <body>
-        <div class="container">
-          <div class="header">
-            <div class="logo">🏢 MBDF-IT</div>
-            <h1 class="title">MBDF Odası Daveti</h1>
-          </div>
-          
-          <div class="content">
-            <p>Merhaba ${recipientName},</p>
-            ${recipientCompany ? `<p style="color: #64748b; font-size: 14px;">🏢 ${recipientCompany}</p>` : ''}
-            <p><strong>${inviterName}</strong> sizi aşağıdaki MBDF odasına davet etti:</p>
-            <p><strong>${roomName}</strong></p>
-          </div>
-          
-          <div class="invitation-box">
-            <strong>📋 Davet Mesajı:</strong><br>
-            ${message || 'Bu odaya katılmak için davet edildiniz.'}
-          </div>
-          
-          ${!isRegistered ? `
-          <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 16px; margin: 16px 0; color: #856404;">
-            <strong>⚠️ Önemli:</strong><br>
-            Sistemimizde kayıtlı değilsiniz. Daveti kabul etmek için öncelikle:
-            <ol style="margin: 8px 0; padding-left: 20px;">
-              <li>Aşağıdaki linke tıklayın</li>
-              <li>Kayıt olun (${recipientName.includes('@') ? recipientName : 'e-posta adresiniz ile'})</li>
-              <li>Giriş yapın</li>
-              <li>Daveti kabul edin</li>
-            </ol>
-          </div>
-          ` : `
-          <div style="background: #d1fae5; border: 1px solid #10b981; border-radius: 8px; padding: 16px; margin: 16px 0; color: #065f46;">
-            <strong>✅ Kayıtlı Kullanıcı:</strong><br>
-            Daveti kabul etmek için aşağıdaki linke tıklayın. Eğer oturum açmadıysanız, önce giriş yapmanız gerekecek.
-          </div>
-          `}
-          
-          <div style="text-align: center;">
-            <a href="${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/invite/${invitationToken}" class="button">✨ Daveti Kabul Et ve Odaya Katıl</a>
-          </div>
-          
-          <div class="content">
-            <p><strong>MBDF Odası Nedir?</strong></p>
-            <p>MBDF odaları, KKDİK MBDF süreçlerinizi yönetmek, doküman paylaşmak, oylamalar yapmak ve sözleşmeler imzalamak için kullanılan dijital çalışma alanlarıdır.</p>
-          </div>
-          
-          <div class="footer">
-            <p>Bu e-posta MBDF-IT Portal tarafından otomatik olarak gönderilmiştir.</p>
-            <p>Herhangi bir sorunuz varsa lütfen sistem yöneticinizle iletişime geçin.</p>
+        <div class="email-wrapper">
+          <div class="container">
+            <div class="header">
+              <div class="logo-container">
+                <div class="logo">🏢 MBDF-IT</div>
+              </div>
+              <div class="header-title">MBDF Odası Daveti</div>
+              <div class="header-subtitle">Yeni bir işbirliği fırsatı sizi bekliyor</div>
+            </div>
+            
+            <div class="content-wrapper">
+              <div class="greeting">Merhaba ${recipientName}! 👋</div>
+              
+              <div class="inviter-section">
+                <div class="inviter-name">
+                  <span>👤</span>
+                  <span>${inviterName}</span>
+                </div>
+                <div style="color: #64748b; font-size: 14px; margin-bottom: 12px;">sizi aşağıdaki MBDF odasına davet etti:</div>
+                <div class="room-name">📦 ${roomName}</div>
+                ${recipientCompany ? `<div class="company-badge"><span>🏢</span> ${recipientCompany}</div>` : ''}
+              </div>
+              
+              ${message && message.trim() ? `
+              <div class="message-box">
+                <div class="message-icon">💬 Davet Mesajı</div>
+                <div class="message-content">"${message}"</div>
+              </div>
+              ` : ''}
+              
+              <div class="status-box">
+                <div class="status-title">
+                  ${!isRegistered ? `<span>⚠️</span> <span>Önemli Bilgi</span>` : `<span>✅</span> <span>Kayıtlı Kullanıcı</span>`}
+                </div>
+                <div class="status-content">
+                  ${!isRegistered ? `
+                    <p>Sistemimizde kayıtlı değilsiniz. Daveti kabul etmek için aşağıdaki adımları izleyin:</p>
+                    <ol class="status-steps">
+                      <li>👇 Aşağıdaki butona tıklayın</li>
+                      <li>📝 Kayıt formunu doldurun</li>
+                      <li>🔐 Sisteme giriş yapın</li>
+                      <li>✨ Daveti kabul edin ve odaya katılın</li>
+                    </ol>
+                  ` : `
+                    <p>Sistemde kayıtlı bir kullanıcısınız! Daveti kabul etmek için aşağıdaki butona tıklamanız yeterli. Eğer oturumunuz açık değilse, önce giriş yapmanız istenecektir.</p>
+                  `}
+                </div>
+              </div>
+              
+              <div class="button-container">
+                <a href="${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/invite/${invitationToken}" class="button">
+                  ✨ Daveti Kabul Et ve Odaya Katıl
+                </a>
+              </div>
+              
+              <div class="info-section">
+                <div class="info-title">
+                  <span>💡</span>
+                  <span>MBDF Odası Nedir?</span>
+                </div>
+                <div class="info-text">
+                  MBDF odaları, KKDİK MBDF süreçlerinizi yönetmek için kullanılan profesyonel dijital çalışma alanlarıdır. Şu özellikleri içerir:
+                </div>
+                <div class="features-grid">
+                  <div class="feature-item">📄 Doküman Paylaşımı</div>
+                  <div class="feature-item">🗳️ Oylama Sistemleri</div>
+                  <div class="feature-item">✍️ E-imza Desteği</div>
+                  <div class="feature-item">💬 Mesajlaşma</div>
+                  <div class="feature-item">📊 Raporlama</div>
+                  <div class="feature-item">🔔 Bildirimler</div>
+                </div>
+              </div>
+            </div>
+            
+            <div class="footer">
+              <p class="footer-text">Bu e-posta <span class="footer-brand">MBDF-IT Portal</span> tarafından otomatik olarak gönderilmiştir.</p>
+              <p class="footer-text">Herhangi bir sorunuz varsa lütfen sistem yöneticinizle iletişime geçin.</p>
+              <p class="footer-text" style="margin-top: 16px; font-size: 12px;">© 2024 MBDF-IT Portal. Tüm hakları saklıdır.</p>
+            </div>
           </div>
         </div>
       </body>
